@@ -1,55 +1,57 @@
-# Skill: Criador de Dashboards de Lancamento
+# Criador Dash — Launch Dashboard Builder Skill
 
-## Antes de tudo: o que isto E (e o que NAO E)
+An AI agent **skill** (a playbook) that teaches a coding agent such as Claude Code **how to build, maintain, and replicate marketing launch dashboards** on Cloudflare Pages + Workers, pulling data from Meta Ads, Hotmart, SendFlow, ManyChat, ActiveCampaign, and Google Sheets.
 
-**Isto NAO e um dashboard pronto pra instalar e usar.**
+This is the **generic, educational version**: it contains **no tokens, account IDs, or real client data**. Everything sensitive appears as a placeholder (`<...>` or in CAPS) for you to fill in with your own project's values.
 
-Isto e uma **skill** (um manual/playbook) que um agente de IA como o Claude Code le
-pra **saber COMO construir** um dashboard de lancamento do zero. E conhecimento, e a
-receita detalhada, nao o prato pronto.
+---
 
-| O que voce recebe aqui | O que voce NAO recebe aqui |
+## First, the most important thing: what this IS and what it is NOT
+
+**This is NOT a ready-to-install dashboard.**
+
+It is a **skill** — a detailed manual/playbook that an AI agent reads to **know HOW to build** a launch dashboard from scratch. It is knowledge and a recipe, not the finished product.
+
+| What you get here | What you do NOT get here |
 |---|---|
-| A metodologia completa de construcao (`SKILL.md`) | O codigo-fonte do dashboard (`dist/`, `functions/`) |
-| Arquitetura, fluxo de dados, regras de cada integracao | Uma conta Cloudflare configurada |
-| Checklist de deploy e de setup de cliente novo | Tokens/secrets das integracoes |
-| Bugs conhecidos e como resolver | Um site no ar automaticamente |
+| The full build methodology (`SKILL.md`) | The dashboard source code (`dist/`, `functions/`) |
+| Architecture, data flow, rules for each integration | A configured Cloudflare account |
+| A defined neutral design system (tokens) | API tokens / secrets for the integrations |
+| Deploy checklist and new-client setup checklist | A live website, automatically |
+| Known bugs and how to fix them | — |
 
-Pensa assim: este repo te entrega o **mapa e o manual de instrucoes**, nao o **carro montado**.
-Quem monta o carro seguindo o manual e voce (ou o agente, te guiando).
-
----
-
-## Como funciona na pratica (passo a passo)
-
-1. **Voce instala a skill** no seu Claude Code (veja abaixo).
-2. **Voce pede ao agente** algo como: *"cria um dashboard de lancamento pra esse cliente, tipo lancamento pago, integrando Meta Ads e Hotmart"*.
-3. **O agente le o `SKILL.md`** e passa a seguir essa metodologia: cria os arquivos, configura as Functions do Cloudflare, monta o funil, etc.
-4. **Voce fornece os dados reais** quando o agente pedir: conta Cloudflare, tokens das integracoes, IDs de produto/campanha. (A skill diz EXATAMENTE quais sao e onde colocar.)
-5. **O agente faz o deploy** seguindo o checklist da skill.
-
-> Resumindo: a skill nao "roda sozinha". Ela faz o agente saber o caminho. O trabalho
-> braçal (criar projeto, colar tokens, deploy) ainda acontece, mas guiado e sem voce
-> ter que descobrir tudo na tentativa e erro.
+Think of it this way: this repo hands you the **map and the instruction manual**, not the **assembled car**. You (or the agent, guiding you) assemble the car by following the manual.
 
 ---
 
-## O que voce precisa ter pra montar um dashboard de verdade
+## How it actually works (step by step)
 
-Mesmo com a skill, pra ter um dashboard no ar voce vai precisar de:
+1. **You install the skill** in your Claude Code (see below).
+2. **The agent onboards you first.** The very first time you trigger the skill, the agent will *not* immediately start building. It explains what the skill is, then runs a short checklist (Do you have a Cloudflare account? Is `wrangler` installed? Which integrations? Do you have the tokens? Which campaign type?).
+3. **You ask the agent** for something like: *"build a launch dashboard for this client, paid-launch type, integrating Meta Ads and Hotmart."*
+4. **The agent reads `SKILL.md`** and follows the methodology: creates the files, wires up the Cloudflare Functions, builds the funnel, applies the design system, etc.
+5. **You provide the real data** when the agent asks for it: Cloudflare account, integration tokens, product/campaign IDs. The skill tells the agent *exactly* which ones are needed and where they go.
+6. **The agent deploys** following the skill's checklist.
 
-- **Conta Cloudflare** (Pages + Workers + KV) — tem plano gratuito que ja serve
-- **`wrangler`** instalado (`npm i -g wrangler`)
-- **Tokens das integracoes que for usar**, por exemplo:
-  - Meta Marketing API (`META_ACCESS_TOKEN`)
+> In short: the skill does not "run by itself." It makes the agent know the path. The hands-on work (create the project, paste tokens, deploy) still happens, but guided, without you having to figure everything out by trial and error.
+
+---
+
+## What you need to actually ship a dashboard
+
+Even with the skill, to get a live dashboard you will need:
+
+- A **Cloudflare account** (Pages + Workers + KV) — the free plan is enough to start
+- **`wrangler`** installed (`npm i -g wrangler`)
+- **Tokens for whichever integrations you use**, for example:
+  - Meta Marketing API (`META_ACCESS_TOKEN`, `META_AD_ACCOUNT_ID`)
   - Hotmart (`HOTMART_BASIC_TOKEN`)
-  - SendFlow, ManyChat, ActiveCampaign, Google Sheets (conforme o caso)
-- **O codigo-fonte do dashboard** — este repo traz so a metodologia (`SKILL.md`).
-  O agente consegue gerar o codigo seguindo a skill, ou voce parte de um projeto base seu.
+  - SendFlow, ManyChat, ActiveCampaign, Google Sheets (as applicable)
+- **The dashboard source code** — this repo ships only the methodology (`SKILL.md`). The agent can generate the code by following the skill, or you can start from a base project of your own.
 
 ---
 
-## Como instalar a skill no Claude Code
+## Installing the skill in Claude Code
 
 ```bash
 git clone https://github.com/ojuliocouto/skill-criador-dash.git
@@ -57,35 +59,53 @@ mkdir -p ~/.claude/skills
 cp -r skill-criador-dash ~/.claude/skills/criador-dash
 ```
 
-Pronto. Na proxima vez que voce pedir um dashboard de lancamento, o Claude Code
-reconhece a skill e passa a seguir a metodologia dela.
+That's it. The next time you ask for a launch dashboard, Claude Code recognizes the skill and starts following its methodology (beginning with the onboarding).
 
-> Tambem da pra so **ler o `SKILL.md` como documentacao**, sem usar agente nenhum:
-> e um guia completo de como esses dashboards sao construidos.
+> You can also just **read `SKILL.md` as documentation**, with no agent at all — it's a complete guide to how these dashboards are built.
 
 ---
 
-## O que tem dentro da skill (`SKILL.md`)
+## What's inside the skill (`SKILL.md`)
 
-- Template de projeto (com placeholders pra voce preencher)
-- 3 tipos de campanha: lancamento pago, gratuito e downsell
-- Arquitetura de arquivos (`dist/` + `functions/`)
-- Fluxo de dados: fetch paralelo, processamento, render do funil
-- Padrao KV-first pro Hotmart (sync via cron, evita timeout do Worker)
-- Regras corretas de contagem do SendFlow (como espelhar a "Visao Geral")
-- Middleware de cache (KV, 5min TTL) com protecoes
-- Checklist de deploy e de setup pra cliente novo
-- Bugs conhecidos e suas solucoes
+- **Onboarding block** — what the agent walks the user through on first use
+- **Project template** — with placeholders to fill in
+- **3 campaign types** — paid launch, free launch, and downsell
+- **File architecture** — `dist/` (frontend) + `functions/` (Cloudflare Functions / API)
+- **Data flow** — parallel fetch, processing, funnel rendering
+- **Hotmart KV-first pattern** — hourly sync via cron to avoid Worker timeouts
+- **SendFlow counting rules** — how to mirror the "Overview" screen correctly
+- **Cache middleware** — KV-backed, 5 min TTL, with safeguards
+- **Design system** — a defined neutral dark token set (see below)
+- **Deploy checklist** and **new-client setup checklist**
+- **Known bugs** and their fixes
 
 ---
 
-## Seguranca
+## Design system (neutral, brandable)
 
-- Esta versao e **generica e sanitizada**: nao tem nenhum token, Account ID ou dado de
-  cliente real. Tudo que e sensivel aparece como placeholder (`<...>` ou em CAPS).
-- **Nunca** commite tokens ou IDs reais. Os secrets vao no painel do Cloudflare Pages
-  (Settings > Environment variables), nunca no codigo.
+Dashboards are **not** styled ad hoc. The skill ships a **neutral, professional dark design system** as CSS tokens (palette, semantic colors, fixed chart palette, typography, spacing, radius/shadow). It belongs to no specific brand.
 
-## Licenca
+To apply a brand, you change **one** variable — the accent color (`--accent`) — and optionally the font and logo. Everything else stays fixed to guarantee consistency and dark-mode legibility. There's an optional light-theme recipe too.
 
-Uso educacional. Adapte livremente pros seus projetos.
+---
+
+## Campaign types at a glance
+
+| Type | Funnel |
+|---|---|
+| **Paid launch** (`lancamento_pago`) | Clicks → Page → Popup (opt) → Ticket → AC Onboarding → Group → Survey (opt) |
+| **Free launch** (`lancamento_gratuito`) | Clicks → Signup → Onboarding → Group → Survey (opt) → Sales |
+| **Downsell** (`downsell`) | Same funnel as free launch, applied to downsell offers |
+
+---
+
+## Security
+
+- This version is **generic and sanitized**: it contains no tokens, account IDs, or real client data. Anything sensitive is a placeholder (`<...>` or CAPS).
+- **Never** commit real tokens or IDs. Secrets go in the Cloudflare Pages panel (Settings > Environment variables), never in the code.
+
+---
+
+## License
+
+Educational use. Adapt freely for your own projects.
