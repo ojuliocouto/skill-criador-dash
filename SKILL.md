@@ -186,6 +186,79 @@ loadAllData() → {start, end} = getActivePeriod()
 
 ---
 
+## DESIGN SYSTEM (NEUTRO — OBRIGATORIO)
+
+Os dashboards NAO devem ter visual improvisado/ad hoc. Use SEMPRE os tokens abaixo.
+Este e um design system **neutro e profissional** (dark): nao pertence a nenhuma marca
+especifica. Pra aplicar a marca do cliente/aluno, troque APENAS `--accent` (e opcionalmente
+a fonte). O resto fica como esta pra garantir consistencia.
+
+### Tokens (cole em `assets/css/main.css`)
+```css
+:root {
+  /* === COR DE DESTAQUE (UNICA coisa que se troca por marca) === */
+  --accent:        #4F8CFF;   /* azul neutro. Troque pela cor da marca */
+  --accent-soft:   #4F8CFF22; /* mesma cor com alpha pra fundos/realces */
+
+  /* === SUPERFICIES (dark) === */
+  --bg:            #0B0F14;   /* fundo da pagina */
+  --surface:       #141A22;   /* cards, paineis */
+  --surface-2:     #1B232D;   /* hover, linhas alternadas de tabela */
+  --border:        #243040;   /* bordas e divisores */
+
+  /* === TEXTO === */
+  --text:          #E6EDF3;   /* texto principal */
+  --text-muted:    #8B98A8;   /* labels, legendas */
+
+  /* === SEMANTICAS (status/metricas) === */
+  --positive:      #2FBF71;   /* alta, sucesso, vendas */
+  --negative:      #F0556C;   /* queda, erro, saidas */
+  --warning:       #F4B740;   /* atencao, atraso */
+
+  /* === PALETA DE GRAFICOS (ordem fixa) === */
+  --chart-1: #4F8CFF;
+  --chart-2: #2FBF71;
+  --chart-3: #F4B740;
+  --chart-4: #B07CFF;
+  --chart-5: #34D3C0;
+
+  /* === TIPOGRAFIA === */
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-display: 32px;  /* numero grande de metrica */
+  --fs-title:   20px;  /* titulo de secao */
+  --fs-body:    14px;  /* corpo */
+  --fs-label:   12px;  /* labels/legendas */
+
+  /* === ESPACAMENTO (base 4px) === */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;  --sp-4: 16px;  --sp-6: 24px;  --sp-8: 32px;
+
+  /* === RAIO E SOMBRA === */
+  --radius-card: 14px;
+  --radius-ctrl: 9px;
+  --shadow-card: 0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.35);
+}
+```
+
+### Regras de uso
+- **Numeros de metrica**: `--fs-display`, peso 700, `font-variant-numeric: tabular-nums` (alinha digitos).
+- **Cards**: fundo `--surface`, borda `1px solid --border`, raio `--radius-card`, sombra `--shadow-card`, padding `--sp-6`.
+- **Variacao positiva/negativa** (ex: +12%, -4%): usar `--positive` / `--negative`, nunca verde/vermelho aleatorio.
+- **Funil**: cada step com fundo `--surface-2`, barra de progresso em `--accent`; o % entre steps em `--text-muted`.
+- **Graficos**: usar a paleta `--chart-1..5` NA ORDEM. Nao sortear cores.
+- **Tabelas**: header `--text-muted` + `--fs-label` maiusculo; linhas zebradas com `--surface-2`; borda `--border`.
+- **Fonte Inter**: carregar via `<link>` Google Fonts ou self-host. Fallback ja esta no token.
+
+### Rebranding (o que o aluno faz)
+1. Trocar `--accent` e `--accent-soft` pela cor primaria da marca dele.
+2. (Opcional) Trocar `--font-ui` pela fonte da marca.
+3. (Opcional) Colocar o logo no header (`dist/assets/img/`).
+4. NAO mexer nas superficies/semanticas — sao calibradas pra contraste e legibilidade no dark.
+
+> Quer tema light tambem? Duplique o bloco `:root` num `[data-theme="light"]` invertendo
+> superficies (`--bg` claro, `--text` escuro) e mantendo accent/semanticas.
+
+---
+
 ## HOTMART — KV-FIRST (CRITICO)
 
 O `sales.js` NAO chama a API Hotmart diretamente por padrao. O fluxo e:
@@ -318,5 +391,5 @@ CLOUDFLARE_API_TOKEN="" wrangler pages deploy dist --project-name=<NOME_PROJETO>
 - Protecao MAX_PAGES em todos os endpoints paginados
 - Middleware com protecao contra cache vazio + no-store
 - Config UI (config.html) pra criar/editar campanhas
-- Tema dark com variaveis CSS customizaveis
+- Design system neutro definido (tokens de cor, tipografia, espacamento) — accent trocavel por marca
 - Date filter (periodo customizado vs periodo total)
