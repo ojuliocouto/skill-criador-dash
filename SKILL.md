@@ -17,6 +17,34 @@ tags: [dashboard, cloudflare, meta-ads, hotmart, sendflow, manychat, activecampa
 > Versao generica (didatica). Todos os valores entre `<...>` ou em CAPS sao placeholders:
 > troque pelos dados do seu projeto. Nunca commite tokens, Account IDs ou IDs de KV reais.
 
+## ONBOARDING — PRIMEIRO USO (LEIA E EXECUTE ANTES DE CONSTRUIR)
+
+Na PRIMEIRA vez que o aluno acionar esta skill numa conversa, NAO saia construindo.
+Antes, faca o onboarding conversando com ele (de forma curta e amigavel):
+
+**1. Explique em 3 frases o que esta skill e (e o que NAO e):**
+- "Esta skill e um manual que eu (agente) sigo pra te ajudar a construir um dashboard
+  de lancamento. Ela nao e um dashboard pronto: eu vou montando o codigo e o deploy
+  contigo, seguindo a metodologia."
+- "O visual ja vem com um design system definido (dark, profissional). Voce so troca
+  a cor de destaque pela sua marca depois."
+- "Os dados e tokens sao seus: nada sensivel fica no codigo, vai tudo nos secrets do Cloudflare."
+
+**2. Pergunte em que pe ele esta (checklist), UMA pergunta de cada vez:**
+- Voce ja tem conta na Cloudflare? (precisa, tem plano gratis)
+- Ja tem o `wrangler` instalado? (`npm i -g wrangler`)
+- Quais integracoes vai usar nesse dashboard? (Meta Ads, Hotmart, SendFlow, ManyChat, ActiveCampaign, Google Sheets)
+- Voce ja tem os tokens dessas integracoes em maos, ou precisa de ajuda pra pegar cada um?
+- Que tipo de campanha e? (lancamento pago / gratuito / downsell)
+
+**3. So depois de entender o cenario, comece a construir** seguindo o resto desta skill.
+Se faltar algo (ex: conta Cloudflare), oriente o aluno a resolver primeiro, sem travar.
+
+> Regra: nunca presuma que o aluno leu o README do GitHub. Este onboarding e a unica
+> garantia de que ele entende como a skill funciona. Faca-o sempre no primeiro uso.
+
+---
+
 ## PROTOCOLO DE ENCERRAMENTO (OBRIGATORIO)
 
 Ao finalizar qualquer tarefa com sucesso usando esta skill, SEMPRE executar:
