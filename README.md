@@ -26,6 +26,7 @@ The person chooses per dashboard:
 - Three ready domains out of the box: Marketing, Sales, and Support.
 - Marketing metrics: investment, impressions, clicks, leads, conversions, revenue, plus derived CTR, CPC, CPL, CPA, and ROAS. Conversion funnel (impressions to conversions) with step-to-step rates.
 - Sales metrics: number of deals, won deals, revenue (won only, with a fallback when there is no status column), average ticket, and win rate. Closing funnel plus ranking by seller and by product.
+- Support metrics: tickets handled, resolved, resolution rate, average response time, and CSAT. Resolution funnel plus ranking by channel.
 - Period trend badges on KPIs: each KPI compares the second half of the period to the first (equal-sized halves) and colors the change green or red by whether higher or lower is better.
 - Optional goal tracking: set a target for the domain primary metric in the wizard and the main KPI shows a progress bar and percent of goal (green once reached).
 - Optional per-dashboard password: protect a published dashboard with a password. Only the SHA-256 hash is stored (never the plain password); the config API returns data only with the correct hash.
@@ -145,6 +146,7 @@ starter-kit/
         hotmart.js              # second-wave stub
     lib/
       csv.mjs                   # parseCSV + detectDelimiter (pure, testable)
+      sheets-url.mjs            # sheetUrlToCsv (shared by connector and Worker)
       meta.mjs                  # buildInsightsUrl + mapInsightsToDataSet (pure)
       snapshots.mjs             # historical-mode SQL + rowToDataSet (pure)
   workers/
@@ -165,19 +167,21 @@ starter-kit/
           format.js             # Brazilian parse/format (currency, number, date)
           metrics.js            # computeMetric, computeAll, groupBy, timeSeries
           auth.js               # SHA-256 hash for optional password
+          theme.js              # light/dark toggle (injected into the topbar)
         templates/
           index.js
           marketing.js
           vendas.js
           suporte.js
         widgets/
+          index.js              # widget registry (type -> render/toHtml)
           _util.js
           kpi.js
           timeseries.js
           funnel.js
           table.js
           ranking.js
-  test/                       # 16 test files, all green (node --test test/*.test.js)
+  test/                       # 18 test files, all green (node --test test/*.test.js)
     csv.test.js
     format.test.js
     metrics.test.js

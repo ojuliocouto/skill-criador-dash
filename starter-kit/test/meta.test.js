@@ -53,6 +53,30 @@ test('buildInsightsUrl: sem since/until omite o time_range', () => {
   assert.equal(new URL(url).searchParams.has('time_range'), false);
 });
 
+test('buildInsightsUrl: aceita o alias account (nome gravado pelo wizard)', () => {
+  const url = buildInsightsUrl({ token: 'TK', account: '456' });
+  assert.ok(
+    url.startsWith('https://graph.facebook.com/v20.0/act_456/insights?'),
+    'deve montar act_456 a partir de account'
+  );
+});
+
+test('buildInsightsUrl: account também remove o prefixo act_ sem duplicar', () => {
+  const url = buildInsightsUrl({ token: 'TK', account: 'act_456' });
+  assert.ok(url.includes('/act_456/insights'), 'deve usar act_456 uma única vez');
+  assert.ok(!url.includes('act_act_'), 'não pode duplicar o prefixo act_');
+});
+
+test('buildInsightsUrl: accountId tem prioridade sobre account quando ambos vierem', () => {
+  const url = buildInsightsUrl({ token: 'TK', accountId: '111', account: '222' });
+  assert.ok(url.includes('/act_111/insights'), 'accountId deve prevalecer');
+  assert.ok(!url.includes('act_222'), 'account não deve ser usado quando accountId existe');
+});
+
+test('buildInsightsUrl: sem accountId nem account lança Error', () => {
+  assert.throws(() => buildInsightsUrl({ token: 'TK' }), /conta|account/i);
+});
+
 test('buildInsightsUrl: sem token lança Error', () => {
   assert.throws(() => buildInsightsUrl({ accountId: '1' }), /token/i);
 });

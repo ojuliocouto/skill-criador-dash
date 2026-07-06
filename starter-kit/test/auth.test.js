@@ -45,3 +45,28 @@ test('stripSecrets: dashboard sem senha marca protected false', () => {
   const out = stripSecrets({ name: 'Y', source: { type: 'csv', data: 'a' }, colMap: {} });
   assert.equal(out.protected, false);
 });
+
+test('stripSecrets: varre credencial em QUALQUER campo da fonte (nao so meta.token)', () => {
+  const cfg = {
+    name: 'X', domain: 'marketing',
+    source: {
+      type: 'custom',
+      token: 'raiz-secreta',
+      apiKey: 'ak-123',
+      crm: { token: 'crm-secreto', account: 'ok-manter' },
+      headers: { Authorization: 'Bearer zzz', 'X-Api-Key': 'kkk' },
+      url: 'https://ok-publico',
+    },
+    colMap: {},
+  };
+  const out = stripSecrets(cfg);
+  assert.equal(out.source.token, undefined);
+  assert.equal(out.source.apiKey, undefined);
+  assert.equal(out.source.crm.token, undefined);
+  assert.equal(out.source.crm.account, 'ok-manter');       // nao-segredo preservado
+  assert.equal(out.source.headers.Authorization, undefined);
+  assert.equal(out.source.headers['X-Api-Key'], undefined);
+  assert.equal(out.source.url, 'https://ok-publico');      // url nao e segredo
+  // nao muta o original
+  assert.equal(cfg.source.token, 'raiz-secreta');
+});

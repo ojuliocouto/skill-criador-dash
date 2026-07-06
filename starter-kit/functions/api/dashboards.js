@@ -25,21 +25,42 @@ export function needsAuth(config) {
   return !!(config && config.auth && config.auth.hash);
 }
 
+// Comparacao de strings em tempo constante (nao vaza onde diferem via timing).
+function safeEqual(a, b) {
+  const x = String(a == null ? '' : a);
+  const y = String(b == null ? '' : b);
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0;
+}
+
 /** Confere se o hash de senha fornecido bate com o guardado (ou se nao ha senha). */
 export function authOk(config, providedHash) {
   if (!needsAuth(config)) return true;
-  return typeof providedHash === 'string' && providedHash === config.auth.hash;
+  return typeof providedHash === 'string' && safeEqual(providedHash, config.auth.hash);
+}
+
+// Qualquer chave cujo nome soe a credencial e removida antes de ir pro browser.
+const SECRET_KEY = /token|secret|api[_-]?key|password|senha|authorization|bearer/i;
+function scrubSecrets(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  for (const k of Object.keys(obj)) {
+    if (SECRET_KEY.test(k)) { delete obj[k]; continue; }
+    if (obj[k] && typeof obj[k] === 'object') scrubSecrets(obj[k]);
+  }
 }
 
 /**
- * Remove segredos antes de devolver a config ao browser: hash da senha e token
- * de conectores (ex: Meta Ads). O token do Meta fica so no servidor.
+ * Remove segredos antes de devolver a config ao browser: hash da senha e QUALQUER
+ * credencial guardada na fonte (token, apiKey, authorization, senha...), inclusive
+ * em conectores sob medida (nao so o Meta). Varredura recursiva de `source`.
  */
 export function stripSecrets(config) {
   if (!config || typeof config !== 'object') return config;
   const clone = JSON.parse(JSON.stringify(config));
   if (clone.auth) delete clone.auth.hash;
-  if (clone.source && clone.source.meta && clone.source.meta.token) delete clone.source.meta.token;
+  if (clone.source) scrubSecrets(clone.source);
   clone.protected = needsAuth(config);
   return clone;
 }
@@ -103,7 +124,17 @@ async function listAll(kv) {
       try { return JSON.parse(raw); } catch { return null; }
     })
   );
-  const validas = configs.filter(Boolean).map(stripSecrets);
+  // A listagem e publica (a landing lista todos): devolve so campos seguros.
+  // NAO expoe `source` (link da planilha, conta do Meta) nem nada da fonte, senao
+  // vazaria a origem de um dashboard PROTEGIDO pra qualquer anonimo.
+  const validas = configs.filter(Boolean).map((c) => ({
+    id: c.id,
+    name: c.name,
+    domain: c.domain,
+    accent: c.accent,
+    createdAt: c.createdAt,
+    protected: needsAuth(c),
+  }));
   validas.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   return json(validas);
 }

@@ -7,14 +7,11 @@
 
 import { getDashboard, fetchDataForSource, fetchD1, setDashboardAuth } from './lib/api-client.js';
 import { getTemplate } from './templates/index.js';
-import { computeAll, groupBy, timeSeries } from './lib/metrics.js';
+import { computeAll } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
 import { sha256Hex } from './lib/auth.js';
 import { render as renderKpi } from './widgets/kpi.js';
-import { render as renderTimeseries } from './widgets/timeseries.js';
-import { render as renderFunnel } from './widgets/funnel.js';
-import { render as renderTable } from './widgets/table.js';
-import { render as renderRanking } from './widgets/ranking.js';
+import { registry } from './widgets/index.js';
 
 const DEFAULT_ACCENT = '#6d28d9';
 
@@ -202,66 +199,15 @@ function renderKpiBlock(items, template, computed, trends = {}, goal = null) {
   return `<div class="grid kpis">${cards}</div>`;
 }
 
-// Renderiza um widget "single" (nao-kpi) ja embrulhado num .card.
+// Renderiza um widget "single" (nao-kpi) ja embrulhado num .card, despachando
+// pelo registry de widgets em vez de um if-chain por tipo. Cada entrada faz a
+// preparacao de dados especifica e chama o render puro. Passamos os helpers de UI
+// (findMetricDef, cardWith) no ctx pra o registry nao precisar reimplementa-los.
 function renderSingle(item, ctx) {
-  const { template, dataset, colMap, computed } = ctx;
-  const props = (item && item.props) || {};
-  const widget = item && item.widget;
-
-  if (widget === 'timeseries') {
-    // Sem coluna de data mapeada, nao ha o que plotar: pula o widget.
-    if (!colMap[props.dateSlot]) return '';
-    const points = timeSeries(dataset.rows, colMap, props.dateSlot, props.valueSlot, 'sum');
-    const title = props.title || 'Evolução no tempo';
-    return cardWith(null, renderTimeseries({ title }, points), 'chart');
-  }
-
-  if (widget === 'ranking') {
-    // Sem a coluna da dimensao (ex canal, vendedor), pula em vez de mostrar vazio.
-    if (!colMap[props.dimensionSlot]) return '';
-    const items = groupBy(dataset.rows, colMap, props.dimensionSlot, props.valueSlot, 'sum');
-    if (!items.length) return '';
-    const title = props.title || `Ranking por ${props.dimensionSlot || ''}`.trim();
-    // formato herda da MetricDef que casa com o valueSlot, se houver; senao number.
-    const valDef = findMetricDef(template, props.valueSlot);
-    const format = props.format || (valDef && valDef.format) || 'number';
-    return cardWith(title, renderRanking({ title: '', format }, items));
-  }
-
-  if (widget === 'funnel') {
-    // Funil generico: props.steps = [{ label, metricKey }] ou [{ label, valueSlot }].
-    // Cada etapa vira { label, value }, puxando de computed (metricKey) ou
-    // somando o valueSlot via groupBy total. Sem dados o widget trata vazio.
-    const defs = Array.isArray(props.steps) ? props.steps : [];
-    const steps = defs.map((s) => {
-      let value = 0;
-      if (s.metricKey != null && computed[s.metricKey] != null) {
-        value = Number(computed[s.metricKey]) || 0;
-      } else if (s.valueSlot != null) {
-        const rows = groupBy(dataset.rows, colMap, s.valueSlot, s.valueSlot, 'sum');
-        value = rows.reduce((a, b) => a + (Number(b.value) || 0), 0);
-      }
-      return { label: s.label || s.metricKey || s.valueSlot || '', value };
-    });
-    // Apara etapas do TOPO com valor zero (ex: impressoes nao mapeada), pra o
-    // funil comecar na primeira etapa com dado, em vez de uma barra vazia.
-    while (steps.length && Number(steps[0].value) === 0) steps.shift();
-    // Se nenhuma etapa tem valor (colunas nao mapeadas), pula o funil.
-    if (!steps.some((s) => Number(s.value) > 0)) return '';
-    const title = props.title || 'Funil';
-    return cardWith(title, renderFunnel({ title: '' }, steps));
-  }
-
-  if (widget === 'table') {
-    const title = props.title || 'Dados';
-    return cardWith(
-      title,
-      renderTable({ title: '' }, { columns: dataset.columns, rows: dataset.rows }),
-    );
-  }
-
-  // Widget desconhecido: nao quebra a pagina.
-  return '';
+  const entry = item && registry[item.widget];
+  // Widget desconhecido (ou sem toHtml): nao quebra a pagina.
+  if (!entry || typeof entry.toHtml !== 'function') return '';
+  return entry.toHtml(item, { ...ctx, findMetricDef, card: cardWith });
 }
 
 // Monta o cabecalho (nome + acoes) e a area de widgets.

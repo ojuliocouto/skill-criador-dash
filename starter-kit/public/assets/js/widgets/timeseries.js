@@ -55,7 +55,11 @@ export function render(props = {}, points) {
   }
 
   // aria-label descritivo para leitores de tela (o SVG e role=img).
-  const label = title ? `Grafico de linha: ${title}` : 'Grafico de linha';
+  // Inclui o titulo e o numero de pontos pra dar contexto sem depender do visual.
+  const pointsLabel = n === 1 ? '1 ponto' : `${n} pontos`;
+  const label = title
+    ? `Grafico de linha: ${title}, ${pointsLabel}`
+    : `Grafico de linha, ${pointsLabel}`;
   // preserveAspectRatio="none" distorcia os circles (viravam ovais) ao esticar o viewBox.
   // Usamos vector-effect="non-scaling-size" nos pontos abaixo pra manter os circulos redondos.
   return (

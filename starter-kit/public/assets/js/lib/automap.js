@@ -25,29 +25,43 @@ export function normalizeHeader(s) {
  * @param {string[]} columns
  * @returns {{ [slotKey:string]: string|null }}
  */
+// Tamanho minimo para considerar match por SUBSTRING (evita casos como a coluna
+// "da" casar o alias "data", ou um cabecalho vazio casar qualquer slot).
+const MIN_SUBSTR = 3;
+
 export function autoMap(slots, columns) {
-  const cols = (columns || []).map((c) => ({ original: c, norm: normalizeHeader(c) }));
+  // Descarta colunas com header vazio: nunca devem casar (planilha Google costuma
+  // exportar uma coluna vazia no fim, e o bug antigo fazia ela casar o 1o slot).
+  const cols = (columns || [])
+    .map((c) => ({ original: c, norm: normalizeHeader(c) }))
+    .filter((c) => c.norm !== '');
   const usados = new Set();
   const result = {};
+  for (const slot of slots || []) result[slot.key] = null;
 
+  const aliasesDe = (slot) => (slot.aliases || []).map((a) => normalizeHeader(a)).filter(Boolean);
+
+  // Passada 1: match EXATO (tem prioridade sobre substring, evita roubar coluna
+  // que outro slot casa exatamente).
   for (const slot of slots || []) {
-    const aliases = (slot.aliases || []).map((a) => normalizeHeader(a));
-    let escolhida = null;
-
-    for (const alias of aliases) {
-      if (!alias) continue;
-      const hit = cols.find((c) => {
-        if (usados.has(c.original)) return false;
-        return c.norm === alias || c.norm.includes(alias) || alias.includes(c.norm);
-      });
-      if (hit) {
-        escolhida = hit.original;
-        break;
-      }
+    for (const alias of aliasesDe(slot)) {
+      const hit = cols.find((c) => !usados.has(c.original) && c.norm === alias);
+      if (hit) { result[slot.key] = hit.original; usados.add(hit.original); break; }
     }
+  }
 
-    if (escolhida) usados.add(escolhida);
-    result[slot.key] = escolhida;
+  // Passada 2: match por SUBSTRING (bidirecional), so para slots ainda sem coluna,
+  // e so quando os dois lados tem tamanho suficiente pra evitar match espurio.
+  for (const slot of slots || []) {
+    if (result[slot.key]) continue;
+    for (const alias of aliasesDe(slot)) {
+      if (alias.length < MIN_SUBSTR) continue;
+      const hit = cols.find((c) => {
+        if (usados.has(c.original) || c.norm.length < MIN_SUBSTR) return false;
+        return c.norm.includes(alias) || alias.includes(c.norm);
+      });
+      if (hit) { result[slot.key] = hit.original; usados.add(hit.original); break; }
+    }
   }
 
   return result;

@@ -12,11 +12,12 @@
 // Sem libs externas.
 import { parseCSV } from '../../../functions/lib/csv.mjs';
 import { sheetUrlToCsv } from '../../../functions/lib/sheets-url.mjs';
+import { buildInsightsUrl, mapInsightsToDataSet } from '../../../functions/lib/meta.mjs';
 
 // Reexporta a lógica pura compartilhada para que o teste de paridade
 // (test/worker-parity.test.js) possa importar daqui e conferir que é a MESMA
 // função usada pelos conectores de Pages, sem cópia inline no Worker.
-export { parseCSV, sheetUrlToCsv };
+export { parseCSV, sheetUrlToCsv, buildInsightsUrl, mapInsightsToDataSet };
 
 const TABLE = 'snapshots';
 
@@ -110,63 +111,34 @@ async function fetchSheetsDataSet(source) {
 
 /**
  * Fonte Meta Ads: monta a chamada de insights da Graph API e mapeia a resposta.
- * Espera source.meta = { token, accountId, since?, until? }.
+ * Espera source.meta = { token, accountId|account, since?, until?, level? }.
+ * O Worker só faz o fetch: a montagem da URL e o mapeamento vêm das funções
+ * puras compartilhadas de functions/lib/meta.mjs (mesmo padrão do CSV/Sheets),
+ * então não há cópia inline da lógica do Meta aqui.
  * @param {{ meta: Object }} source
  * @returns {Promise<Object>} DataSet
  */
 async function fetchMetaDataSet(source) {
   const meta = (source && source.meta) || {};
-  const token = meta.token;
-  // O wizard grava a conta como `account`; aceitamos os dois nomes.
-  const accountId = meta.accountId || meta.account;
-  if (!token) throw new Error('Meta Ads: access token ausente na config.');
-  if (!accountId) throw new Error('Meta Ads: ad account id ausente na config.');
 
-  const digits = String(accountId).replace(/^act_/, '');
-  const params = new URLSearchParams();
-  params.set('access_token', token);
-  params.set('level', meta.level || 'campaign');
-  params.set('time_increment', '1');
-  params.set('fields', 'campaign_name,spend,impressions,clicks,actions,date_start');
-  if (meta.since && meta.until) {
-    params.set('time_range', JSON.stringify({ since: meta.since, until: meta.until }));
-  }
-  const url = `https://graph.facebook.com/v20.0/act_${digits}/insights?${params.toString()}`;
+  // buildInsightsUrl aceita accountId e o alias account (nome que o wizard grava),
+  // e valida token/conta ausentes lançando Error.
+  const url = buildInsightsUrl({
+    token: meta.token,
+    accountId: meta.accountId,
+    account: meta.account,
+    since: meta.since,
+    until: meta.until,
+    level: meta.level,
+  });
 
   const resp = await fetch(url, { redirect: 'follow' });
   const apiJson = await resp.json();
-  if (apiJson && apiJson.error && apiJson.error.message) {
-    throw new Error(apiJson.error.message);
-  }
 
-  const PURCHASE_ACTION_TYPES = ['purchase', 'offsite_conversion.fb_pixel_purchase', 'omni_purchase'];
-  const data = Array.isArray(apiJson.data) ? apiJson.data : [];
-  const rows = data.map((item) => {
-    const actions = Array.isArray(item.actions) ? item.actions : [];
-    const leadAction = actions.find((a) => a && a.action_type === 'lead');
-    const leads = leadAction ? String(leadAction.value) : '0';
-    let conversoesSum = 0;
-    let temConversao = false;
-    for (const a of actions) {
-      if (a && PURCHASE_ACTION_TYPES.includes(a.action_type)) {
-        conversoesSum += Number(a.value) || 0;
-        temConversao = true;
-      }
-    }
-    return {
-      Data: item.date_start != null ? String(item.date_start) : '',
-      Campanha: item.campaign_name != null ? String(item.campaign_name) : '',
-      Investimento: item.spend != null ? String(item.spend) : '',
-      'Impressões': item.impressions != null ? String(item.impressions) : '',
-      Cliques: item.clicks != null ? String(item.clicks) : '',
-      Leads: leads,
-      'Conversões': temConversao ? String(conversoesSum) : '0',
-    };
-  });
+  // mapInsightsToDataSet já trata { error: { message } } lançando Error.
+  const dataset = mapInsightsToDataSet(apiJson);
 
-  return {
-    columns: ['Data', 'Campanha', 'Investimento', 'Impressões', 'Cliques', 'Leads', 'Conversões'],
-    rows,
-    meta: { source: 'meta', fetchedAt: new Date().toISOString(), rowCount: rows.length },
-  };
+  // A função pura deixa fetchedAt null (não usa Date); o Worker carimba a data.
+  dataset.meta.fetchedAt = new Date().toISOString();
+  return dataset;
 }

@@ -48,7 +48,7 @@ Explique em uma frase cada palavra tecnica antes de mandar comando (a pessoa pod
 Checklist (um item por vez; se faltar algo, resolva antes de seguir):
 - [ ] Tem conta no Cloudflare? (o plano gratis ja cobre Pages + Functions + KV; D1 tambem tem free tier). Se nao tiver, peca pra criar em dash.cloudflare.com.
 - [ ] Tem Node instalado? (`node -v`). Sem Node nao roda `wrangler` nem os testes.
-- [ ] Instale o wrangler: `npm i -g wrangler`. No Mac, se der erro de permissao (EACCES), rode `sudo npm i -g wrangler`. Confirme com `wrangler --version`; se der "command not found", o bin global do npm nao esta no PATH (`npm bin -g` mostra a pasta; adicione ao PATH).
+- [ ] Instale o wrangler: `npm i -g wrangler`. No Mac, se der erro de permissao (EACCES), rode `sudo npm i -g wrangler`. Confirme com `wrangler --version`; se der "command not found", o bin global do npm nao esta no PATH (`npm prefix -g` mostra a pasta; adicione ao PATH).
 - [ ] Faca login: `wrangler login` (abre o browser; a pessoa escolhe a conta Cloudflare dela e autoriza).
 - [ ] Confirme a conta certa: `wrangler whoami` (mostra o email e o Account ID logado). Se for a conta errada, `wrangler logout` e login de novo.
 - [ ] Tem Claude Code? (e por ele que eu conduzo a construcao).
@@ -261,6 +261,23 @@ Siga os Contratos 1 e 2 do `ARCHITECTURE.md`. Todo conector devolve exatamente u
 3. Credencial (token) nunca vai pro browser: guarde na config e resolva no servidor por id (veja `meta-ads.js`).
 4. Erro da fonte: lance `Error` com mensagem amigavel em PT-BR.
 5. Escreva o teste da logica pura antes (TDD).
+
+## ADICIONAR UM NOVO WIDGET
+
+Os widgets vivem em `public/assets/js/widgets/` e sao registrados num registry
+(`widgets/index.js`), igual aos templates. Kpi/timeseries/funnel/table/ranking ja vem
+prontos. Para um novo (ex: gauge), TDD: teste antes.
+1. `public/assets/js/widgets/<nome>.js` exportando `render(props, data)` puro (sem DOM),
+   que devolve string HTML e trata o caso vazio ("Sem dados"). Use os widgets atuais como molde.
+2. Registre em `widgets/index.js`: adicione uma entrada `<nome>: { render, toHtml(item, ctx) }`.
+   O `toHtml` faz a preparacao de dados especifica (le `dataset`/`colMap`/`computed`,
+   agrupa/soma o que precisar), aplica os guards (pula quando falta coluna ou nao ha dado,
+   devolvendo `''`) e chama `render`, embrulhando com `ctx.card(title, html, extraClass)`.
+   O `ctx` traz `{ template, dataset, colMap, computed, findMetricDef, card }`.
+3. Use no `layout` de um template (ex: `{ widget: '<nome>', props: { ... } }`). O `dashboard.js`
+   despacha sozinho via `registry[item.widget].toHtml(item, ctx)`, sem tocar em if-chain.
+4. Escreva o teste do render puro em `test/widgets.test.js` (saida HTML + caso vazio). Nao mexe
+   em dominios nem conectores.
 
 ## PROTOCOLO DE ENCERRAMENTO
 

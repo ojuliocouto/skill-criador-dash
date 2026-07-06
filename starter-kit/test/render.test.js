@@ -1,6 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planLayout } from '../public/assets/js/dashboard.js';
+import { registry, getWidget } from '../public/assets/js/widgets/index.js';
+
+// ---------- registry de widgets ----------
+test('registry: tem as chaves esperadas e cada entrada expoe toHtml funcao', () => {
+  const esperadas = ['kpi', 'timeseries', 'funnel', 'table', 'ranking'];
+  for (const key of esperadas) {
+    assert.ok(registry[key], `registry tem a chave ${key}`);
+    assert.equal(typeof registry[key].toHtml, 'function', `${key}.toHtml e funcao`);
+    assert.equal(typeof registry[key].render, 'function', `${key}.render e funcao`);
+  }
+  assert.equal(typeof getWidget('table').toHtml, 'function', 'getWidget resolve a entrada');
+  assert.equal(getWidget('inexistente'), undefined, 'getWidget de tipo desconhecido e undefined');
+});
 
 // ---------- planLayout ----------
 test('planLayout: 6 kpis seguidos viram 1 bloco kpis', () => {

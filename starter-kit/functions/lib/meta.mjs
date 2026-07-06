@@ -28,22 +28,25 @@ const PURCHASE_ACTION_TYPES = [
  * Monta a URL da Graph API v20.0 para buscar insights de anúncios.
  * @param {Object} params
  * @param {string} params.token       access token do usuário
- * @param {string} params.accountId   id da conta de anúncios (com ou sem prefixo act_)
+ * @param {string} [params.accountId] id da conta de anúncios (com ou sem prefixo act_)
+ * @param {string} [params.account]   alias de accountId (nome que o wizard grava em source.meta.account)
  * @param {string} [params.since]     data inicial no formato YYYY-MM-DD
  * @param {string} [params.until]     data final no formato YYYY-MM-DD
  * @param {string} [params.level]     nível de agregação (padrão 'campaign')
  * @returns {string} URL completa pronta para o fetch
  */
-export function buildInsightsUrl({ token, accountId, since, until, level = 'campaign' } = {}) {
+export function buildInsightsUrl({ token, accountId, account, since, until, level = 'campaign' } = {}) {
   if (!token) {
     throw new Error('Meta Ads: informe o access token para buscar os insights.');
   }
-  if (!accountId) {
+  // Aceita tanto accountId quanto o alias account (o wizard grava source.meta.account).
+  const acc = accountId || account;
+  if (!acc) {
     throw new Error('Meta Ads: informe o id da conta de anúncios (ad account id).');
   }
 
   // Remove o prefixo act_ se vier junto, para não duplicar ao remontar.
-  const digits = String(accountId).replace(/^act_/, '');
+  const digits = String(acc).replace(/^act_/, '');
   const base = `https://graph.facebook.com/v20.0/act_${digits}/insights`;
 
   const params = new URLSearchParams();

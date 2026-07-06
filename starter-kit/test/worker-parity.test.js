@@ -9,9 +9,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { parseCSV as workerParseCSV, sheetUrlToCsv as workerSheetUrlToCsv } from '../workers/snapshot/src/index.js';
+import {
+  parseCSV as workerParseCSV,
+  sheetUrlToCsv as workerSheetUrlToCsv,
+  buildInsightsUrl as workerBuildInsightsUrl,
+  mapInsightsToDataSet as workerMapInsightsToDataSet,
+} from '../workers/snapshot/src/index.js';
 import { parseCSV as libParseCSV } from '../functions/lib/csv.mjs';
 import { sheetUrlToCsv as libSheetUrlToCsv } from '../functions/lib/sheets-url.mjs';
+import {
+  buildInsightsUrl as libBuildInsightsUrl,
+  mapInsightsToDataSet as libMapInsightsToDataSet,
+} from '../functions/lib/meta.mjs';
 import { sheetUrlToCsv as connectorSheetUrlToCsv } from '../functions/api/connectors/sheets.js';
 
 test('paridade: worker usa a MESMA função parseCSV do lib (identidade)', () => {
@@ -58,6 +67,41 @@ test('paridade: parseCSV produz o mesmo resultado (vírgula e ponto-e-vírgula)'
     assert.deepStrictEqual(
       workerParseCSV(input),
       libParseCSV(input),
+    );
+  }
+});
+
+test('paridade: worker usa as MESMAS funções de meta.mjs (identidade)', () => {
+  assert.strictEqual(workerBuildInsightsUrl, libBuildInsightsUrl);
+  assert.strictEqual(workerMapInsightsToDataSet, libMapInsightsToDataSet);
+});
+
+test('paridade: mapInsightsToDataSet produz o mesmo DataSet no worker e no lib', () => {
+  const apiJsons = [
+    {
+      data: [
+        {
+          campaign_name: 'Campanha A',
+          spend: '150.50',
+          impressions: '10000',
+          clicks: '250',
+          date_start: '2026-01-01',
+          actions: [
+            { action_type: 'lead', value: '12' },
+            { action_type: 'purchase', value: '5' },
+            { action_type: 'omni_purchase', value: '3' },
+          ],
+        },
+        { campaign_name: 'Campanha B', spend: '80', impressions: '4000', clicks: '90', date_start: '2026-01-02' },
+      ],
+    },
+    {},
+    { data: [] },
+  ];
+  for (const apiJson of apiJsons) {
+    assert.deepStrictEqual(
+      workerMapInsightsToDataSet(apiJson),
+      libMapInsightsToDataSet(apiJson),
     );
   }
 });

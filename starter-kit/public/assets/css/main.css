@@ -12,7 +12,8 @@
   --border: #262b33;
   --text: #e9ecf1;
   --text-dim: #99a1ae;
-  --text-faint: #646b78;
+  /* Clareado de #646b78 (reprovava AA, ~3.4:1) pra 5.82:1 sobre --bg-elev e 6.26:1 sobre --bg. */
+  --text-faint: #8b93a4;
   --good: #34d399;
   --bad: #f87171;
   /* Cor de destaque so para TEXTO (links, badges): clareada no escuro pra passar no contraste WCAG AA.
@@ -34,7 +35,8 @@
   --border: #e2e5ea;
   --text: #191c22;
   --text-dim: #586173;
-  --text-faint: #8b93a1;
+  /* Escurecido de #8b93a1 (reprovava AA, ~2.9:1) pra 6.13:1 sobre --bg-elev e 5.67:1 sobre --bg. */
+  --text-faint: #5b6270;
   --topbar-bg: rgba(255, 255, 255, 0.8);
   --shadow: 0 1px 3px rgba(23, 31, 48, 0.08);
   /* Tons escurecidos de good/bad so no claro: os originais (verde/vermelho claros)

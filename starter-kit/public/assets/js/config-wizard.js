@@ -131,8 +131,10 @@ function renderDomain(body) {
   for (const id of Object.keys(templates)) {
     const tpl = templates[id];
     const cls = ['choice', 'card'];
-    if (state.domain === id) cls.push('selected');
-    const card = el('div', { class: cls.join(' '), role: 'button', tabindex: '0' }, [
+    const isSelected = state.domain === id;
+    if (isSelected) cls.push('selected');
+    // aria-pressed reflete a selecao pra leitor de tela saber qual dominio esta escolhido.
+    const card = el('div', { class: cls.join(' '), role: 'button', tabindex: '0', 'aria-pressed': isSelected ? 'true' : 'false' }, [
       el('h3', { text: tpl.label }),
       el('p', { text: DOMAIN_DESC[id] || '' }),
     ]);
