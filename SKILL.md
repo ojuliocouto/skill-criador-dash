@@ -77,10 +77,12 @@ Fonte de dados -> Conector -> DataSet (schema comum) -> Template -> Widgets -> R
 - CONECTORES DE 2a ONDA (stubs documentados, ainda nao prontos): Meta Ads, CRM, Hotmart.
 
 Dominios prontos e suas metricas:
-- MARKETING: investimento, impressoes, cliques, leads, conversoes, receita (base); CTR (cliques/impressoes), CPC (invest/cliques), CPL (invest/leads), CPA (invest/conversoes) e ROAS (receita/investimento) (derivadas). Layout: KPIs + serie temporal de investimento + ranking por canal + tabela.
-- VENDAS: faturamento (soma do valor), numero de vendas (contagem), ticket medio (media do valor); ranking por vendedor e por produto; evolucao no tempo. Layout: KPIs + serie temporal + 2 rankings + tabela.
+- MARKETING: investimento, impressoes, cliques, leads, conversoes, receita (base); CTR (cliques/impressoes), CPC (invest/cliques), CPL (invest/leads), CPA (invest/conversoes) e ROAS (receita/investimento) (derivadas). Layout: KPIs + funil de conversao (impressoes -> cliques -> leads -> conversoes com % entre etapas) + serie temporal de investimento + ranking por canal + tabela.
+- VENDAS: numero de negocios (contagem), vendas ganhas, faturamento (soma do valor SO das ganhas), ticket medio (faturamento por venda ganha) e taxa de conversao (ganhas / negocios). "Ganha" e detectada pelo status (ganh/won/fechad/pago/aprovad); sem coluna de status, todas contam como venda (fallback). Layout: KPIs + funil de fechamento (negocios -> ganhas) + serie temporal + ranking por vendedor e por produto + tabela.
 
-Widgets: KPI, serie temporal (SVG puro), funil, tabela, ranking. Sem dependencias externas.
+Widgets: KPI (com badge de tendencia opcional), serie temporal (SVG puro), funil, tabela, ranking. Sem dependencias externas.
+
+Tendencia (comparativo de periodo): cada KPI cuja metrica tenha `betterWhen` (`higher`/`lower`) mostra um badge colorido comparando a 2a metade do periodo com a 1a (metades com o mesmo numero de datas). Verde quando melhora, vermelho quando piora (ex: CPL caindo aparece verde). Metricas de soma so sao comparadas entre metades de mesmo tamanho, para nao inflar o numero.
 
 ## COMO USAR O STARTER KIT
 

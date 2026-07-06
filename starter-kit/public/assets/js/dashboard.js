@@ -159,13 +159,18 @@ function renderSingle(item, ctx) {
   const widget = item && item.widget;
 
   if (widget === 'timeseries') {
+    // Sem coluna de data mapeada, nao ha o que plotar: pula o widget.
+    if (!colMap[props.dateSlot]) return '';
     const points = timeSeries(dataset.rows, colMap, props.dateSlot, props.valueSlot, 'sum');
     const title = props.title || 'Evolução no tempo';
     return cardWith(null, renderTimeseries({ title }, points), 'chart');
   }
 
   if (widget === 'ranking') {
+    // Sem a coluna da dimensao (ex canal, vendedor), pula em vez de mostrar vazio.
+    if (!colMap[props.dimensionSlot]) return '';
     const items = groupBy(dataset.rows, colMap, props.dimensionSlot, props.valueSlot, 'sum');
+    if (!items.length) return '';
     const title = props.title || `Ranking por ${props.dimensionSlot || ''}`.trim();
     // formato herda da MetricDef que casa com o valueSlot, se houver; senao number.
     const valDef = findMetricDef(template, props.valueSlot);
@@ -188,6 +193,8 @@ function renderSingle(item, ctx) {
       }
       return { label: s.label || s.metricKey || s.valueSlot || '', value };
     });
+    // Se nenhuma etapa tem valor (colunas nao mapeadas), pula o funil.
+    if (!steps.some((s) => Number(s.value) > 0)) return '';
     const title = props.title || 'Funil';
     return cardWith(title, renderFunnel({ title: '' }, steps));
   }
