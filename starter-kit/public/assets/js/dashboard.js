@@ -193,6 +193,9 @@ function renderSingle(item, ctx) {
       }
       return { label: s.label || s.metricKey || s.valueSlot || '', value };
     });
+    // Apara etapas do TOPO com valor zero (ex: impressoes nao mapeada), pra o
+    // funil comecar na primeira etapa com dado, em vez de uma barra vazia.
+    while (steps.length && Number(steps[0].value) === 0) steps.shift();
     // Se nenhuma etapa tem valor (colunas nao mapeadas), pula o funil.
     if (!steps.some((s) => Number(s.value) > 0)) return '';
     const title = props.title || 'Funil';
