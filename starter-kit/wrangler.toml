@@ -1,4 +1,4 @@
-# Starter kit criador-dash v2. Troque os placeholders pelos seus IDs no painel Cloudflare.
+# Starter kit criador-dash. Troque os placeholders pelos seus IDs (ou configure no painel Cloudflare).
 name = "meu-dashboard"
 pages_build_output_dir = "public"
 compatibility_date = "2026-01-01"
@@ -14,3 +14,11 @@ id = "<SEU_KV_NAMESPACE_ID>"
 [[kv_namespaces]]
 binding = "DASHBOARD_CACHE"
 id = "<SEU_KV_CACHE_ID>"
+
+# MODO HISTORICO (opcional): descomente e cole o id do D1 (wrangler d1 create dashboard-db).
+# Precisa deste binding pro conector d1.js ler o snapshot mais recente. Se preferir,
+# vincule pelo painel: Pages > seu projeto > Settings > Bindings > add D1 (DASHBOARD_DB).
+# [[d1_databases]]
+# binding = "DASHBOARD_DB"
+# database_name = "dashboard-db"
+# database_id = "<SEU_D1_ID>"

@@ -48,7 +48,7 @@ Explique em uma frase cada palavra tecnica antes de mandar comando (a pessoa pod
 Checklist (um item por vez; se faltar algo, resolva antes de seguir):
 - [ ] Tem conta no Cloudflare? (o plano gratis ja cobre Pages + Functions + KV; D1 tambem tem free tier). Se nao tiver, peca pra criar em dash.cloudflare.com.
 - [ ] Tem Node instalado? (`node -v`). Sem Node nao roda `wrangler` nem os testes.
-- [ ] Instale o wrangler: `npm i -g wrangler`. No Mac, se der erro de permissao (EACCES), rode `sudo npm i -g wrangler`.
+- [ ] Instale o wrangler: `npm i -g wrangler`. No Mac, se der erro de permissao (EACCES), rode `sudo npm i -g wrangler`. Confirme com `wrangler --version`; se der "command not found", o bin global do npm nao esta no PATH (`npm bin -g` mostra a pasta; adicione ao PATH).
 - [ ] Faca login: `wrangler login` (abre o browser; a pessoa escolhe a conta Cloudflare dela e autoriza).
 - [ ] Confirme a conta certa: `wrangler whoami` (mostra o email e o Account ID logado). Se for a conta errada, `wrangler logout` e login de novo.
 - [ ] Tem Claude Code? (e por ele que eu conduzo a construcao).
@@ -127,6 +127,12 @@ Recursos dos KPIs:
 Protecao por senha (opcional): senha por dashboard; guarda-se so o hash SHA-256. O dashboard pede a
 senha; a API so devolve a config com o hash correto no header `x-dash-auth`. Segredos (hash, token do
 Meta) sao removidos das respostas da API.
+
+Tema claro/escuro: botao na topbar (`lib/theme.js`), injetado em todas as paginas; persiste no
+localStorage e respeita a preferencia do sistema no primeiro acesso. A estetica e de ferramenta de
+analytics (superficie chapada, borda de 1px, numeros tabulares, sem gradiente decorativo), pra NAO
+ter cara de template de IA. A cor de destaque da marca funciona nos dois temas (o `--accent-soft`
+deriva dela via color-mix, entao nao fica um roxo generico fixo).
 
 Arvore de arquivos (`starter-kit/`, sem node_modules):
 ```

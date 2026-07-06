@@ -1,32 +1,53 @@
-/* Design system do criador-dash v2. Tema escuro, cor de destaque trocável por marca. */
+/* Design system do criador-dash. Tema escuro e claro; cor de destaque trocavel por marca.
+   Estetica de ferramenta de analytics (nao de landing): superficie chapada, borda de 1px,
+   sombra minima, numeros tabulares, sem gradiente decorativo. */
 :root {
   --accent: #6d28d9;              /* cor de destaque (branding). Trocada por dashboard. */
-  --accent-soft: rgba(109, 40, 217, 0.14);
-  --bg: #0b0d12;
-  --bg-elev: #141821;
-  --bg-elev-2: #1b202b;
-  --border: #262c38;
-  --text: #e8ebf2;
-  --text-dim: #99a1b3;
-  --text-faint: #626a7d;
+  /* accent-soft segue a cor de destaque automaticamente (nao fica um roxo fixo generico) */
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 40%, transparent);
+  --bg: #0c0e12;
+  --bg-elev: #14171d;
+  --bg-elev-2: #1b1f27;
+  --border: #262b33;
+  --text: #e9ecf1;
+  --text-dim: #99a1ae;
+  --text-faint: #646b78;
   --good: #34d399;
   --bad: #f87171;
-  --radius: 14px;
-  --radius-sm: 9px;
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --topbar-bg: rgba(12, 14, 18, 0.72);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: dark;
+}
+
+/* Tema claro: superficie clara de ferramenta, nao branco estourado. */
+[data-theme="light"] {
+  --bg: #f5f6f8;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #eef0f3;
+  --border: #e2e5ea;
+  --text: #191c22;
+  --text-dim: #586173;
+  --text-faint: #8b93a1;
+  --topbar-bg: rgba(255, 255, 255, 0.8);
+  --shadow: 0 1px 3px rgba(23, 31, 48, 0.08);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  background: radial-gradient(1200px 600px at 80% -10%, var(--accent-soft), transparent 60%), var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font);
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -36,12 +57,12 @@ a:hover { text-decoration: underline; }
 /* Header */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--border);
-  background: rgba(11, 13, 18, 0.7); backdrop-filter: blur(8px);
+  gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--border);
+  background: var(--topbar-bg); backdrop-filter: blur(10px);
   position: sticky; top: 0; z-index: 10;
 }
-.topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -0.01em; }
-.topbar .brand .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+.topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -0.01em; }
+.topbar .brand .dot { width: 9px; height: 9px; border-radius: 2px; background: var(--accent); }
 .topbar .brand small { color: var(--text-dim); font-weight: 500; }
 .topbar .actions { display: flex; gap: 8px; flex-shrink: 0; }
 @media (max-width: 620px) {
@@ -72,7 +93,8 @@ h2 { font-size: 18px; letter-spacing: -0.01em; margin: 0 0 14px; }
 .kpi { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; position: relative; overflow: hidden; }
 .kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: 0.85; }
 .kpi .kpi-label, .kpi__label { color: var(--text-dim); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
-.kpi .kpi-value, .kpi__value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+.kpi .kpi-value, .kpi__value { font-size: 26px; font-weight: 680; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
+.kpi__value, .funnel__value, .ranking__value, .funnel__conv, td { font-variant-numeric: tabular-nums; }
 .kpi .kpi-hint, .kpi__hint { color: var(--text-faint); font-size: 12px; margin-top: 6px; }
 .kpi__trend { font-size: 12.5px; font-weight: 600; margin-top: 8px; }
 .kpi__trend.is-good { color: var(--good); }
@@ -171,3 +193,13 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 .badge { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
 .error { color: var(--bad); font-size: 13.5px; margin-top: 8px; }
 .hint { color: var(--text-faint); font-size: 12.5px; }
+
+/* Botao de tema claro/escuro (injetado pelo theme.js na topbar) */
+.theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; padding: 0; flex-shrink: 0;
+  border: 1px solid var(--border); background: transparent; color: var(--text-dim);
+  border-radius: 10px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--text-faint); }
+.theme-toggle svg { width: 18px; height: 18px; display: block; }

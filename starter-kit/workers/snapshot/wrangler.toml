@@ -4,8 +4,8 @@
 #
 # Deploy:
 #   cd workers/snapshot && wrangler deploy
-# Antes, aplique o schema no D1:
-#   wrangler d1 execute <NOME_DO_DB> --file=../../db/schema.sql
+# Antes, aplique o schema no D1 REMOTO (sem --remote ele aplica so no local e o Worker em producao nao ve a tabela):
+#   wrangler d1 execute dashboard-db --remote --file=../../db/schema.sql
 
 name = "dashboard-snapshot"
 main = "src/index.js"

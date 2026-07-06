@@ -1,8 +1,11 @@
-# Starter Kit: Contratos de Arquitetura (criador-dash v2)
+# Starter Kit: Contratos de Arquitetura (criador-dash v3)
 
-Dashboard genérico plug-and-play para **Marketing** e **Vendas**, rodando em
-Cloudflare Pages + Functions. O usuário conecta uma fonte de dados (planilha
-Google ou CSV), escolhe um domínio, mapeia colunas e publica. Zero código.
+Dashboard genérico para **Marketing**, **Vendas** e **Suporte**, rodando em
+Cloudflare Pages + Functions (e D1 no modo histórico). O usuário conecta uma fonte
+de dados (planilha Google, CSV, Meta Ads ou um conector sob medida), escolhe um
+domínio, mapeia colunas e publica. Dois modos de dados: ao vivo (lê a fonte na
+hora, KV só guarda config) ou histórico (um cron grava snapshots no D1 e o
+dashboard lê o snapshot mais recente). Zero código para o usuário final.
 
 Este documento é o **contrato**: todo módulo abaixo deve respeitar exatamente
 estas interfaces para que as camadas fiquem desacopladas e testáveis isoladamente.
@@ -137,7 +140,7 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
 export function autoMap(slots, columns) {} // -> { [slotKey]: columnName|null }  casa aliases vs columns
 ```
 
-Templates do MVP: `marketing.js`, `vendas.js`.
+Templates prontos: `marketing.js`, `vendas.js`, `suporte.js`.
 - **Marketing** slots: data, canal, investimento, impressoes, cliques, leads, conversoes, receita.
   Métricas: investimento (sum), impressoes (sum), cliques (sum), CTR (ratio cliques/impressoes),
   CPC (ratio invest/cliques), leads (sum), CPL (ratio invest/leads), conversoes (sum),

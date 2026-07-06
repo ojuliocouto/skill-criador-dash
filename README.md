@@ -32,6 +32,7 @@ The person chooses per dashboard:
 - Widgets: KPI cards (with optional trend badge), time series (pure SVG), funnel, table, ranking. No external libraries.
 - 4-step no-code wizard with automatic column mapping by header name; widgets whose columns are not mapped are skipped instead of shown empty.
 - Brand accent color per dashboard.
+- Light/dark theme toggle in the topbar, persisted per browser (respects the OS preference on first load). Analytics-tool aesthetic: flat surfaces, hairline borders, tabular figures, no decorative gradient.
 - Configs stored in Cloudflare KV; optional 5-minute data cache.
 
 ## Architecture (3 layers)
