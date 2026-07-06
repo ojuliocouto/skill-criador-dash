@@ -1,20 +1,25 @@
 # Criador Dash
 
-A plug-and-play builder for marketing and sales dashboards, running on Cloudflare Pages + Functions + KV. Connect a Google Sheet by link (or upload a CSV), pick a domain, map your columns in a 4-step wizard, and publish. No code, no OAuth, no API keys.
+A guided builder for marketing, sales, and support dashboards on Cloudflare Pages + Functions + KV (and D1 in historical mode). It is meant to be run by an AI coding agent (Claude Code) that walks a person, step by step, through building and publishing THEIR OWN dashboard on THEIR OWN Cloudflare account. The agent composes from a library of tested pieces (connectors, widgets, templates, metrics engine) and customizes for the person, writing a bespoke connector when the data source is specific.
 
 ## What it is / What it is NOT
 
 It is:
-- A starter kit of real, tested code (73 passing unit tests, built with TDD) plus a playbook for an AI coding agent to operate it.
-- A generic dashboard creator with two ready domains (Marketing and Sales) and an architecture designed for adding more.
-- Plug-and-play: the end user pastes a spreadsheet link or uploads a CSV and publishes through a wizard.
+- A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
+- A library of real, tested code (100+ passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A generic creator with ready domains (Marketing, Sales, and Support as a guided add) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
 It is NOT:
-- Not a hosted SaaS. You deploy it to your own Cloudflare Pages account.
-- Not a locked, single-niche dashboard (launch, e-commerce, etc.). It is a builder.
-- Not ready-made integrations with CRM or Hotmart. Those connectors are documented second-wave stubs. Meta Ads IS a working connector (via a Graph API access token).
-- Not requiring OAuth or an API key for the MVP. A link-shared public spreadsheet is enough.
+- Not a hosted SaaS. Each person deploys to their own Cloudflare account and owns the code and infra.
+- Not a locked, single-niche dashboard. It is a builder that adapts domain, metrics, and source to the person.
+- Not a fixed list of vendor integrations. Google Sheets/CSV and Meta Ads ship ready; for any other source the agent writes a bespoke connector following the contract (CRM and Hotmart are documented starting-point stubs).
+
+## Data modes
+
+The person chooses per dashboard:
+- Live (default, simplest): the dashboard reads the source on demand. KV stores only the config. No database.
+- Historical (D1 + cron): a cron Worker snapshots the source into a Cloudflare D1 database and the dashboard reads the latest snapshot. Gives real history and does not break if the source goes down. More setup.
 
 ## Features
 
@@ -60,6 +65,7 @@ Number and date normalization (Brazilian formats included) happens in the metric
 - Google Sheets via gviz CSV (flagship connector): the user shares the spreadsheet as "anyone with the link" and pastes the link. No OAuth, no API key, no "publish to web" step. The connector extracts the spreadsheet ID from the link and fetches `https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&gid={GID}`.
 - CSV upload (fallback): the CSV text is posted and parsed with automatic delimiter detection.
 - Meta Ads (native, advanced): pulls campaign insights from the Graph API using an access token (Business Manager System User) plus the ad account id. The token stays server-side only (stored in the config, never returned to the browser; the Function resolves it by dashboard id). Shown in the wizard only for the Marketing domain.
+- D1 (historical mode): the `d1.js` connector reads the latest snapshot written by the cron Worker, so the dashboard shows data from the database instead of the live source.
 - Second-wave stubs (documented, not finished): CRM, Hotmart.
 
 ## Prerequisites / Onboarding
@@ -128,6 +134,7 @@ starter-kit/
         sheets.js               # flagship connector (gviz CSV)
         csv.js                  # upload connector
         meta-ads.js             # Meta Ads connector (Graph API, token server-side)
+        d1.js                   # historical-mode connector (reads latest D1 snapshot)
         crm.js                  # second-wave stub
         hotmart.js              # second-wave stub
     lib/

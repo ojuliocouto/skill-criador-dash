@@ -1,0 +1,27 @@
+# Worker separado do modo histórico: um cron tira "fotos" (snapshots) das fontes
+# vivas dos dashboards e grava no D1. O dashboard lê o snapshot mais recente.
+# Este Worker é um exemplo de referência: ajuste os ids dos bindings aos seus.
+#
+# Deploy:
+#   cd workers/snapshot && wrangler deploy
+# Antes, aplique o schema no D1:
+#   wrangler d1 execute <NOME_DO_DB> --file=../../db/schema.sql
+
+name = "dashboard-snapshot"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Cron de hora em hora (minuto 0). Ajuste a cadência conforme a necessidade.
+[triggers]
+crons = ["0 * * * *"]
+
+# Banco D1 onde os snapshots são gravados. Troque o database_id pelo seu.
+[[d1_databases]]
+binding = "DASHBOARD_DB"
+database_name = "dashboard-db"
+database_id = "<SEU_D1_ID>"
+
+# KV com as configs dos dashboards (mesmo namespace do Pages, chaves dash:<id>).
+[[kv_namespaces]]
+binding = "DASHBOARDS_KV"
+id = "<SEU_KV_ID>"

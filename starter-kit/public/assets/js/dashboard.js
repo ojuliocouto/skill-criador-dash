@@ -5,7 +5,7 @@
 // A logica pura de agrupar o layout (juntar kpis consecutivos em blocos) esta
 // fatorada em planLayout(), que e testada em node:test sem tocar o DOM.
 
-import { getDashboard, fetchDataForSource, setDashboardAuth } from './lib/api-client.js';
+import { getDashboard, fetchDataForSource, fetchD1, setDashboardAuth } from './lib/api-client.js';
 import { getTemplate } from './templates/index.js';
 import { computeAll, groupBy, timeSeries } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
@@ -365,7 +365,10 @@ async function init() {
   app.innerHTML = `<div class="empty-state"><p>Carregando dados...</p></div>`;
   let dataset;
   try {
-    dataset = await fetchDataForSource(config.source, id);
+    // Modo historico: le o snapshot mais recente do D1. Ao vivo: busca a fonte na hora.
+    dataset = config.storage === 'd1'
+      ? await fetchD1(id)
+      : await fetchDataForSource(config.source, id);
   } catch (err) {
     showError(app, err && err.message ? err.message : 'Falha ao buscar os dados da fonte.', {
       href: `/config.html?id=${encodeURIComponent(id)}`, label: 'Reconfigurar',

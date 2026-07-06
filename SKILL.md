@@ -1,226 +1,232 @@
 ---
 name: criador-dash
 description: >
-  Criador plug-and-play de dashboards de marketing e vendas. Nao e um dashboard pronto
-  de um nicho: e um starter kit de codigo real e testado (Cloudflare Pages + Functions + KV)
-  com wizard de 4 passos que qualquer pessoa usa sem escrever codigo. Conecta a fonte de
-  dados por link do Google Sheets (endpoint gviz CSV, sem OAuth, sem API key, sem publicar
-  na web) ou upload de CSV, escolhe o dominio (Marketing ou Vendas), mapeia colunas
-  (auto-mapeamento por nome de cabecalho), nomeia, escolhe a cor de destaque e publica.
-  Arquitetura em 3 camadas desacopladas (conectores, widgets, templates de dominio).
-  Use quando precisar criar um dashboard novo para um cliente, adicionar um dominio ou
-  conector, ou publicar um dashboard no Cloudflare Pages.
-version: 2.0.0
+  Construtor guiado de dashboards de marketing, vendas e suporte. NAO entrega um app pronto:
+  o agente conduz a pessoa, passo a passo, para construir e publicar o proprio dashboard na
+  infra dela (conta Cloudflare, KV, Pages, dominio e, no modo historico, D1 + Worker cron).
+  O agente MONTA a partir de uma biblioteca de pecas ja testadas (conectores, widgets,
+  templates, motor de metricas) em `starter-kit/`, personalizando para a operacao da pessoa,
+  e escreve conectores sob medida quando a fonte e especifica. Dois modos de dados: ao vivo
+  (le a fonte na hora, KV so guarda config) ou historico (cron tira snapshots no D1). Use
+  quando alguem quiser criar, personalizar e publicar um dashboard proprio no Cloudflare.
+version: 3.0.0
 author: Julio Couto
 category: marketing-analytics
-tags: [dashboard, marketing, vendas, plug-and-play, cloudflare-pages, functions, kv, google-sheets, csv, wizard, no-code, roas, cpl, cpa, ticket-medio]
+tags: [dashboard, marketing, vendas, suporte, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio]
 ---
 
-# Criador Dash: Criador Plug-and-Play de Dashboards
+# Criador Dash: Construtor Guiado de Dashboards
 
-> Versao generica. Todo valor entre `<...>` ou em CAPS e placeholder: troque pelos dados
-> do seu projeto. Nunca commite tokens, Account IDs ou IDs de KV reais. No MVP (Google
-> Sheets ou CSV) voce NAO precisa de nenhum token: a planilha compartilhada por link basta.
+> Esta skill NAO e um app que voce entrega pronto. Ela e um roteiro que VOCE (agente) conduz
+> para construir, com a pessoa, o dashboard DELA, na conta Cloudflare DELA. Voce monta a
+> partir das pecas ja testadas em `starter-kit/` (nao reinventa a cada vez) e personaliza.
+> Valores entre `<...>` ou em CAPS sao placeholders. Nunca commite token, Account ID ou id de KV/D1 real.
 
-## ONBOARDING (PRIMEIRO USO)
+## MODO DE OPERACAO (leia antes de tudo)
 
-O agente conduz o aluno leigo, sem presumir que ele leu o README ou este arquivo.
+1. Voce e o maestro. A entrega e o dashboard da PESSOA, publicado na infra DELA, feito sob medida.
+2. NAO reinvente: componha a partir da biblioteca de pecas provadas em `starter-kit/` (conectores,
+   widgets, templates, motor de metricas, wizard). Personalizar em cima de peca testada = rapido
+   e confiavel. Escrever tudo do zero a cada pessoa baixaria a qualidade.
+3. Fonte especifica da pessoa? Escreva um conector sob medida na hora, seguindo o Contrato 2 do
+   `ARCHITECTURE.md` (o `meta-ads.js` e o exemplo de conector com token). Assim o "generico" e real:
+   a pessoa nao fica presa a uma lista de ferramentas, voce cria a que ela precisa.
+4. A pessoa escolhe o MODO DE DADOS (secao "Os dois modos de dados"): ao vivo ou historico.
+5. Toda operacao no Cloudflare e na conta DA PESSOA. Pergunte SEMPRE qual conta antes de operar.
 
-O que e, em 3 frases:
-1. Isto e um CRIADOR plug-and-play de dashboards de marketing e vendas, nao um dashboard pronto de um nicho so.
-2. Voce nao escreve codigo: um wizard de 4 passos gera o dashboard a partir da sua planilha ou CSV.
-3. Roda no Cloudflare Pages, guarda as configuracoes no KV e nao pede nenhum token no MVP (Google Sheets ou CSV).
+## PASSO A PASSO (o roteiro que voce conduz)
 
-Checklist antes de comecar (pergunte ao aluno, um por um):
-- [ ] Tem conta no Cloudflare? (gratuita ja serve para o Pages + Functions + KV)
-- [ ] Tem o `wrangler` instalado e logado? (`npm i -g wrangler` e `wrangler login`)
+### 1. Onboarding e checklist
+Nunca presuma que a pessoa leu o README. Explique em 3 frases e rode o checklist, um item por vez:
+- O que e: "eu vou construir com voce o seu dashboard, na sua conta Cloudflare, do jeito da sua operacao".
+- Nao e um produto fechado de um nicho: adaptamos dominio, metricas e fonte a voce.
+- No fim, o dashboard fica publicado num dominio seu, e voce e o dono do codigo e da infra.
+
+Checklist:
+- [ ] Tem conta no Cloudflare? (o plano gratis ja cobre Pages + Functions + KV; D1 tambem tem free tier)
+- [ ] Tem `wrangler` instalado e logado? (`npm i -g wrangler` e `wrangler login`)
 - [ ] Tem Node instalado? (para rodar os testes e o `wrangler pages dev`)
-- [ ] Sua fonte de dados e uma planilha do Google ou um arquivo CSV?
-- [ ] Se for planilha: ela esta compartilhada como "qualquer pessoa com o link"? (o conector le por link, sem OAuth; sem esse compartilhamento o fetch falha)
+- [ ] Tem Claude Code? (e por ele que eu conduzo a construcao)
 
-Regra do agente: nunca presuma que o aluno ja leu o README. Conduza o checklist acima
-antes de mandar qualquer comando. Se ele nao tiver Cloudflare ou wrangler, resolva isso
-primeiro; sem isso nao da para publicar.
+### 2. Descoberta da operacao
+Antes de montar, entenda:
+- Que area ela quer medir: Marketing, Vendas, Suporte, ou mais de uma (um dashboard por area).
+- Onde os dados dela vivem: planilha, um CRM, Meta Ads, WhatsApp, um sistema com API, etc.
+- O que ela precisa DECIDIR olhando o dashboard (isso define quais metricas importam).
 
-## O QUE E / O QUE NAO E
+### 3. Escolher o modo de dados
+Explique e deixe a pessoa escolher (ver secao "Os dois modos de dados"):
+- AO VIVO: o dashboard le a fonte na hora. So precisa de KV pra config. Setup minimo. Bom pra maioria.
+- HISTORICO: um Worker cron tira "fotos" (snapshots) da fonte e grava no D1; o dashboard le o D1.
+  Da historico de verdade e nao depende da fonte ficar no ar. Mais robusto, mais setup.
 
-E:
-- Um starter kit de codigo real, testado (73 testes verdes, TDD) e pronto para rodar.
-- Um criador generico: dois dominios prontos (Marketing e Vendas) e arquitetura para adicionar mais.
-- Plug-and-play: o usuario final so cola um link de planilha ou sobe um CSV e publica pelo wizard.
-- Zero dependencia externa em runtime (SVG na mao, ESM puro).
+### 4. Provisionar a infra DELA
+Pergunte qual conta Cloudflare usar. Depois (ver secao "Provisionar a infra"):
+- KV `DASHBOARDS_KV` (sempre) e `DASHBOARD_CACHE` (opcional).
+- Modo historico: D1 + aplicar `db/schema.sql` + Worker cron (`workers/snapshot/`).
+- Projeto Pages + dominio customizado.
 
-Nao e:
-- Nao e um SaaS hospedado: voce mesmo publica no seu Cloudflare Pages.
-- Nao e um dashboard fechado de um unico nicho (lancamento, e-commerce, etc.).
-- CRM e Hotmart ainda sao stubs de 2a onda (documentados, nao prontos). Meta Ads JA e um conector real (via access token da Graph API).
-- A fonte padrao (planilha/CSV) nao pede OAuth nem API key: a planilha publica por link basta. O Meta Ads exige um access token (caminho avancado, opcional).
+### 5. Montar o dashboard
+- Escolha o dominio/template pronto (Marketing, Vendas, Suporte) ou crie um novo (secao "Adicionar dominio").
+- Conecte a fonte: planilha (gviz CSV), upload CSV, Meta Ads (token), ou um conector sob medida.
+- Mapeie colunas (auto-mapeamento por cabecalho pre-preenche), defina branding (cor), meta opcional e senha opcional.
+- No modo ao vivo, a fonte fica na config; no modo historico, a fonte alimenta o cron e o dashboard le o D1.
 
-## ARQUITETURA: 3 CAMADAS DESACOPLADAS
+### 6. Deploy e verificacao
+- Publique na conta DA PESSOA (`wrangler pages deploy public --project-name=<NOME>`).
+- Modo historico: deploy do Worker cron e rode uma primeira captura.
+- Confirme com os proprios olhos: abra o dashboard publicado e cheque KPIs, funil, tendencia e a cor
+  de marca, em desktop E mobile, antes de dizer pronto.
 
-O contrato completo esta em `starter-kit/ARCHITECTURE.md`. Resumo das camadas:
+### 7. Encerramento
+Salve o contexto do projeto da pessoa em `references/` (projeto Pages, dominio, fontes, decisoes,
+modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeholders.
 
+## A CAIXA DE PECAS (biblioteca provada em `starter-kit/`)
+
+Codigo real e testado (mais de 100 testes verdes, TDD). Voce compoe a partir daqui.
+
+Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Nao sabem de metricas.
-2. WIDGETS: blocos visuais puros (KPI, serie temporal, funil, tabela, ranking). Recebem dados ja calculados, devolvem HTML/DOM. Nao conhecem template nem conector.
-3. TEMPLATES DE DOMINIO: definem os slots semanticos, as metricas e o layout de widgets de cada dominio (Marketing, Vendas).
-
-Fluxo de dados:
+2. WIDGETS: blocos visuais puros (KPI, serie temporal, funil, tabela, ranking). Recebem dados ja calculados.
+3. TEMPLATES DE DOMINIO: definem slots semanticos, metricas e o layout de widgets de cada dominio.
 
 ```
-Fonte de dados -> Conector -> DataSet (schema comum) -> Template -> Widgets -> Render
+Fonte -> Conector -> DataSet (schema comum) -> Template -> Widgets -> Render
 ```
 
-- CONECTOR carro-chefe: Google Sheets via endpoint gviz CSV. O usuario compartilha a planilha
-  como "qualquer pessoa com o link" e so cola o link. Sem OAuth, sem API key, sem publicar na web.
-  O conector extrai o ID do link e busca `https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&gid={GID}`.
-- FALLBACK: upload de arquivo CSV (POST do texto, parse com deteccao de delimitador).
-- META ADS (nativo, avancado): busca insights de campanha na Graph API com um access token
-  (System User do Business Manager) + ID da conta de anuncios. O token fica SO no servidor
-  (guardado na config e nunca devolvido ao browser); a Function resolve o token por id do dashboard.
-  So aparece no wizard no dominio Marketing.
-- CONECTORES DE 2a ONDA (stubs documentados, ainda nao prontos): CRM, Hotmart.
+Conectores e fontes disponiveis:
+- Google Sheets via gviz CSV (carro-chefe, leigo-friendly): a pessoa compartilha a planilha como
+  "qualquer pessoa com o link" e so cola o link. Sem OAuth, sem API key.
+- Upload de CSV (fallback universal).
+- Meta Ads (nativo, avancado): insights da Graph API com access token; o token fica SO no servidor.
+- Conector sob medida: escreva um novo seguindo o Contrato 2 quando a fonte da pessoa for especifica.
+- D1 (modo historico): le o snapshot mais recente gravado pelo cron.
 
-Protecao por senha (opcional): no wizard da pra definir uma senha por dashboard. Guarda-se
-so o hash SHA-256 (nunca a senha em texto puro). Ao abrir o link, o dashboard pede a senha;
-a config so e devolvida pela API com o hash correto no header `x-dash-auth`. Segredos (hash da
-senha e token do Meta) sao removidos da resposta da API.
+Dominios prontos:
+- MARKETING: investimento, impressoes, cliques, leads, conversoes, receita; derivadas CTR, CPC, CPL,
+  CPA, ROAS. Layout: KPIs + funil de conversao + serie temporal + ranking por canal + tabela.
+- VENDAS: numero de negocios, vendas ganhas, faturamento (soma do valor SO das ganhas), ticket medio
+  e taxa de conversao. "Ganha" detectada pelo status; sem status, todas contam (fallback). Layout:
+  KPIs + funil de fechamento + serie temporal + rankings + tabela.
+- (Crie SUPORTE ou outro dominio conforme a operacao da pessoa: ver "Adicionar dominio".)
 
-Dominios prontos e suas metricas:
-- MARKETING: investimento, impressoes, cliques, leads, conversoes, receita (base); CTR (cliques/impressoes), CPC (invest/cliques), CPL (invest/leads), CPA (invest/conversoes) e ROAS (receita/investimento) (derivadas). Layout: KPIs + funil de conversao (impressoes -> cliques -> leads -> conversoes com % entre etapas) + serie temporal de investimento + ranking por canal + tabela.
-- VENDAS: numero de negocios (contagem), vendas ganhas, faturamento (soma do valor SO das ganhas), ticket medio (faturamento por venda ganha) e taxa de conversao (ganhas / negocios). "Ganha" e detectada pelo status (ganh/won/fechad/pago/aprovad); sem coluna de status, todas contam como venda (fallback). Layout: KPIs + funil de fechamento (negocios -> ganhas) + serie temporal + ranking por vendedor e por produto + tabela.
+Recursos dos KPIs:
+- Tendencia (comparativo de periodo): metrica com `betterWhen` (`higher`/`lower`) ganha um badge
+  colorido comparando a 2a metade do periodo com a 1a (metades de mesmo tamanho). Verde melhora, vermelho piora.
+- Meta vs realizado (opcional): meta na metrica principal do dominio (`primaryMetric`); o card mostra
+  barra de progresso e percentual da meta.
 
-Widgets: KPI (com badge de tendencia opcional), serie temporal (SVG puro), funil, tabela, ranking. Sem dependencias externas.
+Protecao por senha (opcional): senha por dashboard; guarda-se so o hash SHA-256. O dashboard pede a
+senha; a API so devolve a config com o hash correto no header `x-dash-auth`. Segredos (hash, token do
+Meta) sao removidos das respostas da API.
 
-Tendencia (comparativo de periodo): cada KPI cuja metrica tenha `betterWhen` (`higher`/`lower`) mostra um badge colorido comparando a 2a metade do periodo com a 1a (metades com o mesmo numero de datas). Verde quando melhora, vermelho quando piora (ex: CPL caindo aparece verde). Metricas de soma so sao comparadas entre metades de mesmo tamanho, para nao inflar o numero.
-
-Meta vs realizado (opcional): no ultimo passo do wizard da pra informar uma meta para a metrica principal do dominio (`primaryMetric`: leads no Marketing, faturamento em Vendas). O card principal passa a mostrar uma barra de progresso e o percentual da meta (verde quando bate ou passa de 100%). Sem meta informada, nada muda.
-
-## COMO USAR O STARTER KIT
-
-O codigo vive em `starter-kit/`. Nao edite os arquivos de codigo/testes ao publicar para
-um cliente: eles ja estao validados. Clone/copie a pasta e configure por cima.
-
-Rodar local:
-```
-cd starter-kit
-npm test                       # 73 testes unitarios, node --test 'test/*.test.js'
-wrangler pages dev public      # sobe local com Functions + KV
-```
-
-Criar um dashboard (wizard de 4 passos, zero codigo), abrindo `config.html`:
-1. Escolher o dominio (Marketing ou Vendas).
-2. Conectar a fonte: colar o link do Google Sheets ou subir um CSV. O conector busca e mostra o preview das colunas.
-3. Mapear colunas: o auto-mapeamento por nome de cabecalho pre-preenche; o usuario ajusta o que faltar. Valida os slots obrigatorios.
-4. Nomear + escolher a cor de destaque (branding). Salva no KV e redireciona para o dashboard.
-
-O dashboard (`dashboard.html`) le `?id=`, busca a config no KV, busca os dados pelo conector,
-roda `computeAll` + o layout do template e renderiza os widgets.
-
-Arvore de arquivos real (`starter-kit/`, sem node_modules):
+Arvore de arquivos (`starter-kit/`, sem node_modules):
 ```
 ARCHITECTURE.md                 contratos das 3 camadas (fonte da verdade)
-package.json
-wrangler.toml
-examples/
-  marketing-exemplo.csv
-  vendas-exemplo.csv
+package.json  wrangler.toml
+db/schema.sql                   tabela de snapshots do modo historico (D1)
+examples/                       marketing-exemplo.csv, vendas-exemplo.csv
 functions/
-  _middleware.js
+  _middleware.js                CORS + cache KV (5 min) dos conectores
   api/
-    dashboards.js               CRUD das configs no KV
+    dashboards.js               CRUD das configs no KV + gate de senha + strip de segredos
     connectors/
       sheets.js                 conector carro-chefe (gviz CSV)
       csv.js                     conector de upload
       meta-ads.js                conector Meta Ads (Graph API, token no servidor)
-      crm.js                     stub 2a onda
-      hotmart.js                 stub 2a onda
+      d1.js                      conector do modo historico (le snapshot do D1)
+      crm.js  hotmart.js         stubs (ponto de partida)
   lib/
-    csv.mjs                     parseCSV + detectDelimiter (logica pura, testavel)
+    csv.mjs                     parseCSV + detectDelimiter (puro, testavel)
+    meta.mjs                    buildInsightsUrl + mapInsightsToDataSet (puro)
+    snapshots.mjs               SQL do modo historico + rowToDataSet (puro)
+workers/
+  snapshot/                     Worker com cron que grava snapshots no D1
 public/
-  index.html
-  config.html                   wizard de 4 passos
-  dashboard.html
-  assets/
-    css/main.css
-    js/
-      config-wizard.js
-      dashboard.js
-      index-page.js
-      lib/
-        api-client.js
-        automap.js               auto-mapeamento slot -> coluna
-        format.js                parse/format BR (moeda, numero, data)
-        metrics.js               computeMetric, computeAll, groupBy, timeSeries
-      templates/
-        index.js
-        marketing.js
-        vendas.js
-      widgets/
-        _util.js
-        kpi.js
-        timeseries.js
-        funnel.js
-        table.js
-        ranking.js
-test/
-  csv.test.js
-  dashboards.test.js
-  format.test.js
-  metrics.test.js
-  render.test.js
-  templates.test.js
-  widgets.test.js
-  wizard.test.js
+  index.html  config.html (wizard)  dashboard.html
+  assets/css/main.css
+  assets/js/
+    config-wizard.js  dashboard.js  index-page.js
+    lib/ api-client.js  automap.js  format.js  metrics.js  auth.js
+    templates/ index.js  marketing.js  vendas.js
+    widgets/ _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
+test/                           mais de 100 testes (node --test 'test/*.test.js')
 ```
 
-## COMO ADICIONAR UM NOVO DOMINIO
+Rodar local:
+```
+cd starter-kit
+npm test                       # suite completa (TDD)
+wrangler pages dev public      # sobe local com Functions + KV
+```
 
-Exemplo: um dominio "Suporte". Siga o Contrato 5 do `ARCHITECTURE.md`.
+## OS DOIS MODOS DE DADOS
 
-1. Crie `public/assets/js/templates/suporte.js` exportando um `template` com:
-   - `id`, `label`.
-   - `slots`: cada slot com `key`, `label`, `required` e `aliases` (nomes de cabecalho comuns, lowercase e sem acento, para o auto-mapeamento). Ex: tickets, tempo_resposta, resolvido, canal.
-   - `metrics`: use `agg` `sum`/`avg`/`count`/`countDistinct`/`ratio`/`derived`. Coloque as metricas base antes das derivadas (a ordem importa). Ex: total de tickets (count), tempo medio de resposta (avg), taxa de resolucao (ratio resolvidos/tickets).
-   - `layout`: lista de widgets (`kpi`/`timeseries`/`funnel`/`table`/`ranking`) com suas props.
-2. Registre o template em `public/assets/js/templates/index.js` para ele aparecer no wizard.
-3. Escreva o teste antes (TDD) em `test/templates.test.js`: cobre `autoMap` e `computeAll` do novo dominio.
-4. Nao precisa mexer em widgets nem conectores: eles sao agnosticos de dominio.
+A pessoa escolhe no passo 3. Os dois convivem no mesmo starter-kit.
 
-## COMO ADICIONAR UM NOVO CONECTOR
+### Modo AO VIVO (padrao, mais simples)
+- O `dashboard.html` chama o conector, que busca a fonte na hora (planilha/CSV/Meta/sob medida).
+- KV `DASHBOARDS_KV` guarda so a config. `DASHBOARD_CACHE` (opcional) cacheia a resposta por 5 min.
+- Sem banco de dados. Ideal pra maioria e pra quem so quer ver o numero atual.
+- Limite: sem historico proprio (a tendencia usa o periodo que a fonte trouxer) e depende da fonte estar no ar.
 
-Siga os Contratos 1 e 2 do `ARCHITECTURE.md`. Todo conector devolve exatamente um `DataSet`:
-`{ columns: string[], rows: Object[], meta: { source, fetchedAt, rowCount, name? } }`, com
-os valores das linhas como STRING crua (a normalizacao de numero/data e da camada de metricas).
+### Modo HISTORICO (D1 + cron, mais robusto)
+- Um Worker com cron trigger (`workers/snapshot/`) roda de tempos em tempos, busca a fonte e grava um
+  snapshot no D1 (`db/schema.sql`, tabela `snapshots`).
+- O `dashboard.html` usa o conector `d1.js`, que le o snapshot mais recente do D1 (`env.DASHBOARD_DB`).
+- Da historico de verdade (uma linha do tempo mesmo que a fonte nao tenha datas) e nao quebra se a fonte cair.
+- Setup extra: criar o D1, aplicar o schema, deployar o Worker cron, e configurar os bindings.
+- A logica pura (SQL de insert/select, `rowToDataSet`) esta em `functions/lib/snapshots.mjs` e e testada.
 
-1. Crie `functions/api/connectors/<nome>.js` com o handler Cloudflare `export async function onRequest(context)` que responde o `DataSet` em JSON.
-2. Mantenha a logica pura de parse fora do handler (ex: em `functions/lib/csv.mjs`), para poder testar sem rede.
-3. Se a fonte falhar, lance `Error` com mensagem amigavel em PT-BR.
-4. Escreva o teste da logica pura antes (TDD).
-5. `meta-ads.js` ja e um exemplo de conector com credencial (token no servidor); `crm.js` e `hotmart.js` sao stubs, ponto de partida da 2a onda.
+## PROVISIONAR A INFRA (guia de comandos)
 
-## CHECKLIST DE DEPLOY PARA NOVO CLIENTE
+Pergunte SEMPRE qual conta Cloudflare antes de operar. Confirme com `wrangler whoami`.
 
-Para o MVP (Google Sheets ou CSV) NAO ha nenhum secret ou token a configurar.
+Base (os dois modos):
+```
+wrangler kv namespace create DASHBOARDS_KV
+wrangler kv namespace create DASHBOARD_CACHE      # opcional (cache 5 min)
+# cole os ids no wrangler.toml (bindings). Nunca commite id real em repo publico.
+wrangler pages deploy public --project-name=<NOME-DO-PROJETO>
+# no painel Pages: Custom domains -> apontar o dominio da pessoa
+```
 
-1. Copie o `starter-kit/` para o projeto do cliente (nao edite o codigo validado).
-2. Crie os namespaces KV no Cloudflare:
-   - `DASHBOARDS_KV` (obrigatorio, guarda as configs dos dashboards).
-   - `DASHBOARD_CACHE` (opcional, cache de 5 min dos dados).
-   ```
-   wrangler kv namespace create DASHBOARDS_KV
-   wrangler kv namespace create DASHBOARD_CACHE
-   ```
-3. Cole os ids retornados no `wrangler.toml` (bindings). Nunca commite ids reais em repo publico: use placeholders.
-4. Publique:
-   ```
-   wrangler pages deploy public --project-name=<NOME-DO-PROJETO>
-   ```
-5. (Opcional) Aponte o dominio customizado do cliente no painel do Cloudflare Pages.
-6. Abra `config.html` no dominio publicado e crie o primeiro dashboard pelo wizard.
-7. Confirme com os proprios olhos: abra o dashboard publicado, cheque KPIs e a troca de cor de marca, em desktop e mobile, antes de reportar pronto.
+Modo historico (adiciona):
+```
+wrangler d1 create dashboard-db
+wrangler d1 execute dashboard-db --file db/schema.sql      # cria a tabela snapshots
+# em workers/snapshot/wrangler.toml: bindings DASHBOARD_DB (D1) e DASHBOARDS_KV, e o cron
+cd workers/snapshot && wrangler deploy                     # sobe o Worker com cron trigger
+# vincule o binding D1 DASHBOARD_DB tambem no projeto Pages (Settings > Bindings), pro d1.js ler
+```
+
+Deploy do Pages: sem CLOUDFLARE_API_TOKEN forcado, usa o OAuth do `wrangler login`.
+
+## ADICIONAR UM NOVO DOMINIO (ex: Suporte)
+
+Siga o Contrato 5 do `ARCHITECTURE.md`. TDD: teste antes.
+1. `public/assets/js/templates/<dominio>.js` exportando `template` com `id`, `label`, `primaryMetric`,
+   `slots` (com `aliases` lowercase sem acento pro auto-mapeamento), `metrics` (base antes das derivadas;
+   marque `betterWhen` nas que tem direcao) e `layout` (kpi/timeseries/funnel/table/ranking).
+   Ex Suporte: slots atendimentos, tempo_resposta, resolvido, canal, data; metricas total de atendimentos
+   (count), tempo medio de resposta (avg), taxa de resolucao (ratio resolvidos/atendimentos).
+2. Registre em `templates/index.js`.
+3. Escreva o teste em `test/templates.test.js` (autoMap + estrutura). Nao mexe em widgets nem conectores.
+
+## ADICIONAR UM NOVO CONECTOR
+
+Siga os Contratos 1 e 2 do `ARCHITECTURE.md`. Todo conector devolve exatamente um `DataSet`
+(`{ columns, rows, meta }`), com os valores das linhas como STRING crua.
+1. `functions/api/connectors/<nome>.js` com `export async function onRequest(context)` respondendo o DataSet.
+2. Logica pura de parse/mapeamento fora do handler (ex: `functions/lib/<nome>.mjs`), pra testar sem rede.
+3. Credencial (token) nunca vai pro browser: guarde na config e resolva no servidor por id (veja `meta-ads.js`).
+4. Erro da fonte: lance `Error` com mensagem amigavel em PT-BR.
+5. Escreva o teste da logica pura antes (TDD).
 
 ## PROTOCOLO DE ENCERRAMENTO
 
 Ao terminar um trabalho nesta skill:
-1. Atualize este `SKILL.md` se algo mudou (novo dominio, novo conector, novo passo de deploy).
-2. Salve o contexto do projeto do cliente em `references/` (nome do projeto Pages, dominio, dominios de dados usados, links de planilha, decisoes). Nunca coloque token, Account ID ou id de KV real nesses arquivos: use placeholders.
+1. Atualize este `SKILL.md` se algo mudou (novo dominio, novo conector, novo modo, novo passo).
+2. Salve o contexto do projeto da pessoa em `references/YYYYMMDD-descricao.md`: projeto Pages, dominio,
+   modo de dados, fontes usadas, decisoes. Nunca coloque token, Account ID ou id de KV/D1 real: use placeholders.

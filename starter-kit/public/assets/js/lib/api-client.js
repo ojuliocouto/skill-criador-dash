@@ -75,6 +75,11 @@ export async function fetchMetaById(id) {
   return jsonOrThrow(await fetch(`/api/connectors/meta-ads?id=${encodeURIComponent(id)}`));
 }
 
+// Modo historico: le o snapshot mais recente gravado pelo cron no D1.
+export async function fetchD1(id) {
+  return jsonOrThrow(await fetch(`/api/connectors/d1?id=${encodeURIComponent(id)}`));
+}
+
 // Busca o DataSet de acordo com o source salvo na config.
 // `id` e necessario para o conector Meta (o token e resolvido no servidor por id).
 export async function fetchDataForSource(source, id) {
