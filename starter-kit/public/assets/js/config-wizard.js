@@ -120,6 +120,7 @@ function actions({ onBack, onNext, nextLabel = 'Avançar', nextDisabled = false,
 const DOMAIN_DESC = {
   marketing: 'Investimento, cliques, CTR, CPL, CPA e ROAS por canal e ao longo do tempo.',
   vendas: 'Faturamento, número de vendas, ticket médio e ranking por vendedor e produto.',
+  suporte: 'Atendimentos, resolvidos, taxa de resolução, tempo de resposta e CSAT por canal e ao longo do tempo.',
 };
 
 function renderDomain(body) {

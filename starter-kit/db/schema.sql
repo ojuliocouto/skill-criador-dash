@@ -1,7 +1,8 @@
 -- Schema do modo histórico (snapshots) no Cloudflare D1.
 -- Cada linha é uma "foto" do DataSet de um dashboard num instante.
 -- O dashboard lê o snapshot mais recente; o cron grava novos periodicamente.
--- Aplicar com: wrangler d1 execute <DB> --file=db/schema.sql
+-- Aplicar no D1 REMOTO (sem --remote aplica so no local e o Worker em producao nao ve a tabela):
+--   wrangler d1 execute dashboard-db --remote --file=db/schema.sql
 
 CREATE TABLE IF NOT EXISTS snapshots (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,

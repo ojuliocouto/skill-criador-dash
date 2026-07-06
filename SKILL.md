@@ -229,8 +229,14 @@ Em `workers/snapshot/wrangler.toml`, preencha os bindings DASHBOARD_DB (D1) e DA
 cd workers/snapshot && wrangler deploy                 # sobe o Worker com cron trigger (captura de hora em hora)
 ```
 No projeto Pages > Settings > Bindings, adicione o binding D1 `DASHBOARD_DB` apontando pro mesmo banco (pro `d1.js` ler).
-A primeira captura acontece no proximo disparo do cron; para ver dado na hora, dispare o worker uma vez
-(`wrangler dev` com trigger de teste, ou aguarde o cron) ou insira um snapshot manual.
+A primeira captura acontece no proximo disparo do cron (de hora em hora), entao o dashboard mostra
+"Ainda nao ha dados capturados" ate la (nao esta quebrado). Para ver dado NA HORA, force uma captura:
+```
+cd workers/snapshot && wrangler dev --remote      # usa o D1/KV reais
+# noutro terminal, dispara o scheduled uma vez:
+curl "http://localhost:8787/__scheduled?cron=0+*+*+*+*"
+```
+Depois e so recarregar o dashboard. (Alternativa: inserir um snapshot manual no D1 com um INSERT em `snapshots`.)
 
 Deploy do Pages: sem CLOUDFLARE_API_TOKEN forcado, usa o OAuth do `wrangler login`.
 
