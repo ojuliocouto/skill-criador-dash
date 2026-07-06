@@ -2,8 +2,9 @@
 
 import { template as marketing } from './marketing.js';
 import { template as vendas } from './vendas.js';
+import { template as suporte } from './suporte.js';
 
-export const templates = { marketing, vendas };
+export const templates = { marketing, vendas, suporte };
 
 /**
  * Retorna o template pelo id, ou undefined se nao existir.

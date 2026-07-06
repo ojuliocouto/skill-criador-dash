@@ -114,7 +114,8 @@ async function fetchSheetsDataSet(source) {
 async function fetchMetaDataSet(source) {
   const meta = (source && source.meta) || {};
   const token = meta.token;
-  const accountId = meta.accountId;
+  // O wizard grava a conta como `account`; aceitamos os dois nomes.
+  const accountId = meta.accountId || meta.account;
   if (!token) throw new Error('Meta Ads: access token ausente na config.');
   if (!accountId) throw new Error('Meta Ads: ad account id ausente na config.');
 

@@ -5,6 +5,7 @@ import { normalizeHeader, autoMap } from '../public/assets/js/lib/automap.js';
 import { templates, getTemplate } from '../public/assets/js/templates/index.js';
 import { template as marketing } from '../public/assets/js/templates/marketing.js';
 import { template as vendas } from '../public/assets/js/templates/vendas.js';
+import { template as suporte } from '../public/assets/js/templates/suporte.js';
 
 test('normalizeHeader: caixa e acentos', () => {
   assert.equal(normalizeHeader('Investimento'), normalizeHeader('investimento'));
@@ -48,8 +49,9 @@ test('autoMap vendas: mapeia colunas reais', () => {
 test('getTemplate retorna template por id', () => {
   assert.equal(getTemplate('marketing'), marketing);
   assert.equal(getTemplate('vendas'), vendas);
+  assert.equal(getTemplate('suporte'), suporte);
   assert.equal(getTemplate('inexistente'), undefined);
-  assert.deepEqual(Object.keys(templates).sort(), ['marketing', 'vendas']);
+  assert.deepEqual(Object.keys(templates).sort(), ['marketing', 'suporte', 'vendas']);
 });
 
 function validaTemplate(tpl) {
@@ -100,4 +102,25 @@ test('estrutura do template vendas', () => {
   validaTemplate(vendas);
   const req = vendas.slots.filter((s) => s.required).map((s) => s.key).sort();
   assert.deepEqual(req, ['data', 'valor']);
+});
+
+test('autoMap suporte: mapeia todos os slots', () => {
+  const columns = ['Data', 'Canal', 'Atendimentos', 'Resolvidos', 'Tempo de resposta', 'CSAT'];
+  const map = autoMap(suporte.slots, columns);
+  assert.equal(map.data, 'Data');
+  assert.equal(map.canal, 'Canal');
+  assert.equal(map.atendimentos, 'Atendimentos');
+  assert.equal(map.resolvidos, 'Resolvidos');
+  assert.equal(map.tempo_resposta, 'Tempo de resposta');
+  assert.equal(map.csat, 'CSAT');
+});
+
+test('estrutura do template suporte', () => {
+  validaTemplate(suporte);
+  const req = suporte.slots.filter((s) => s.required).map((s) => s.key).sort();
+  assert.deepEqual(req, ['atendimentos', 'data']);
+  // base antes da derivada: taxa_resolucao (ratio) depende de resolvidos e atendimentos
+  const keys = suporte.metrics.map((m) => m.key);
+  assert.ok(keys.indexOf('resolvidos') < keys.indexOf('taxa_resolucao'));
+  assert.ok(keys.indexOf('atendimentos') < keys.indexOf('taxa_resolucao'));
 });

@@ -423,6 +423,20 @@ function renderFinish(body) {
     el('input', { class: 'input', id: 'dashPassword', type: 'password', placeholder: 'Deixe em branco para dashboard aberto', autocomplete: 'new-password' }),
     el('span', { class: 'hint', text: 'Com senha, quem abrir o link precisa digita-la. A senha nao e guardada em texto puro, so o hash.' }),
   ]));
+  // Modo de dados: so oferece historico para fontes vivas (planilha/Meta).
+  const sourceType = state.source && state.source.type;
+  const podeHistorico = sourceType === 'sheets' || sourceType === 'meta';
+  if (podeHistorico) {
+    const modeSelect = el('select', { class: 'input', id: 'dashStorage' }, [
+      el('option', { value: 'live', text: 'Ao vivo (le a fonte na hora)' }),
+      el('option', { value: 'd1', text: 'Historico (guarda no banco D1 via cron)' }),
+    ]);
+    fields.push(el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Modo de dados' }),
+      modeSelect,
+      el('span', { class: 'hint', text: 'Historico precisa do D1 e do Worker cron provisionados (o agente configura). Ao vivo nao precisa de banco.' }),
+    ]));
+  }
   const card = el('div', { class: 'card' }, fields);
   body.appendChild(card);
 
@@ -467,6 +481,12 @@ function renderFinish(body) {
     const pw = pwInput ? pwInput.value : '';
     if (pw) {
       config.auth = { hash: await sha256Hex(pw) };
+    }
+
+    // Modo de dados: historico le do D1 (via cron); ao vivo le a fonte na hora.
+    const storageInput = card.querySelector('#dashStorage');
+    if (storageInput && storageInput.value === 'd1') {
+      config.storage = 'd1';
     }
 
     createBtn.disabled = true;

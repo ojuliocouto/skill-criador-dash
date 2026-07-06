@@ -42,11 +42,16 @@ Nunca presuma que a pessoa leu o README. Explique em 3 frases e rode o checklist
 - Nao e um produto fechado de um nicho: adaptamos dominio, metricas e fonte a voce.
 - No fim, o dashboard fica publicado num dominio seu, e voce e o dono do codigo e da infra.
 
-Checklist:
-- [ ] Tem conta no Cloudflare? (o plano gratis ja cobre Pages + Functions + KV; D1 tambem tem free tier)
-- [ ] Tem `wrangler` instalado e logado? (`npm i -g wrangler` e `wrangler login`)
-- [ ] Tem Node instalado? (para rodar os testes e o `wrangler pages dev`)
-- [ ] Tem Claude Code? (e por ele que eu conduzo a construcao)
+Explique em uma frase cada palavra tecnica antes de mandar comando (a pessoa pode nunca ter usado):
+- Cloudflare Pages: onde o dashboard fica hospedado (de graca). KV: um banco chave-valor onde ficam as configs. wrangler: a ferramenta de linha de comando do Cloudflare, e por ela que a gente cria e publica.
+
+Checklist (um item por vez; se faltar algo, resolva antes de seguir):
+- [ ] Tem conta no Cloudflare? (o plano gratis ja cobre Pages + Functions + KV; D1 tambem tem free tier). Se nao tiver, peca pra criar em dash.cloudflare.com.
+- [ ] Tem Node instalado? (`node -v`). Sem Node nao roda `wrangler` nem os testes.
+- [ ] Instale o wrangler: `npm i -g wrangler`. No Mac, se der erro de permissao (EACCES), rode `sudo npm i -g wrangler`.
+- [ ] Faca login: `wrangler login` (abre o browser; a pessoa escolhe a conta Cloudflare dela e autoriza).
+- [ ] Confirme a conta certa: `wrangler whoami` (mostra o email e o Account ID logado). Se for a conta errada, `wrangler logout` e login de novo.
+- [ ] Tem Claude Code? (e por ele que eu conduzo a construcao).
 
 ### 2. Descoberta da operacao
 Antes de montar, entenda:
@@ -109,7 +114,9 @@ Dominios prontos:
 - VENDAS: numero de negocios, vendas ganhas, faturamento (soma do valor SO das ganhas), ticket medio
   e taxa de conversao. "Ganha" detectada pelo status; sem status, todas contam (fallback). Layout:
   KPIs + funil de fechamento + serie temporal + rankings + tabela.
-- (Crie SUPORTE ou outro dominio conforme a operacao da pessoa: ver "Adicionar dominio".)
+- SUPORTE: atendimentos, resolvidos, taxa de resolucao, tempo de resposta (media) e CSAT (media).
+  Layout: KPIs + funil de resolucao (atendimentos -> resolvidos) + serie temporal + ranking por canal + tabela.
+- (Precisa de outro dominio, ex Financeiro? Crie conforme a operacao da pessoa: ver "Adicionar dominio".)
 
 Recursos dos KPIs:
 - Tendencia (comparativo de periodo): metrica com `betterWhen` (`higher`/`lower`) ganha um badge
@@ -126,7 +133,7 @@ Arvore de arquivos (`starter-kit/`, sem node_modules):
 ARCHITECTURE.md                 contratos das 3 camadas (fonte da verdade)
 package.json  wrangler.toml
 db/schema.sql                   tabela de snapshots do modo historico (D1)
-examples/                       marketing-exemplo.csv, vendas-exemplo.csv
+examples/                       marketing-exemplo.csv, vendas-exemplo.csv, suporte-exemplo.csv
 functions/
   _middleware.js                CORS + cache KV (5 min) dos conectores
   api/
@@ -149,9 +156,9 @@ public/
   assets/js/
     config-wizard.js  dashboard.js  index-page.js
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js
-    templates/ index.js  marketing.js  vendas.js
+    templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           mais de 100 testes (node --test 'test/*.test.js')
+test/                           128 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local:
@@ -175,42 +182,61 @@ A pessoa escolhe no passo 3. Os dois convivem no mesmo starter-kit.
 - Um Worker com cron trigger (`workers/snapshot/`) roda de tempos em tempos, busca a fonte e grava um
   snapshot no D1 (`db/schema.sql`, tabela `snapshots`).
 - O `dashboard.html` usa o conector `d1.js`, que le o snapshot mais recente do D1 (`env.DASHBOARD_DB`).
+- COMO O DASHBOARD SABE QUE E HISTORICO: a config precisa ter `storage: "d1"`. No wizard (passo Finalizar),
+  quando a fonte e planilha ou Meta, aparece o seletor "Modo de dados"; escolher "Historico" grava
+  `storage:"d1"`. Se voce montar a config na mao, inclua `storage:"d1"` (senao o dashboard le ao vivo).
 - Da historico de verdade (uma linha do tempo mesmo que a fonte nao tenha datas) e nao quebra se a fonte cair.
-- Setup extra: criar o D1, aplicar o schema, deployar o Worker cron, e configurar os bindings.
+- So faz sentido para fontes vivas (planilha/Meta); CSV e estatico e o cron o ignora.
 - A logica pura (SQL de insert/select, `rowToDataSet`) esta em `functions/lib/snapshots.mjs` e e testada.
 
 ## PROVISIONAR A INFRA (guia de comandos)
 
 Pergunte SEMPRE qual conta Cloudflare antes de operar. Confirme com `wrangler whoami`.
+Nao ha passo de build: o `wrangler.toml` ja tem `pages_build_output_dir = "public"`, entao os comandos
+usam a pasta `public/` direto.
 
 Base (os dois modos):
 ```
 wrangler kv namespace create DASHBOARDS_KV
-wrangler kv namespace create DASHBOARD_CACHE      # opcional (cache 5 min)
-# cole os ids no wrangler.toml (bindings). Nunca commite id real em repo publico.
-wrangler pages deploy public --project-name=<NOME-DO-PROJETO>
-# no painel Pages: Custom domains -> apontar o dominio da pessoa
+# O comando IMPRIME algo como:  id = "abc123...".  Copie esse id.
+wrangler kv namespace create DASHBOARD_CACHE      # opcional (cache 5 min); imprime outro id
 ```
+Abra `wrangler.toml` e troque os placeholders pelos ids impressos: `<SEU_KV_NAMESPACE_ID>` pelo id do
+DASHBOARDS_KV e `<SEU_KV_CACHE_ID>` pelo id do DASHBOARD_CACHE. Nunca commite id real em repo publico.
+```
+wrangler pages project create <NOME-DO-PROJETO> --production-branch main   # cria o projeto Pages
+wrangler pages deploy public --project-name=<NOME-DO-PROJETO> --branch main
+```
+Bindings em producao: com os ids ja no `wrangler.toml`, o `wrangler pages deploy` aplica os bindings de KV
+ao deployment. Se por algum motivo a API responder 500 "Binding DASHBOARDS_KV nao configurado", vincule no
+painel: Cloudflare Pages > seu projeto > Settings > Bindings > add KV binding `DASHBOARDS_KV` (e `DASHBOARD_CACHE`).
+Depois: no painel Pages > Custom domains, aponte o dominio da pessoa. Abra `config.html` no dominio e crie o dashboard.
 
-Modo historico (adiciona):
+Modo historico (adiciona, so se a pessoa escolheu Historico):
 ```
 wrangler d1 create dashboard-db
-wrangler d1 execute dashboard-db --file db/schema.sql      # cria a tabela snapshots
-# em workers/snapshot/wrangler.toml: bindings DASHBOARD_DB (D1) e DASHBOARDS_KV, e o cron
-cd workers/snapshot && wrangler deploy                     # sobe o Worker com cron trigger
-# vincule o binding D1 DASHBOARD_DB tambem no projeto Pages (Settings > Bindings), pro d1.js ler
+# imprime database_id = "..."; cole em workers/snapshot/wrangler.toml (DASHBOARD_DB) e no binding D1 do Pages
+wrangler d1 execute dashboard-db --remote --file db/schema.sql   # cria a tabela snapshots no D1 REMOTO
 ```
+Em `workers/snapshot/wrangler.toml`, preencha os bindings DASHBOARD_DB (D1) e DASHBOARDS_KV (o mesmo do Pages), e o cron.
+```
+cd workers/snapshot && wrangler deploy                 # sobe o Worker com cron trigger (captura de hora em hora)
+```
+No projeto Pages > Settings > Bindings, adicione o binding D1 `DASHBOARD_DB` apontando pro mesmo banco (pro `d1.js` ler).
+A primeira captura acontece no proximo disparo do cron; para ver dado na hora, dispare o worker uma vez
+(`wrangler dev` com trigger de teste, ou aguarde o cron) ou insira um snapshot manual.
 
 Deploy do Pages: sem CLOUDFLARE_API_TOKEN forcado, usa o OAuth do `wrangler login`.
 
-## ADICIONAR UM NOVO DOMINIO (ex: Suporte)
+## ADICIONAR UM NOVO DOMINIO (ex: Financeiro)
 
-Siga o Contrato 5 do `ARCHITECTURE.md`. TDD: teste antes.
+Marketing, Vendas e Suporte ja vem prontos. Para um novo (ex: Financeiro), siga o Contrato 5 do
+`ARCHITECTURE.md` e use `vendas.js`/`suporte.js` como molde. TDD: teste antes.
 1. `public/assets/js/templates/<dominio>.js` exportando `template` com `id`, `label`, `primaryMetric`,
    `slots` (com `aliases` lowercase sem acento pro auto-mapeamento), `metrics` (base antes das derivadas;
    marque `betterWhen` nas que tem direcao) e `layout` (kpi/timeseries/funnel/table/ranking).
-   Ex Suporte: slots atendimentos, tempo_resposta, resolvido, canal, data; metricas total de atendimentos
-   (count), tempo medio de resposta (avg), taxa de resolucao (ratio resolvidos/atendimentos).
+   Ex Financeiro: slots data, categoria, entrada, saida; metricas receita (sum entrada), despesa (sum saida),
+   saldo (derived entrada-saida), margem (ratio saldo/entrada).
 2. Registre em `templates/index.js`.
 3. Escreva o teste em `test/templates.test.js` (autoMap + estrutura). Nao mexe em widgets nem conectores.
 

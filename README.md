@@ -6,8 +6,8 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (100+ passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
-- A generic creator with ready domains (Marketing, Sales, and Support as a guided add) and an architecture for adding more.
+- A library of real, tested code (128 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
 It is NOT:
@@ -23,7 +23,7 @@ The person chooses per dashboard:
 
 ## Features
 
-- Two ready domains out of the box: Marketing and Sales.
+- Three ready domains out of the box: Marketing, Sales, and Support.
 - Marketing metrics: investment, impressions, clicks, leads, conversions, revenue, plus derived CTR, CPC, CPL, CPA, and ROAS. Conversion funnel (impressions to conversions) with step-to-step rates.
 - Sales metrics: number of deals, won deals, revenue (won only, with a fallback when there is no status column), average ticket, and win rate. Closing funnel plus ranking by seller and by product.
 - Period trend badges on KPIs: each KPI compares the second half of the period to the first (equal-sized halves) and colors the change green or red by whether higher or lower is better.
@@ -40,7 +40,7 @@ The full contract lives in `starter-kit/ARCHITECTURE.md`. The three decoupled la
 
 1. Connectors: fetch data from a source and return a `DataSet` (a common tabular schema). They know nothing about metrics.
 2. Widgets: pure visual blocks (KPI, time series, funnel, table, ranking). They receive already-computed data and return HTML/DOM. They know nothing about templates or connectors.
-3. Domain templates: define the semantic slots, the metrics, and the widget layout for each domain (Marketing, Sales).
+3. Domain templates: define the semantic slots, the metrics, and the widget layout for each domain (Marketing, Sales, Support).
 
 Data flow:
 
@@ -85,13 +85,13 @@ For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 73 unit tests: node --test 'test/*.test.js'
+npm test                      # 128 unit tests: node --test 'test/*.test.js'
 wrangler pages dev public     # local dev server with Functions + KV
 ```
 
 Then open `config.html` and create your first dashboard through the 4-step wizard:
 
-1. Pick a domain (Marketing or Sales).
+1. Pick a domain (Marketing, Sales, or Support).
 2. Connect a source: paste the Google Sheets link or upload a CSV. The connector fetches it and previews the columns.
 3. Map columns: automatic mapping by header name pre-fills the slots; adjust what is missing. Required slots are validated.
 4. Name it and pick a brand accent color. The config is saved to KV and you are redirected to the dashboard.
@@ -108,13 +108,16 @@ For the MVP (Google Sheets or CSV) there is no secret or token to configure.
    wrangler kv namespace create DASHBOARD_CACHE
    ```
    `DASHBOARDS_KV` is required (it stores dashboard configs). `DASHBOARD_CACHE` is optional (5-minute data cache).
-2. Put the returned ids into the `wrangler.toml` bindings. Use placeholders in any public repo; never commit real ids.
+   Each command prints an `id = "..."`. Copy it.
+2. Put the returned ids into the `wrangler.toml` bindings, replacing `<SEU_KV_NAMESPACE_ID>` and `<SEU_KV_CACHE_ID>`. Use placeholders in any public repo; never commit real ids. There is no build step: `pages_build_output_dir` is already `public`.
 3. Deploy:
    ```
-   wrangler pages deploy public --project-name=<YOUR-PROJECT-NAME>
+   wrangler pages deploy public --project-name=<YOUR-PROJECT-NAME> --branch main
    ```
-4. Optionally attach a custom domain in the Cloudflare Pages dashboard.
-5. Open `config.html` on the published domain and create the first dashboard.
+4. If the API responds 500 "Binding DASHBOARDS_KV nao configurado", attach the bindings in the panel: Cloudflare Pages > your project > Settings > Bindings > add the KV binding `DASHBOARDS_KV` (and `DASHBOARD_CACHE`).
+5. Optionally attach a custom domain in the Cloudflare Pages dashboard.
+6. Open `config.html` on the published domain and create the first dashboard.
+7. Historical mode: also create a D1 database (`wrangler d1 create ...`), apply `db/schema.sql` with `--remote`, deploy the Worker in `workers/snapshot/`, and bind D1 (`DASHBOARD_DB`) to the Pages project. See SKILL.md for the exact commands.
 
 ## Project structure
 
@@ -123,13 +126,15 @@ starter-kit/
   ARCHITECTURE.md               # the 3-layer contracts (source of truth)
   package.json
   wrangler.toml
+  db/schema.sql                 # snapshots table for historical mode (D1)
   examples/
     marketing-exemplo.csv
     vendas-exemplo.csv
+    suporte-exemplo.csv
   functions/
-    _middleware.js
+    _middleware.js              # CORS + KV cache (JSON only)
     api/
-      dashboards.js             # CRUD of dashboard configs in KV
+      dashboards.js             # CRUD of dashboard configs in KV + password gate + secret strip
       connectors/
         sheets.js               # flagship connector (gviz CSV)
         csv.js                  # upload connector
@@ -139,6 +144,10 @@ starter-kit/
         hotmart.js              # second-wave stub
     lib/
       csv.mjs                   # parseCSV + detectDelimiter (pure, testable)
+      meta.mjs                  # buildInsightsUrl + mapInsightsToDataSet (pure)
+      snapshots.mjs             # historical-mode SQL + rowToDataSet (pure)
+  workers/
+    snapshot/                   # Worker with a cron trigger that writes D1 snapshots
   public/
     index.html
     config.html                 # 4-step wizard
@@ -154,10 +163,12 @@ starter-kit/
           automap.js            # slot -> column auto-mapping
           format.js             # Brazilian parse/format (currency, number, date)
           metrics.js            # computeMetric, computeAll, groupBy, timeSeries
+          auth.js               # SHA-256 hash for optional password
         templates/
           index.js
           marketing.js
           vendas.js
+          suporte.js
         widgets/
           _util.js
           kpi.js
@@ -178,7 +189,7 @@ starter-kit/
 
 ## Testing
 
-There are 73 unit tests, all green, written before the code (TDD). They cover the pure logic: CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, the wizard flow, and the dashboards CRUD.
+There are 128 unit tests, all green, written before the code (TDD). They cover the pure logic: CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, the wizard flow, and the dashboards CRUD.
 
 ```
 cd starter-kit
