@@ -38,13 +38,19 @@ export const template = {
   ],
   layout: [
     { widget: 'kpi', props: { metricKey: 'investimento' } },
-    { widget: 'kpi', props: { metricKey: 'cliques' } },
+    { widget: 'kpi', props: { metricKey: 'leads' } },
     { widget: 'kpi', props: { metricKey: 'CTR' } },
     { widget: 'kpi', props: { metricKey: 'CPL' } },
     { widget: 'kpi', props: { metricKey: 'CPA' } },
     { widget: 'kpi', props: { metricKey: 'ROAS' } },
-    { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'investimento' } },
-    { widget: 'ranking', props: { dimensionSlot: 'canal', valueSlot: 'investimento' } },
+    { widget: 'funnel', props: { title: 'Funil de conversão', steps: [
+      { label: 'Impressões', metricKey: 'impressoes' },
+      { label: 'Cliques', metricKey: 'cliques' },
+      { label: 'Leads', metricKey: 'leads' },
+      { label: 'Conversões', metricKey: 'conversoes' },
+    ] } },
+    { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'investimento', title: 'Investimento no tempo' } },
+    { widget: 'ranking', props: { dimensionSlot: 'canal', valueSlot: 'investimento', title: 'Ranking por canal' } },
     { widget: 'table', props: {} },
   ],
 };

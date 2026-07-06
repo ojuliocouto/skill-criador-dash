@@ -153,6 +153,7 @@ function renderDomain(body) {
 
 function renderSource(body) {
   body.appendChild(el('h2', { text: 'Conecte a fonte de dados' }));
+  body.appendChild(el('p', { class: 'hint', text: 'Atenção à privacidade: a planilha fica acessível por link e o dashboard publicado pode ser aberto por qualquer pessoa que tenha a URL. Use dados que voce nao se importa que sejam vistos por quem tiver o link.' }));
 
   // Opção A: Google Sheets
   const sheetsCard = el('div', { class: 'card' }, [
