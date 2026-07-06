@@ -32,6 +32,13 @@ function isCacheableBody(text) {
   return true;
 }
 
+// Decide se uma resposta pode ir pro cache. So cacheia JSON de verdade (200 +
+// content-type application/json + corpo nao vazio). Isso impede cachear o HTML
+// de fallback (SPA) que pode aparecer durante a propagacao de um deploy.
+export function shouldCache(status, contentType, body) {
+  return status === 200 && String(contentType || '').includes('application/json') && isCacheableBody(body);
+}
+
 export async function onRequest(context) {
   const { request, env, next } = context;
   const method = request.method.toUpperCase();
@@ -68,8 +75,9 @@ export async function onRequest(context) {
   // Miss: busca a resposta real e cacheia se valer a pena.
   const response = await next();
   const body = await response.clone().text();
+  const contentType = response.headers.get('content-type') || '';
 
-  if (response.status === 200 && isCacheableBody(body)) {
+  if (shouldCache(response.status, contentType, body)) {
     try {
       await cache.put(cacheKey, body, { expirationTtl: CACHE_TTL });
     } catch {
