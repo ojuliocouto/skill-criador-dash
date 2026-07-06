@@ -8,6 +8,7 @@
 import { getDashboard, fetchDataForSource } from './lib/api-client.js';
 import { getTemplate } from './templates/index.js';
 import { computeAll, groupBy, timeSeries } from './lib/metrics.js';
+import { parseDateBR, fmtPercent } from './lib/format.js';
 import { render as renderKpi } from './widgets/kpi.js';
 import { render as renderTimeseries } from './widgets/timeseries.js';
 import { render as renderFunnel } from './widgets/funnel.js';
@@ -39,6 +40,61 @@ export function planLayout(layout) {
     }
   }
   return blocks;
+}
+
+/**
+ * Divide as linhas em duas metades por data: a primeira metade das datas
+ * distintas (previous) e a segunda (current). Serve para calcular tendencia
+ * dentro do proprio periodo. Se houver menos de 2 datas validas, nao ha
+ * comparacao possivel e previous volta null.
+ * @returns {{current:Object[], previous:Object[]|null}}
+ */
+export function splitByPeriod(rows, colMap, dateSlot) {
+  const col = (colMap && colMap[dateSlot]) || dateSlot;
+  const dated = [];
+  for (const r of (rows || [])) {
+    const iso = parseDateBR(r[col]);
+    if (iso) dated.push({ iso, r });
+  }
+  const uniq = [...new Set(dated.map((d) => d.iso))].sort();
+  if (uniq.length < 2) return { current: rows || [], previous: null };
+  // Metades com o MESMO numero de datas, para que somas sejam comparaveis.
+  // Se o total de datas for impar, a data do meio fica de fora das duas metades.
+  const half = Math.floor(uniq.length / 2);
+  const prevDates = new Set(uniq.slice(0, half));
+  const curDates = new Set(uniq.slice(uniq.length - half));
+  const previous = [];
+  const current = [];
+  for (const d of dated) {
+    if (prevDates.has(d.iso)) previous.push(d.r);
+    else if (curDates.has(d.iso)) current.push(d.r);
+  }
+  if (!previous.length || !current.length) return { current: rows || [], previous: null };
+  return { current, previous };
+}
+
+/**
+ * Monta o mapa de tendencias por metrica (2a metade vs 1a metade do periodo).
+ * So gera tendencia para metricas com betterWhen definido e denominador nao-zero.
+ * @returns {Object<string,{text:string, good:boolean}>}
+ */
+export function buildTrends(metrics, curRows, prevRows, colMap) {
+  if (!prevRows || !prevRows.length) return {};
+  const cur = computeAll(metrics, curRows, colMap);
+  const prev = computeAll(metrics, prevRows, colMap);
+  const trends = {};
+  for (const m of (metrics || [])) {
+    if (!m.betterWhen) continue;
+    const c = cur[m.key];
+    const p = prev[m.key];
+    if (!Number.isFinite(c) || !Number.isFinite(p) || p === 0) continue;
+    const delta = (c - p) / Math.abs(p);
+    if (Math.abs(delta) < 0.0005) continue; // praticamente estavel
+    const up = c > p;
+    const good = m.betterWhen === 'higher' ? up : !up;
+    trends[m.key] = { text: `${up ? '▲' : '▼'} ${fmtPercent(Math.abs(delta))}`, good };
+  }
+  return trends;
 }
 
 // ---- Helpers de UI (browser) ----
@@ -82,7 +138,7 @@ function findMetricDef(template, key) {
 }
 
 // Renderiza um bloco de kpis (.grid.kpis) a partir dos itens de layout.
-function renderKpiBlock(items, template, computed) {
+function renderKpiBlock(items, template, computed, trends = {}) {
   const cards = items
     .map((item) => {
       const key = item.props && item.props.metricKey;
@@ -90,7 +146,7 @@ function renderKpiBlock(items, template, computed) {
       const label = def.label || key || '';
       const format = def.format || 'number';
       const value = computed[key];
-      return renderKpi({ label, format, hint: item.props && item.props.hint }, value);
+      return renderKpi({ label, format, hint: item.props && item.props.hint, trend: trends[key] }, value);
     })
     .join('');
   return `<div class="grid kpis">${cards}</div>`;
@@ -156,7 +212,7 @@ function renderDashboard(app, ctx) {
   const body = blocks
     .map((block) => {
       if (block.type === 'kpis') {
-        return `<section class="section">${renderKpiBlock(block.items, template, ctx.computed)}</section>`;
+        return `<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.trends)}</section>`;
       }
       const html = renderSingle(block.item, ctx);
       return html ? `<section class="section">${html}</section>` : '';
@@ -259,10 +315,14 @@ async function init() {
     return;
   }
 
-  // 5. Metricas + render
+  // 5. Metricas + tendencia (2a metade vs 1a metade do periodo) + render
   const colMap = config.colMap || {};
   const computed = computeAll(template.metrics, dataset.rows, colMap);
-  renderDashboard(app, { config, template, dataset, colMap, computed });
+  const tsItem = (template.layout || []).find((l) => l.widget === 'timeseries');
+  const dateSlot = (tsItem && tsItem.props && tsItem.props.dateSlot) || 'data';
+  const { current, previous } = splitByPeriod(dataset.rows, colMap, dateSlot);
+  const trends = buildTrends(template.metrics, current, previous, colMap);
+  renderDashboard(app, { config, template, dataset, colMap, computed, trends });
 }
 
 // So dispara no browser. Em node:test o import so pega planLayout.

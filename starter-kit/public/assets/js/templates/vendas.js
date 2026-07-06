@@ -41,18 +41,18 @@ export const template = {
   ],
   metrics: [
     // Base: total de negocios registrados (todas as linhas).
-    { key: 'num_vendas', label: 'Negócios', agg: 'count', column: 'valor', format: 'integer' },
+    { key: 'num_vendas', label: 'Negócios', agg: 'count', column: 'valor', format: 'integer', betterWhen: 'higher' },
     // Ganhas: linhas com status de venda fechada (ou todas, no fallback).
-    { key: 'vendas_ganhas', label: 'Vendas ganhas', agg: 'derived', format: 'integer',
+    { key: 'vendas_ganhas', label: 'Vendas ganhas', agg: 'derived', format: 'integer', betterWhen: 'higher',
       compute: ({ rows, colMap }) => ganhasRows(rows, colMap).length },
     // Faturamento: soma do valor apenas das ganhas.
-    { key: 'faturamento', label: 'Faturamento', agg: 'derived', format: 'currency',
+    { key: 'faturamento', label: 'Faturamento', agg: 'derived', format: 'currency', betterWhen: 'higher',
       compute: ({ rows, colMap }) => somaValor(ganhasRows(rows, colMap), colMap) },
     // Ticket medio: faturamento por venda ganha.
-    { key: 'ticket_medio', label: 'Ticket médio', agg: 'derived', format: 'currency',
+    { key: 'ticket_medio', label: 'Ticket médio', agg: 'derived', format: 'currency', betterWhen: 'higher',
       compute: ({ computed }) => (computed.vendas_ganhas ? computed.faturamento / computed.vendas_ganhas : 0) },
     // Taxa de conversao: ganhas sobre total de negocios.
-    { key: 'taxa_conversao', label: 'Taxa de conversão', agg: 'derived', format: 'percent',
+    { key: 'taxa_conversao', label: 'Taxa de conversão', agg: 'derived', format: 'percent', betterWhen: 'higher',
       compute: ({ computed }) => (computed.num_vendas ? computed.vendas_ganhas / computed.num_vendas : 0) },
   ],
   layout: [
