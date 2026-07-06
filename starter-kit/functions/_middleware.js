@@ -4,10 +4,13 @@
 // - Nunca cacheia /api/dashboards (dados mutáveis).
 // - Sempre devolve Cache-Control: no-store ao browser.
 
+// So expomos GET para cross-origin (leitura). POST/DELETE ficam de fora do CORS:
+// mutacao e same-origin (as proprias paginas), entao o browser bloqueia mutacao
+// cross-origin. Isso, somado a checagem de senha, protege quem muta/le dado protegido.
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, x-dash-auth',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -61,7 +64,10 @@ export async function onRequest(context) {
     return withHeaders(response);
   }
 
-  const cacheKey = url.pathname + url.search;
+  // A chave inclui o header de senha: assim um pedido SEM a senha (ou com senha
+  // errada) tem chave diferente, da cache MISS, cai no handler e recebe 401.
+  // Sem isso, uma resposta de dado protegido cacheada vazaria pra quem nao tem a senha.
+  const cacheKey = url.pathname + url.search + '|' + (request.headers.get('x-dash-auth') || '');
 
   // Tenta servir do cache.
   const hit = await cache.get(cacheKey);

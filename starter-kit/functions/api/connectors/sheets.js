@@ -1,25 +1,11 @@
 // Conector de planilhas Google (Contrato 2).
 // Recebe o link de uma planilha pública e devolve um DataSet.
-// A lógica pura de conversão de link (sheetUrlToCsv) é testável sem rede.
+// A lógica pura de conversão de link (sheetUrlToCsv) vive em lib/sheets-url.mjs
+// e é reexportada aqui para compatibilidade com quem já importava daqui.
 import { parseCSV } from '../../lib/csv.mjs';
+import { sheetUrlToCsv } from '../../lib/sheets-url.mjs';
 
-/**
- * Converte um link de planilha Google no endpoint gviz que devolve CSV.
- * Extrai o ID do trecho /spreadsheets/d/{ID}/ do link.
- * @param {string} url   link completo da planilha
- * @param {string} [gid] aba (gid), default '0'
- * @returns {string} endpoint gviz que responde CSV
- * @throws {Error} se o link não contiver um ID de planilha válido
- */
-export function sheetUrlToCsv(url, gid = '0') {
-  const match = String(url || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!match) {
-    throw new Error('Link de planilha Google inválido. Cole o link completo da planilha.');
-  }
-  const id = match[1];
-  const aba = gid || '0';
-  return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${aba}`;
-}
+export { sheetUrlToCsv };
 
 /**
  * Handler Cloudflare Pages Function.

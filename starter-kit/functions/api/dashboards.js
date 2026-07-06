@@ -82,10 +82,10 @@ export async function onRequest(context) {
       return id ? await getOne(kv, id, providedHash) : await listAll(kv);
     }
     if (method === 'POST') {
-      return await create(kv, request);
+      return await create(kv, request, providedHash);
     }
     if (method === 'DELETE') {
-      return await remove(kv, id);
+      return await remove(kv, id, providedHash);
     }
     return erro(`Método ${method} não suportado.`, 405);
   } catch (err) {
@@ -121,7 +121,14 @@ async function getOne(kv, id, providedHash) {
   return json(stripSecrets(config));
 }
 
-async function create(kv, request) {
+// Carrega a config crua do KV (ou null). Usado para checar protecao antes de mutar.
+async function loadConfig(kv, id) {
+  const raw = await kv.get(kvKey(id));
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+async function create(kv, request, providedHash) {
   let config;
   try {
     config = await request.json();
@@ -145,13 +152,25 @@ async function create(kv, request) {
   if (!config.id) config.id = slugify(config.name);
   if (!config.createdAt) config.createdAt = new Date().toISOString();
 
+  // Nao deixa SOBRESCREVER um dashboard protegido sem a senha dele (senao qualquer
+  // um com o id apagaria/trocaria a config de um dashboard protegido).
+  const existente = await loadConfig(kv, config.id);
+  if (existente && needsAuth(existente) && !authOk(existente, providedHash)) {
+    return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para sobrescrever.', needsPassword: true }, 401);
+  }
+
   await kv.put(kvKey(config.id), JSON.stringify(config));
   return json(stripSecrets(config));
 }
 
-async function remove(kv, id) {
+async function remove(kv, id, providedHash) {
   if (!id) {
     return erro('Parâmetro "id" é obrigatório para excluir um dashboard.', 400);
+  }
+  // Nao deixa EXCLUIR um dashboard protegido sem a senha dele.
+  const existente = await loadConfig(kv, id);
+  if (existente && needsAuth(existente) && !authOk(existente, providedHash)) {
+    return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para excluir.', needsPassword: true }, 401);
   }
   await kv.delete(kvKey(id));
   return json({ ok: true });

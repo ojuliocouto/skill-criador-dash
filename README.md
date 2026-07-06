@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (128 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (145 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -86,7 +86,7 @@ For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 128 unit tests: node --test 'test/*.test.js'
+npm test                      # 145 unit tests: node --test 'test/*.test.js'
 wrangler pages dev public     # local dev server with Functions + KV
 ```
 
@@ -177,20 +177,28 @@ starter-kit/
           funnel.js
           table.js
           ranking.js
-  test/
+  test/                       # 16 test files, all green (node --test test/*.test.js)
     csv.test.js
-    dashboards.test.js
     format.test.js
     metrics.test.js
-    render.test.js
     templates.test.js
     widgets.test.js
+    render.test.js
     wizard.test.js
+    dashboards.test.js
+    middleware.test.js
+    auth.test.js
+    meta.test.js
+    snapshots.test.js
+    trends.test.js
+    vendas-metrics.test.js
+    suporte-metrics.test.js
+    worker-parity.test.js     # guards the snapshot worker against parser drift
 ```
 
 ## Testing
 
-There are 128 unit tests, all green, written before the code (TDD). They cover the pure logic: CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, the wizard flow, and the dashboards CRUD.
+There are 145 unit tests, all green, written before the code (TDD). They cover the pure logic: CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, the wizard flow, and the dashboards CRUD.
 
 ```
 cd starter-kit

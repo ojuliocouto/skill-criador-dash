@@ -34,9 +34,19 @@ Todo conector devolve **exatamente** este formato:
  * @typedef {Object} DataSet
  * @property {string[]} columns   Cabeçalhos, na ordem original. Ex: ["Data","Canal","Investimento"]
  * @property {Object[]} rows      Cada linha é um objeto { [coluna]: valor }. Valores são STRING crua.
- * @property {Object}   meta       { source: 'sheets'|'csv', fetchedAt: ISO string, rowCount: number, name?: string }
+ * @property {Object}   meta       { source: 'sheets'|'csv'|'meta', fetchedAt: ISO string, rowCount: number, name?: string }
  */
 ```
+
+O enum de `meta.source` cobre as fontes que o código realmente emite:
+- `'sheets'`: conector de planilha Google (`connectors/sheets.js`).
+- `'csv'`: upload de CSV (`connectors/csv.js`).
+- `'meta'`: conector Meta Ads (`lib/meta.mjs` carimba `meta.source = 'meta'`).
+
+Além da fonte, o modo de armazenamento é ortogonal ao `DataSet`: no modo ao vivo o
+conector é lido na hora; no modo histórico a config marca `storage: 'd1'` e um cron
+grava snapshots do `DataSet` no D1 (ver Contrato 7). O tipo da fonte (`source.type`)
+não muda entre os modos: o que muda é de onde o dashboard lê o `DataSet` pronto.
 
 Regras:
 - `rows` preserva o valor **como veio** (string). A normalização de número/data é
@@ -61,13 +71,20 @@ export function parseCSV(text /* string */, opts = {}) {} // -> { columns, rows 
 export function detectDelimiter(text) {}                    // -> ',' | ';' | '\t'
 ```
 
-Conectores do MVP:
+Conectores implementados:
 - `sheets.js`: recebe `?url=<link da planilha Google>&gid=<opcional>`. Converte o link em
   endpoint gviz `https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&gid={GID}`,
-  faz `fetch`, passa por `parseCSV`. Extrai o ID do link (`/spreadsheets/d/{ID}/`).
+  faz `fetch`, passa por `parseCSV`. A conversão do link (`sheetUrlToCsv`) vive em
+  `functions/lib/sheets-url.mjs` (compartilhada com o Worker de snapshot, sem drift).
 - `csv.js`: recebe upload (POST body text/csv), passa por `parseCSV` com `detectDelimiter`.
+- `meta-ads.js`: conector REAL do Meta Ads (Facebook/Instagram) via Graph API. Dois modos:
+  `POST` (preview no wizard, recebe `{ token, account, since, until }` no corpo) e
+  `GET ?id=<dashboardId>` (lê a config no KV, usa o token guardado em `source.meta` e
+  busca os insights). O token fica **só no servidor**: nunca vai pro browser. A lógica
+  pura (montar a URL de insights, mapear a resposta para o `DataSet`) vive em
+  `functions/lib/meta.mjs` (`buildInsightsUrl`, `mapInsightsToDataSet`).
 
-Conectores de 2a onda (fora do MVP, deixar como stub documentado): `meta-ads.js`, `crm.js`, `hotmart.js`.
+Conectores de 2a onda (fora do MVP, deixar como stub documentado): `crm.js`, `hotmart.js`.
 
 ---
 
@@ -118,7 +135,7 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
 ```js
 /**
  * @typedef {Object} Template
- * @property {string} id            'marketing' | 'vendas'
+ * @property {string} id            'marketing' | 'vendas' | 'suporte'
  * @property {string} label
  * @property {SlotDef[]} slots      slots semânticos que o usuário mapeia para colunas
  * @property {MetricDef[]} metrics  métricas do domínio (usam os slots)
@@ -140,7 +157,7 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
 export function autoMap(slots, columns) {} // -> { [slotKey]: columnName|null }  casa aliases vs columns
 ```
 
-Templates prontos: `marketing.js`, `vendas.js`, `suporte.js`.
+Templates prontos: `marketing.js`, `vendas.js`, `suporte.js` (3 domínios).
 - **Marketing** slots: data, canal, investimento, impressoes, cliques, leads, conversoes, receita.
   Métricas: investimento (sum), impressoes (sum), cliques (sum), CTR (ratio cliques/impressoes),
   CPC (ratio invest/cliques), leads (sum), CPL (ratio invest/leads), conversoes (sum),
@@ -148,6 +165,9 @@ Templates prontos: `marketing.js`, `vendas.js`, `suporte.js`.
 - **Vendas** slots: data, vendedor, produto, valor, status.
   Métricas: faturamento (sum valor), num_vendas (count), ticket_medio (avg valor),
   ranking por vendedor (groupBy), evolução (timeSeries).
+- **Suporte** slots: data, canal, atendimentos, resolvidos, tempo_resposta, csat.
+  Métricas: atendimentos (sum), resolvidos (sum), tempo_resposta (avg), csat (avg),
+  taxa_resolucao (ratio resolvidos/atendimentos).
 
 `autoMap` normaliza (lowercase, remove acento) tanto os aliases quanto os `columns` e casa por
 inclusão. Slot sem match vira `null` (usuário mapeia na mão no wizard).
@@ -180,19 +200,32 @@ Widgets NÃO conhecem template nem conector. Recebem dados já calculados.
 {
   id: 'slug',
   name: 'Meu Dash de Marketing',
-  domain: 'marketing',
-  source: { type: 'sheets', url: '...', gid: '0' },  // ou { type:'csv', data:'...' }
+  domain: 'marketing',                                // 'marketing' | 'vendas' | 'suporte'
+  source: { type: 'sheets', url: '...', gid: '0' },   // ou { type:'csv', data:'...' }
+                                                      // ou { type:'meta', meta:{ token, account, since, until } }
   colMap: { data:'Data', investimento:'Investimento', ... },
   accent: '#6d28d9',        // cor de destaque (branding)
+  goal: { metricKey:'investimento', value: 10000 },   // opcional: meta vs realizado na métrica principal
+  auth: { hash: '<sha256 da senha>' },                // opcional: senha do dashboard (só o hash SHA-256)
+  storage: 'd1',                                      // opcional: modo histórico (cron grava snapshots no D1)
   createdAt: ISO
 }
 ```
 
+Campos opcionais da config (o código só os grava quando o usuário os preenche):
+- `source.meta`: presente quando `source.type === 'meta'`. Guarda `{ token, account, since, until }`.
+  O `token` fica **só no servidor** (KV): nunca é devolvido ao browser (ver `meta-ads.js` e Contrato 2).
+- `goal`: `{ metricKey, value }`. Habilita a comparação meta vs realizado na métrica principal do domínio.
+- `auth`: `{ hash }` com o SHA-256 da senha (nunca a senha em texto puro). Ao ler/escrever a config
+  protegida, o cliente manda a senha no header `x-dash-auth`; o `hash` nunca é exposto na resposta.
+- `storage: 'd1'`: liga o modo histórico. Nesse modo o Worker de snapshot (cron) grava o `DataSet`
+  no D1 e o dashboard lê o snapshot mais recente. Ausente (ou diferente de `'d1'`) = modo ao vivo.
+
 Fluxo do wizard (`config.html` + `config-wizard.js`), 4 passos:
-1. Escolher domínio (marketing/vendas)
-2. Conectar fonte (colar link Google Sheets / subir CSV), chama conector, mostra preview das colunas
+1. Escolher domínio (marketing/vendas/suporte)
+2. Conectar fonte (colar link Google Sheets / subir CSV / conectar Meta Ads), chama conector, mostra preview das colunas
 3. Mapear colunas (autoMap pré-preenche, usuário ajusta), valida slots required
-4. Nomear + cor de destaque, salva no KV, redireciona pro dashboard
+4. Nomear + cor de destaque + (opcional) meta, senha e modo histórico; salva no KV, redireciona pro dashboard
 
 `dashboard.html` + `dashboard.js`: lê `?id=`, busca config no KV, busca dados via conector,
 roda `computeAll` + layout do template, renderiza widgets.

@@ -45,19 +45,23 @@ export function render(props = {}, points) {
   let body;
   if (n === 1) {
     const c = coords[0];
-    body = `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="4" />`;
+    body = `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="4" vector-effect="non-scaling-size" />`;
   } else {
     const pts = coords.map((c) => `${c.x},${c.y}`).join(' ');
     const dots = coords
-      .map((c) => `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="3" />`)
+      .map((c) => `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="3" vector-effect="non-scaling-size" />`)
       .join('');
     body = `<polyline class="chart__line" fill="none" points="${pts}" />${dots}`;
   }
 
+  // aria-label descritivo para leitores de tela (o SVG e role=img).
+  const label = title ? `Grafico de linha: ${title}` : 'Grafico de linha';
+  // preserveAspectRatio="none" distorcia os circles (viravam ovais) ao esticar o viewBox.
+  // Usamos vector-effect="non-scaling-size" nos pontos abaixo pra manter os circulos redondos.
   return (
     `<div class="chart chart--timeseries">` +
       titleHtml +
-      `<svg class="chart__svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">` +
+      `<svg class="chart__svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(label)}">` +
         body +
       `</svg>` +
     `</div>`

@@ -49,6 +49,15 @@ export async function deleteDashboard(id) {
   return jsonOrThrow(await fetch(`/api/dashboards?id=${encodeURIComponent(id)}`, { method: 'DELETE' }));
 }
 
+// Header de senha (se houver) para os endpoints de DADOS por id (D1, Meta).
+function authHeader(id) {
+  try {
+    const h = sessionStorage.getItem(AUTH_KEY(id));
+    if (h) return { 'x-dash-auth': h };
+  } catch { /* ignora */ }
+  return {};
+}
+
 // ---- Conectores (fontes de dados) -> devolvem DataSet {columns, rows, meta} ----
 export async function fetchSheet(url, gid = '0') {
   const qs = new URLSearchParams({ url, gid });
@@ -72,12 +81,12 @@ export async function previewMeta(params) {
 }
 // Meta Ads: dados de um dashboard ja salvo (token fica no servidor, buscado por id).
 export async function fetchMetaById(id) {
-  return jsonOrThrow(await fetch(`/api/connectors/meta-ads?id=${encodeURIComponent(id)}`));
+  return jsonOrThrow(await fetch(`/api/connectors/meta-ads?id=${encodeURIComponent(id)}`, { headers: authHeader(id) }));
 }
 
 // Modo historico: le o snapshot mais recente gravado pelo cron no D1.
 export async function fetchD1(id) {
-  return jsonOrThrow(await fetch(`/api/connectors/d1?id=${encodeURIComponent(id)}`));
+  return jsonOrThrow(await fetch(`/api/connectors/d1?id=${encodeURIComponent(id)}`, { headers: authHeader(id) }));
 }
 
 // Busca o DataSet de acordo com o source salvo na config.

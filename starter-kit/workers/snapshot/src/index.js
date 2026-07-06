@@ -3,12 +3,20 @@
 // fonte seja viva (sheets ou meta), busca o DataSet atual e grava um snapshot no D1.
 // Fontes 'csv' são estáticas (o dado já está salvo na config), então são puladas.
 //
-// Este Worker vive em workers/snapshot/, fora de functions/. Para não criar uma
-// dependência cruzada de import com functions/lib, o SQL do INSERT e um parse de
-// CSV mínimo são feitos inline aqui. A referência canônica da lógica pura de
-// snapshots continua sendo functions/lib/snapshots.mjs.
+// Este Worker vive em workers/snapshot/, fora de functions/. O bundler do
+// wrangler (esbuild) segue imports relativos, então importamos a MESMA lógica
+// pura de parse de CSV e de conversão de link do Sheets usada pelos conectores
+// de Pages. Isso elimina o drift: não há cópia inline aqui. A referência
+// canônica da lógica pura de snapshots continua sendo functions/lib/snapshots.mjs.
 //
 // Sem libs externas.
+import { parseCSV } from '../../../functions/lib/csv.mjs';
+import { sheetUrlToCsv } from '../../../functions/lib/sheets-url.mjs';
+
+// Reexporta a lógica pura compartilhada para que o teste de paridade
+// (test/worker-parity.test.js) possa importar daqui e conferir que é a MESMA
+// função usada pelos conectores de Pages, sem cópia inline no Worker.
+export { parseCSV, sheetUrlToCsv };
 
 const TABLE = 'snapshots';
 
@@ -84,20 +92,15 @@ async function fetchDataSet(type, source) {
  * @returns {Promise<Object>} DataSet
  */
 async function fetchSheetsDataSet(source) {
-  const match = String((source && source.url) || '').match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!match) {
-    throw new Error('Link de planilha Google inválido.');
-  }
-  const id = match[1];
   const gid = (source && source.gid) || '0';
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  const csvUrl = sheetUrlToCsv((source && source.url) || '', gid);
 
   const resp = await fetch(csvUrl, { redirect: 'follow' });
   if (!resp.ok) {
     throw new Error(`Planilha respondeu ${resp.status}. Confira se está pública.`);
   }
   const text = await resp.text();
-  const { columns, rows } = parseCSVInline(text);
+  const { columns, rows } = parseCSV(text);
   return {
     columns,
     rows,
@@ -166,92 +169,4 @@ async function fetchMetaDataSet(source) {
     rows,
     meta: { source: 'meta', fetchedAt: new Date().toISOString(), rowCount: rows.length },
   };
-}
-
-/**
- * Parse de CSV mínimo (inline), suficiente para o snapshot. Trata aspas duplas
- * básicas (campo entre aspas com delimitador/quebra dentro e aspa escapada "").
- * Delimitador fixo em vírgula (padrão do gviz CSV do Google Sheets).
- * @param {string} text
- * @returns {{ columns: string[], rows: Object[] }}
- */
-function parseCSVInline(text) {
-  const raw = text == null ? '' : String(text);
-  if (raw.trim() === '') return { columns: [], rows: [] };
-
-  const records = [];
-  let field = '';
-  let record = [];
-  let inQuotes = false;
-  let i = 0;
-  const len = raw.length;
-  const delimiter = ',';
-
-  const pushField = () => {
-    record.push(field);
-    field = '';
-  };
-  const pushRecord = () => {
-    pushField();
-    records.push(record);
-    record = [];
-  };
-
-  while (i < len) {
-    const ch = raw[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (raw[i + 1] === '"') {
-          field += '"';
-          i += 2;
-          continue;
-        }
-        inQuotes = false;
-        i++;
-        continue;
-      }
-      field += ch;
-      i++;
-      continue;
-    }
-    if (ch === '"') {
-      inQuotes = true;
-      i++;
-      continue;
-    }
-    if (ch === delimiter) {
-      pushField();
-      i++;
-      continue;
-    }
-    if (ch === '\r') {
-      if (raw[i + 1] === '\n') i++;
-      pushRecord();
-      i++;
-      continue;
-    }
-    if (ch === '\n') {
-      pushRecord();
-      i++;
-      continue;
-    }
-    field += ch;
-    i++;
-  }
-  if (field !== '' || record.length > 0) pushRecord();
-
-  if (records.length === 0) return { columns: [], rows: [] };
-
-  const columns = records[0].map((c) => c.trim());
-  const rows = [];
-  for (let r = 1; r < records.length; r++) {
-    const fields = records[r];
-    if (fields.every((f) => f.trim() === '')) continue;
-    const row = {};
-    for (let c = 0; c < columns.length; c++) {
-      row[columns[c]] = fields[c] !== undefined ? fields[c] : '';
-    }
-    rows.push(row);
-  }
-  return { columns, rows };
 }

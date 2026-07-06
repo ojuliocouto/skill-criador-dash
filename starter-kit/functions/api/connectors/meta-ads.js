@@ -8,6 +8,7 @@
 //    source.meta e busca os dados. O token fica SO no servidor, nunca vai pro browser.
 
 import { buildInsightsUrl, mapInsightsToDataSet } from '../../lib/meta.mjs';
+import { needsAuth, authOk } from '../dashboards.js';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
@@ -44,6 +45,10 @@ export async function onRequest(context) {
       if (!raw) return erro('Dashboard nao encontrado.', 404);
       let config;
       try { config = JSON.parse(raw); } catch { return erro('Configuracao corrompida.', 500); }
+      // Protecao por senha: dashboard protegido exige a senha tambem para os DADOS.
+      if (needsAuth(config) && !authOk(config, request.headers.get('x-dash-auth') || '')) {
+        return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
+      }
       const m = config.source && config.source.meta;
       if (!m || !m.token) return erro('Este dashboard nao tem conector Meta Ads configurado.', 400);
       return json(await fetchMeta(m));

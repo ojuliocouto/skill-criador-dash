@@ -2,11 +2,21 @@
 // Em vez de bater na fonte ao vivo, lê o snapshot mais recente que o cron gravou.
 // A lógica pura de SQL e de reidratação vive em functions/lib/snapshots.mjs.
 import { latestSnapshotSQL, rowToDataSet } from '../../lib/snapshots.mjs';
+import { needsAuth, authOk } from '../dashboards.js';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+}
+
+// Carrega a config do dashboard no KV para checar protecao por senha.
+async function loadConfig(env, id) {
+  const kv = env && env.DASHBOARDS_KV;
+  if (!kv) return null;
+  const raw = await kv.get(`dash:${id}`);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
 }
 
 /**
@@ -33,6 +43,13 @@ export async function onRequest(context) {
   const id = searchParams.get('id');
   if (!id) {
     return json({ error: 'Parâmetro "id" do dashboard é obrigatório.' }, 400);
+  }
+
+  // Protecao por senha: se o dashboard e protegido, os DADOS tambem exigem a senha
+  // (senao a senha protegeria so a config e nao o conteudo).
+  const config = await loadConfig(env, id);
+  if (config && needsAuth(config) && !authOk(config, request.headers.get('x-dash-auth') || '')) {
+    return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
   }
 
   try {
