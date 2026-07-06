@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PECAS (biblioteca provada em `starter-kit/`)
 
-Codigo real e testado (169 testes verdes, TDD). Voce compoe a partir daqui.
+Codigo real e testado (185 testes verdes, TDD). Voce compoe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Nao sabem de metricas.
@@ -172,7 +172,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           169 testes (npm test  ->  node --test test/*.test.js)
+test/                           185 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local:
@@ -240,11 +240,12 @@ No projeto Pages > Settings > Bindings, adicione o binding D1 `DASHBOARD_DB` apo
 A primeira captura acontece no proximo disparo do cron (de hora em hora), entao o dashboard mostra
 "Ainda nao ha dados capturados" ate la (nao esta quebrado). Para ver dado NA HORA, force uma captura:
 ```
-cd workers/snapshot && wrangler dev --remote      # usa o D1/KV reais
+cd workers/snapshot && wrangler dev --remote --test-scheduled   # --test-scheduled expoe a rota /__scheduled; --remote usa o D1/KV reais
 # noutro terminal, dispara o scheduled uma vez:
 curl "http://localhost:8787/__scheduled?cron=0+*+*+*+*"
 ```
-Depois e so recarregar o dashboard. (Alternativa: inserir um snapshot manual no D1 com um INSERT em `snapshots`.)
+Sem o flag `--test-scheduled` a rota `/__scheduled` nao existe e o curl da 404. Depois e so recarregar
+o dashboard. (Alternativa: inserir um snapshot manual no D1 com um INSERT em `snapshots`.)
 
 Deploy do Pages: sem CLOUDFLARE_API_TOKEN forcado, usa o OAuth do `wrangler login`.
 

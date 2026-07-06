@@ -33,7 +33,7 @@ export function validateRequired(slots, colMap) {
 
 const state = {
   step: 1, // 1..4
-  domain: null, // 'marketing' | 'vendas'
+  domain: null, // 'marketing' | 'vendas' | 'suporte'
   source: null, // { type:'sheets', url, gid } | { type:'csv', data }
   dataset: null, // DataSet { columns, rows, meta }
   colMap: {}, // { slotKey: columnName|null }

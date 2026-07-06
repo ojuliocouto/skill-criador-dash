@@ -83,8 +83,13 @@ Conectores implementados:
   busca os insights). O token fica **só no servidor**: nunca vai pro browser. A lógica
   pura (montar a URL de insights, mapear a resposta para o `DataSet`) vive em
   `functions/lib/meta.mjs` (`buildInsightsUrl`, `mapInsightsToDataSet`).
+- `d1.js`: conector do MODO HISTORICO. Nao bate na fonte viva: le o snapshot mais recente
+  gravado pelo cron no D1 (via `functions/lib/snapshots.mjs`). So faz sentido com `storage:'d1'`.
 
 Conectores de 2a onda (fora do MVP, deixar como stub documentado): `crm.js`, `hotmart.js`.
+
+Os conectores por id (`d1.js`, `meta-ads.js` GET) checam a senha do dashboard antes de devolver
+dados, importando `needsAuth`/`authOk` de `functions/lib/auth-config.mjs` (modulo neutro, nao de `dashboards.js`).
 
 ---
 
@@ -168,8 +173,12 @@ Templates prontos: `marketing.js`, `vendas.js`, `suporte.js` (3 domínios).
   CPC (ratio invest/cliques), leads (sum), CPL (ratio invest/leads), conversoes (sum),
   CPA (ratio invest/conversoes), ROAS (derived receita/investimento).
 - **Vendas** slots: data, vendedor, produto, valor, status.
-  Métricas: faturamento (sum valor), num_vendas (count), ticket_medio (avg valor),
-  ranking por vendedor (groupBy), evolução (timeSeries).
+  Métricas: num_vendas (count), vendas_ganhas (derived: conta linhas com status "ganho"),
+  faturamento (derived: soma do valor SO das ganhas), ticket_medio (derived: faturamento/ganhas),
+  taxa_conversao (derived: ganhas/num_vendas). Layout tambem tem funil, timeSeries e rankings.
+  Nota: um `derived.compute` PODE ser imperativo e usar `lib/format.js` (o vendas.js filtra as
+  linhas ganhas e soma via `parseNumberBR`); marketing e suporte sao 100% declarativos. O contrato
+  permite as duas formas: `sum/avg/count/ratio` declarativos, ou `derived` com `compute` proprio.
 - **Suporte** slots: data, canal, atendimentos, resolvidos, tempo_resposta, csat.
   Métricas: atendimentos (sum), resolvidos (sum), tempo_resposta (avg), csat (avg),
   taxa_resolucao (ratio resolvidos/atendimentos).

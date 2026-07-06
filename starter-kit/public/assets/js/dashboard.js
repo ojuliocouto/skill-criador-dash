@@ -16,6 +16,35 @@ import { registry } from './widgets/index.js';
 const DEFAULT_ACCENT = '#6d28d9';
 
 /**
+ * Decide a cor do texto que fica SOBRE o accent (fundo de botao, chip ativo).
+ * Calcula a luminancia relativa (WCAG) do accent e devolve texto escuro em
+ * accent claro (amarelo, ciano, lima) ou texto branco em accent escuro.
+ * Hex invalido cai no fallback seguro '#fff' (o accent padrao e escuro).
+ *
+ * @param {string} hex cor do accent (#rgb ou #rrggbb)
+ * @returns {'#111'|'#fff'}
+ */
+export function accentForeground(hex) {
+  if (typeof hex !== 'string') return '#fff';
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3) {
+    h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  }
+  if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return '#fff';
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  // Luminancia relativa WCAG: linearizar cada canal e ponderar.
+  const lin = (c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  // Limiar 0.5: acima disso o accent e claro, entao texto escuro contrasta melhor.
+  return luminance > 0.5 ? '#111' : '#fff';
+}
+
+/**
  * Agrupa itens de layout: kpis consecutivos viram um unico bloco 'kpis';
  * qualquer outro widget vira um bloco 'single'.
  * @param {Array<{widget:string, props:object}>} layout
@@ -296,6 +325,8 @@ async function init() {
   // 2. Cor de destaque + topbar
   const accent = config.accent || DEFAULT_ACCENT;
   document.documentElement.style.setProperty('--accent', accent);
+  // Texto sobre o accent: preto em accent claro, branco em accent escuro (contraste WCAG).
+  document.documentElement.style.setProperty('--accent-fg', accentForeground(accent));
   renderTopbar(config, id);
 
   // 3. Template
