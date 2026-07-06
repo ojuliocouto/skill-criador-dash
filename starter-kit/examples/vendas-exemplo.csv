@@ -1,0 +1,16 @@
+Data,Vendedor,Produto,Valor,Status
+01/07/2026,Ana Paula,Plano Pro,"1.997,00",Ganha
+01/07/2026,Bruno Lima,Plano Start,"497,00",Ganha
+02/07/2026,Ana Paula,Plano Enterprise,"4.997,00",Ganha
+02/07/2026,Carla Souza,Plano Pro,"1.997,00",Ganha
+02/07/2026,Bruno Lima,Plano Start,"497,00",Perdida
+03/07/2026,Ana Paula,Plano Pro,"1.997,00",Ganha
+03/07/2026,Carla Souza,Plano Start,"497,00",Ganha
+03/07/2026,Diego Alves,Plano Pro,"1.997,00",Ganha
+04/07/2026,Bruno Lima,Plano Enterprise,"4.997,00",Ganha
+04/07/2026,Carla Souza,Plano Pro,"1.997,00",Ganha
+04/07/2026,Ana Paula,Plano Start,"497,00",Ganha
+05/07/2026,Diego Alves,Plano Enterprise,"4.997,00",Ganha
+05/07/2026,Carla Souza,Plano Pro,"1.997,00",Ganha
+05/07/2026,Bruno Lima,Plano Pro,"1.997,00",Ganha
+05/07/2026,Ana Paula,Plano Enterprise,"4.997,00",Ganha

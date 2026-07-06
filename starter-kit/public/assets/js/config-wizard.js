@@ -1,0 +1,418 @@
+// Wizard de configuração do dashboard. 4 passos, tudo client-side vanilla ESM.
+// Importa apenas módulos prontos (read-only): api-client, templates, automap.
+
+import { fetchSheet, uploadCsv, saveDashboard } from './lib/api-client.js';
+import { templates, getTemplate } from './templates/index.js';
+import { autoMap } from './lib/automap.js';
+
+// ---------------------------------------------------------------------------
+// Validação pura de slots obrigatórios (testável, named export).
+// Retorna a lista de slots required que não têm coluna escolhida.
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {{key:string,label:string,required:boolean}[]} slots
+ * @param {{ [slotKey:string]: string|null }} colMap
+ * @returns {{key:string,label:string}[]} slots obrigatórios sem coluna mapeada
+ */
+export function validateRequired(slots, colMap) {
+  const map = colMap || {};
+  return (slots || [])
+    .filter((s) => s && s.required)
+    .filter((s) => {
+      const v = map[s.key];
+      return v == null || String(v).trim() === '';
+    })
+    .map((s) => ({ key: s.key, label: s.label }));
+}
+
+// ---------------------------------------------------------------------------
+// Estado em memória.
+// ---------------------------------------------------------------------------
+
+const state = {
+  step: 1, // 1..4
+  domain: null, // 'marketing' | 'vendas'
+  source: null, // { type:'sheets', url, gid } | { type:'csv', data }
+  dataset: null, // DataSet { columns, rows, meta }
+  colMap: {}, // { slotKey: columnName|null }
+  name: '',
+  accent: '#6d28d9',
+  connecting: false, // trava o botão Conectar durante a chamada
+};
+
+const STEPS = [
+  { n: 1, label: 'Domínio' },
+  { n: 2, label: 'Fonte' },
+  { n: 3, label: 'Mapear' },
+  { n: 4, label: 'Finalizar' },
+];
+
+// ---------------------------------------------------------------------------
+// Helpers de DOM.
+// ---------------------------------------------------------------------------
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'text') node.textContent = v;
+    else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v);
+  }
+  for (const c of [].concat(children)) {
+    if (c == null) continue;
+    node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  }
+  return node;
+}
+
+function errorBox(message) {
+  return el('p', { class: 'error', text: message });
+}
+
+// ---------------------------------------------------------------------------
+// Barra de passos.
+// ---------------------------------------------------------------------------
+
+function renderSteps() {
+  const bar = document.getElementById('steps');
+  bar.innerHTML = '';
+  for (const s of STEPS) {
+    const cls = ['step-chip'];
+    if (s.n === state.step) cls.push('active');
+    else if (s.n < state.step) cls.push('done');
+    const chip = el('div', { class: cls.join(' ') }, [
+      el('span', { class: 'num', text: s.n < state.step ? '✓' : String(s.n) }),
+      el('span', { text: s.label }),
+    ]);
+    bar.appendChild(chip);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Navegação.
+// ---------------------------------------------------------------------------
+
+function goTo(step) {
+  state.step = step;
+  render();
+}
+
+function actions({ onBack, onNext, nextLabel = 'Avançar', nextDisabled = false, extra = null }) {
+  const row = el('div', { class: 'row-actions' });
+  if (onBack) row.appendChild(el('button', { class: 'btn ghost', type: 'button', onclick: onBack, text: 'Voltar' }));
+  if (extra) row.appendChild(extra);
+  if (onNext) {
+    const btn = el('button', { class: 'btn', type: 'button', onclick: onNext, text: nextLabel });
+    if (nextDisabled) btn.disabled = true;
+    row.appendChild(btn);
+  }
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// Passo 1: Domínio.
+// ---------------------------------------------------------------------------
+
+const DOMAIN_DESC = {
+  marketing: 'Investimento, cliques, CTR, CPL, CPA e ROAS por canal e ao longo do tempo.',
+  vendas: 'Faturamento, número de vendas, ticket médio e ranking por vendedor e produto.',
+};
+
+function renderDomain(body) {
+  body.appendChild(el('h2', { text: 'Escolha o domínio' }));
+  body.appendChild(el('p', { class: 'hint', text: 'O domínio define quais métricas e widgets o dashboard vai mostrar.' }));
+
+  const choices = el('div', { class: 'choices' });
+  for (const id of Object.keys(templates)) {
+    const tpl = templates[id];
+    const cls = ['choice', 'card'];
+    if (state.domain === id) cls.push('selected');
+    const card = el('div', { class: cls.join(' '), role: 'button', tabindex: '0' }, [
+      el('h3', { text: tpl.label }),
+      el('p', { text: DOMAIN_DESC[id] || '' }),
+    ]);
+    const pick = () => {
+      state.domain = id;
+      goTo(2);
+    };
+    card.addEventListener('click', pick);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+    });
+    choices.appendChild(card);
+  }
+  body.appendChild(choices);
+}
+
+// ---------------------------------------------------------------------------
+// Passo 2: Fonte.
+// ---------------------------------------------------------------------------
+
+function renderSource(body) {
+  body.appendChild(el('h2', { text: 'Conecte a fonte de dados' }));
+
+  // Opção A: Google Sheets
+  const sheetsCard = el('div', { class: 'card' }, [
+    el('h3', { text: 'Google Sheets' }),
+    el('p', { class: 'hint', text: 'Cole o link da planilha. A planilha precisa estar compartilhada como "qualquer pessoa com o link".' }),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Link da planilha' }),
+      el('input', { class: 'input', id: 'sheetUrl', type: 'url', placeholder: 'https://docs.google.com/spreadsheets/d/...' }),
+    ]),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'gid da aba (opcional)' }),
+      el('input', { class: 'input', id: 'sheetGid', type: 'text', placeholder: '0' }),
+    ]),
+    el('button', { class: 'btn', type: 'button', id: 'connectSheet', text: 'Conectar planilha' }),
+  ]);
+  sheetsCard.style.marginBottom = '16px';
+
+  // Opção B: CSV
+  const csvCard = el('div', { class: 'card' }, [
+    el('h3', { text: 'Arquivo CSV' }),
+    el('p', { class: 'hint', text: 'Suba um arquivo .csv do seu computador.' }),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Arquivo' }),
+      el('input', { class: 'input', id: 'csvFile', type: 'file', accept: '.csv,text/csv' }),
+    ]),
+    el('button', { class: 'btn', type: 'button', id: 'connectCsv', text: 'Conectar CSV' }),
+  ]);
+
+  body.appendChild(sheetsCard);
+  body.appendChild(csvCard);
+
+  const feedback = el('div', { id: 'sourceFeedback' });
+  body.appendChild(feedback);
+
+  // Se já conectou antes, mostra o preview de novo.
+  if (state.dataset) feedback.appendChild(preview(state.dataset));
+
+  const nav = actions({
+    onBack: () => goTo(1),
+    onNext: () => { if (state.dataset) goTo(3); },
+    nextDisabled: !state.dataset,
+  });
+  body.appendChild(nav);
+
+  const nextBtn = nav.querySelector('.btn:not(.ghost)');
+
+  function setConnecting(on) {
+    state.connecting = on;
+    sheetsCard.querySelector('#connectSheet').disabled = on;
+    csvCard.querySelector('#connectCsv').disabled = on;
+  }
+
+  function onConnected(ds, source) {
+    state.dataset = ds;
+    state.source = source;
+    // Novo dataset invalida mapeamento anterior.
+    state.colMap = {};
+    feedback.innerHTML = '';
+    feedback.appendChild(preview(ds));
+    nextBtn.disabled = false;
+  }
+
+  function onError(e) {
+    feedback.innerHTML = '';
+    feedback.appendChild(errorBox(e && e.message ? e.message : 'Não foi possível conectar à fonte.'));
+    nextBtn.disabled = !state.dataset;
+  }
+
+  sheetsCard.querySelector('#connectSheet').addEventListener('click', async () => {
+    if (state.connecting) return;
+    const url = sheetsCard.querySelector('#sheetUrl').value.trim();
+    const gid = sheetsCard.querySelector('#sheetGid').value.trim() || '0';
+    feedback.innerHTML = '';
+    if (!url) { feedback.appendChild(errorBox('Cole o link da planilha antes de conectar.')); return; }
+    setConnecting(true);
+    feedback.appendChild(el('p', { class: 'hint', text: 'Conectando...' }));
+    try {
+      const ds = await fetchSheet(url, gid);
+      onConnected(ds, { type: 'sheets', url, gid });
+    } catch (e) {
+      onError(e);
+    } finally {
+      setConnecting(false);
+    }
+  });
+
+  csvCard.querySelector('#connectCsv').addEventListener('click', () => {
+    if (state.connecting) return;
+    const input = csvCard.querySelector('#csvFile');
+    const file = input.files && input.files[0];
+    feedback.innerHTML = '';
+    if (!file) { feedback.appendChild(errorBox('Selecione um arquivo CSV antes de conectar.')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => { setConnecting(false); onError(new Error('Falha ao ler o arquivo.')); };
+    reader.onload = async () => {
+      const text = String(reader.result || '');
+      feedback.innerHTML = '';
+      feedback.appendChild(el('p', { class: 'hint', text: 'Conectando...' }));
+      try {
+        const ds = await uploadCsv(text);
+        onConnected(ds, { type: 'csv', data: text });
+      } catch (e) {
+        onError(e);
+      } finally {
+        setConnecting(false);
+      }
+    };
+    setConnecting(true);
+    reader.readAsText(file);
+  });
+}
+
+function preview(ds) {
+  const cols = ds.columns || [];
+  const rowCount = (ds.meta && ds.meta.rowCount != null) ? ds.meta.rowCount : (ds.rows ? ds.rows.length : 0);
+  const box = el('div', { class: 'card' }, [
+    el('h3', { text: 'Fonte conectada' }),
+    el('p', { class: 'hint', text: `${rowCount} linha(s) detectada(s).` }),
+    el('p', { class: 'lbl', text: `Colunas detectadas (${cols.length}):` }),
+  ]);
+  const wrap = el('div');
+  for (const c of cols) wrap.appendChild(el('span', { class: 'badge', text: c }));
+  // Espacinho entre os badges.
+  wrap.querySelectorAll('.badge').forEach((b) => { b.style.marginRight = '6px'; b.style.marginBottom = '6px'; });
+  box.appendChild(wrap);
+  box.style.marginTop = '16px';
+  return box;
+}
+
+// ---------------------------------------------------------------------------
+// Passo 3: Mapear colunas.
+// ---------------------------------------------------------------------------
+
+function renderMap(body) {
+  const tpl = getTemplate(state.domain);
+  if (!tpl) { body.appendChild(errorBox('Domínio inválido.')); return; }
+  const columns = (state.dataset && state.dataset.columns) || [];
+
+  // Pré-preenche com autoMap se ainda não houver mapeamento definido.
+  if (!state.colMap || Object.keys(state.colMap).length === 0) {
+    state.colMap = autoMap(tpl.slots, columns);
+  }
+
+  body.appendChild(el('h2', { text: 'Mapeie as colunas' }));
+  body.appendChild(el('p', { class: 'hint', text: 'Cada campo do domínio aponta para uma coluna da sua fonte. Os campos com asterisco são obrigatórios.' }));
+
+  const card = el('div', { class: 'card' });
+  for (const slot of tpl.slots) {
+    const label = el('span', { class: 'slot' }, [slot.label]);
+    if (slot.required) label.appendChild(el('span', { class: 'req', text: '*' }));
+
+    const select = el('select', { class: 'input', 'data-slot': slot.key });
+    select.appendChild(el('option', { value: '', text: '(nenhuma)' }));
+    for (const c of columns) select.appendChild(el('option', { value: c, text: c }));
+    const cur = state.colMap[slot.key];
+    select.value = cur == null ? '' : cur;
+    select.addEventListener('change', () => {
+      state.colMap[slot.key] = select.value === '' ? null : select.value;
+    });
+
+    card.appendChild(el('div', { class: 'maprow' }, [label, select]));
+  }
+  body.appendChild(card);
+
+  const feedback = el('div', { id: 'mapFeedback' });
+  body.appendChild(feedback);
+
+  body.appendChild(actions({
+    onBack: () => goTo(2),
+    onNext: () => {
+      const missing = validateRequired(tpl.slots, state.colMap);
+      feedback.innerHTML = '';
+      if (missing.length) {
+        const nomes = missing.map((m) => m.label).join(', ');
+        feedback.appendChild(errorBox(`Escolha uma coluna para os campos obrigatórios: ${nomes}.`));
+        return;
+      }
+      goTo(4);
+    },
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Passo 4: Finalizar.
+// ---------------------------------------------------------------------------
+
+function renderFinish(body) {
+  body.appendChild(el('h2', { text: 'Finalize o dashboard' }));
+
+  const card = el('div', { class: 'card' }, [
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Nome do dashboard' }),
+      el('input', { class: 'input', id: 'dashName', type: 'text', placeholder: 'Ex: Marketing setembro', value: state.name || '' }),
+    ]),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Cor de destaque' }),
+      el('input', { class: 'input', id: 'dashAccent', type: 'color', value: state.accent || '#6d28d9' }),
+    ]),
+  ]);
+  body.appendChild(card);
+
+  const feedback = el('div', { id: 'finishFeedback' });
+  body.appendChild(feedback);
+
+  const nav = actions({
+    onBack: () => goTo(3),
+    onNext: onCreate,
+    nextLabel: 'Criar dashboard',
+  });
+  body.appendChild(nav);
+
+  const createBtn = nav.querySelector('.btn:not(.ghost)');
+
+  async function onCreate() {
+    const name = card.querySelector('#dashName').value.trim();
+    const accent = card.querySelector('#dashAccent').value || '#6d28d9';
+    state.name = name;
+    state.accent = accent;
+    feedback.innerHTML = '';
+
+    if (!name) { feedback.appendChild(errorBox('Dê um nome ao dashboard.')); return; }
+
+    const config = {
+      name,
+      domain: state.domain,
+      source: state.source,
+      colMap: state.colMap,
+      accent,
+    };
+
+    createBtn.disabled = true;
+    feedback.appendChild(el('p', { class: 'hint', text: 'Salvando...' }));
+    try {
+      const saved = await saveDashboard(config);
+      const id = saved && saved.id;
+      if (!id) throw new Error('O servidor não retornou o id do dashboard.');
+      window.location.href = `/dashboard.html?id=${encodeURIComponent(id)}`;
+    } catch (e) {
+      feedback.innerHTML = '';
+      feedback.appendChild(errorBox(e && e.message ? e.message : 'Não foi possível salvar o dashboard.'));
+      createBtn.disabled = false;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Render principal.
+// ---------------------------------------------------------------------------
+
+function render() {
+  renderSteps();
+  const body = document.getElementById('stepBody');
+  body.innerHTML = '';
+  if (state.step === 1) renderDomain(body);
+  else if (state.step === 2) renderSource(body);
+  else if (state.step === 3) renderMap(body);
+  else if (state.step === 4) renderFinish(body);
+}
+
+// Só inicializa a UI quando há DOM (evita rodar sob node:test).
+if (typeof document !== 'undefined' && document.getElementById('steps')) {
+  render();
+}

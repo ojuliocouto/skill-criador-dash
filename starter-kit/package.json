@@ -1,0 +1,11 @@
+{
+  "name": "criador-dash-starter-kit",
+  "version": "2.0.0",
+  "description": "Dashboard genérico plug-and-play (Marketing e Vendas) para Cloudflare Pages",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/",
+    "dev": "wrangler pages dev public --compatibility-date=2026-01-01"
+  },
+  "license": "MIT"
+}
