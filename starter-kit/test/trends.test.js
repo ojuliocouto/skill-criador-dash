@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { splitByPeriod, buildTrends } from '../public/assets/js/dashboard.js';
+import { splitByPeriod, buildTrends, buildGoal } from '../public/assets/js/dashboard.js';
 
 const colMap = { data: 'Data', invest: 'Invest' };
 
@@ -75,4 +75,18 @@ test('buildTrends: sem previous nao gera tendencia', () => {
 test('buildTrends: metrica sem betterWhen nao gera tendencia', () => {
   const metrics = [{ key: 'invest', agg: 'sum', column: 'invest' }];
   assert.deepEqual(buildTrends(metrics, [{ Invest: '20' }], [{ Invest: '10' }], colMap), {});
+});
+
+test('buildGoal: calcula percentual da meta', () => {
+  const g = buildGoal({ goal: { metricKey: 'leads', value: 1000 } }, { leads: 1001 });
+  assert.equal(g.metricKey, 'leads');
+  assert.ok(Math.abs(g.pct - 1.001) < 1e-9);
+  assert.match(g.text, /da meta/);
+});
+
+test('buildGoal: sem meta, meta <= 0 ou metrica ausente devolve null', () => {
+  assert.equal(buildGoal({}, { leads: 10 }), null);
+  assert.equal(buildGoal({ goal: { metricKey: 'leads', value: 0 } }, { leads: 10 }), null);
+  assert.equal(buildGoal({ goal: { metricKey: 'leads', value: -5 } }, { leads: 10 }), null);
+  assert.equal(buildGoal({ goal: { metricKey: 'x', value: 100 } }, {}), null);
 });

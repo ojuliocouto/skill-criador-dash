@@ -32,6 +32,8 @@ function somaValor(rows, colMap) {
 export const template = {
   id: 'vendas',
   label: 'Vendas',
+  // Metrica sugerida para a meta opcional (meta vs realizado).
+  primaryMetric: 'faturamento',
   slots: [
     { key: 'data', label: 'Data', required: true, aliases: ['data', 'dia', 'date'] },
     { key: 'vendedor', label: 'Vendedor', required: false, aliases: ['vendedor', 'vendedora', 'responsavel', 'sdr', 'closer', 'seller'] },

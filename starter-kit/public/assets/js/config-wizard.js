@@ -343,7 +343,13 @@ function renderMap(body) {
 function renderFinish(body) {
   body.appendChild(el('h2', { text: 'Finalize o dashboard' }));
 
-  const card = el('div', { class: 'card' }, [
+  // Metrica principal do dominio, para a meta opcional (meta vs realizado).
+  const tpl = getTemplate(state.domain) || {};
+  const primaryKey = tpl.primaryMetric;
+  const primaryDef = (tpl.metrics || []).find((m) => m.key === primaryKey);
+  const primaryLabel = primaryDef ? primaryDef.label : 'meta';
+
+  const fields = [
     el('label', { class: 'field' }, [
       el('span', { class: 'lbl', text: 'Nome do dashboard' }),
       el('input', { class: 'input', id: 'dashName', type: 'text', placeholder: 'Ex: Marketing setembro', value: state.name || '' }),
@@ -352,7 +358,15 @@ function renderFinish(body) {
       el('span', { class: 'lbl', text: 'Cor de destaque' }),
       el('input', { class: 'input', id: 'dashAccent', type: 'color', value: state.accent || '#6d28d9' }),
     ]),
-  ]);
+  ];
+  if (primaryKey) {
+    fields.push(el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: `Meta de ${primaryLabel} (opcional)` }),
+      el('input', { class: 'input', id: 'dashGoal', type: 'number', min: '0', placeholder: 'Deixe em branco se nao tiver meta' }),
+      el('span', { class: 'hint', text: 'Mostra o progresso (percentual da meta) no card principal.' }),
+    ]));
+  }
+  const card = el('div', { class: 'card' }, fields);
   body.appendChild(card);
 
   const feedback = el('div', { id: 'finishFeedback' });
@@ -383,6 +397,13 @@ function renderFinish(body) {
       colMap: state.colMap,
       accent,
     };
+
+    // Meta opcional (meta vs realizado) na metrica principal do dominio.
+    const goalInput = card.querySelector('#dashGoal');
+    const goalVal = goalInput ? Number(goalInput.value) : NaN;
+    if (primaryKey && Number.isFinite(goalVal) && goalVal > 0) {
+      config.goal = { metricKey: primaryKey, value: goalVal };
+    }
 
     createBtn.disabled = true;
     feedback.appendChild(el('p', { class: 'hint', text: 'Salvando...' }));

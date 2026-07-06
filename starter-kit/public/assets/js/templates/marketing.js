@@ -5,6 +5,8 @@
 export const template = {
   id: 'marketing',
   label: 'Marketing',
+  // Metrica sugerida para a meta opcional (meta vs realizado).
+  primaryMetric: 'leads',
   slots: [
     { key: 'data', label: 'Data', required: true, aliases: ['data', 'dia', 'date'] },
     { key: 'canal', label: 'Canal', required: false, aliases: ['canal', 'origem', 'fonte', 'plataforma', 'campanha'] },

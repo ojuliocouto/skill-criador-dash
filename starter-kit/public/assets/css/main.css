@@ -78,6 +78,11 @@ h2 { font-size: 18px; letter-spacing: -0.01em; margin: 0 0 14px; }
 .kpi__trend.is-good { color: var(--good); }
 .kpi__trend.is-bad { color: var(--bad); }
 .kpi__trend .kpi__trend-cap { color: var(--text-faint); font-weight: 400; }
+.kpi__goal { margin-top: 10px; }
+.kpi__goal-track { background: var(--bg-elev-2); border-radius: 6px; height: 7px; overflow: hidden; }
+.kpi__goal-fill { height: 100%; background: var(--accent); border-radius: 6px; min-width: 2px; }
+.kpi__goal-fill.is-done { background: var(--good); }
+.kpi__goal-text { color: var(--text-faint); font-size: 11.5px; margin-top: 5px; }
 
 /* Widget wrapper */
 .widget { margin-top: 0; }

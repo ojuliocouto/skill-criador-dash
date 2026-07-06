@@ -97,6 +97,21 @@ export function buildTrends(metrics, curRows, prevRows, colMap) {
   return trends;
 }
 
+/**
+ * Monta o progresso da meta (meta vs realizado) para a metrica configurada.
+ * config.goal = { metricKey, value }. Retorna { metricKey, pct, text } ou null.
+ */
+export function buildGoal(config, computed) {
+  const g = config && config.goal;
+  if (!g || !g.metricKey) return null;
+  const target = Number(g.value);
+  if (!Number.isFinite(target) || target <= 0) return null;
+  const val = computed[g.metricKey];
+  if (!Number.isFinite(val)) return null;
+  const pct = val / target;
+  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} da meta` };
+}
+
 // ---- Helpers de UI (browser) ----
 
 function esc(v) {
@@ -138,7 +153,7 @@ function findMetricDef(template, key) {
 }
 
 // Renderiza um bloco de kpis (.grid.kpis) a partir dos itens de layout.
-function renderKpiBlock(items, template, computed, trends = {}) {
+function renderKpiBlock(items, template, computed, trends = {}, goal = null) {
   const cards = items
     .map((item) => {
       const key = item.props && item.props.metricKey;
@@ -146,7 +161,11 @@ function renderKpiBlock(items, template, computed, trends = {}) {
       const label = def.label || key || '';
       const format = def.format || 'number';
       const value = computed[key];
-      return renderKpi({ label, format, hint: item.props && item.props.hint, trend: trends[key] }, value);
+      const goalForKpi = goal && goal.metricKey === key ? goal : undefined;
+      return renderKpi(
+        { label, format, hint: item.props && item.props.hint, trend: trends[key], goal: goalForKpi },
+        value,
+      );
     })
     .join('');
   return `<div class="grid kpis">${cards}</div>`;
@@ -222,7 +241,7 @@ function renderDashboard(app, ctx) {
   const body = blocks
     .map((block) => {
       if (block.type === 'kpis') {
-        return `<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.trends)}</section>`;
+        return `<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.trends, ctx.goal)}</section>`;
       }
       const html = renderSingle(block.item, ctx);
       return html ? `<section class="section">${html}</section>` : '';
@@ -332,7 +351,8 @@ async function init() {
   const dateSlot = (tsItem && tsItem.props && tsItem.props.dateSlot) || 'data';
   const { current, previous } = splitByPeriod(dataset.rows, colMap, dateSlot);
   const trends = buildTrends(template.metrics, current, previous, colMap);
-  renderDashboard(app, { config, template, dataset, colMap, computed, trends });
+  const goal = buildGoal(config, computed);
+  renderDashboard(app, { config, template, dataset, colMap, computed, trends, goal });
 }
 
 // So dispara no browser. Em node:test o import so pega planLayout.

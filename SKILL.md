@@ -84,6 +84,8 @@ Widgets: KPI (com badge de tendencia opcional), serie temporal (SVG puro), funil
 
 Tendencia (comparativo de periodo): cada KPI cuja metrica tenha `betterWhen` (`higher`/`lower`) mostra um badge colorido comparando a 2a metade do periodo com a 1a (metades com o mesmo numero de datas). Verde quando melhora, vermelho quando piora (ex: CPL caindo aparece verde). Metricas de soma so sao comparadas entre metades de mesmo tamanho, para nao inflar o numero.
 
+Meta vs realizado (opcional): no ultimo passo do wizard da pra informar uma meta para a metrica principal do dominio (`primaryMetric`: leads no Marketing, faturamento em Vendas). O card principal passa a mostrar uma barra de progresso e o percentual da meta (verde quando bate ou passa de 100%). Sem meta informada, nada muda.
+
 ## COMO USAR O STARTER KIT
 
 O codigo vive em `starter-kit/`. Nao edite os arquivos de codigo/testes ao publicar para
