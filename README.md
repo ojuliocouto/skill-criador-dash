@@ -13,7 +13,7 @@ It is:
 It is NOT:
 - Not a hosted SaaS. You deploy it to your own Cloudflare Pages account.
 - Not a locked, single-niche dashboard (launch, e-commerce, etc.). It is a builder.
-- Not ready-made integrations with Meta Ads, CRM, or Hotmart. Those connectors are documented second-wave stubs, not finished.
+- Not ready-made integrations with CRM or Hotmart. Those connectors are documented second-wave stubs. Meta Ads IS a working connector (via a Graph API access token).
 - Not requiring OAuth or an API key for the MVP. A link-shared public spreadsheet is enough.
 
 ## Features
@@ -23,6 +23,7 @@ It is NOT:
 - Sales metrics: number of deals, won deals, revenue (won only, with a fallback when there is no status column), average ticket, and win rate. Closing funnel plus ranking by seller and by product.
 - Period trend badges on KPIs: each KPI compares the second half of the period to the first (equal-sized halves) and colors the change green or red by whether higher or lower is better.
 - Optional goal tracking: set a target for the domain primary metric in the wizard and the main KPI shows a progress bar and percent of goal (green once reached).
+- Optional per-dashboard password: protect a published dashboard with a password. Only the SHA-256 hash is stored (never the plain password); the config API returns data only with the correct hash.
 - Widgets: KPI cards (with optional trend badge), time series (pure SVG), funnel, table, ranking. No external libraries.
 - 4-step no-code wizard with automatic column mapping by header name; widgets whose columns are not mapped are skipped instead of shown empty.
 - Brand accent color per dashboard.
@@ -58,7 +59,8 @@ Number and date normalization (Brazilian formats included) happens in the metric
 
 - Google Sheets via gviz CSV (flagship connector): the user shares the spreadsheet as "anyone with the link" and pastes the link. No OAuth, no API key, no "publish to web" step. The connector extracts the spreadsheet ID from the link and fetches `https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&gid={GID}`.
 - CSV upload (fallback): the CSV text is posted and parsed with automatic delimiter detection.
-- Second-wave stubs (documented, not finished): Meta Ads, CRM, Hotmart.
+- Meta Ads (native, advanced): pulls campaign insights from the Graph API using an access token (Business Manager System User) plus the ad account id. The token stays server-side only (stored in the config, never returned to the browser; the Function resolves it by dashboard id). Shown in the wizard only for the Marketing domain.
+- Second-wave stubs (documented, not finished): CRM, Hotmart.
 
 ## Prerequisites / Onboarding
 
@@ -125,7 +127,7 @@ starter-kit/
       connectors/
         sheets.js               # flagship connector (gviz CSV)
         csv.js                  # upload connector
-        meta-ads.js             # second-wave stub
+        meta-ads.js             # Meta Ads connector (Graph API, token server-side)
         crm.js                  # second-wave stub
         hotmart.js              # second-wave stub
     lib/
@@ -180,7 +182,10 @@ The full browser flow (Marketing and Sales, including the brand accent color swa
 
 ## Security
 
-- No token is required for the MVP: a link-shared public Google Sheet or a CSV upload is enough.
+- No token is required for the default source: a link-shared public Google Sheet or a CSV upload is enough.
+- Optional password per dashboard: only the SHA-256 hash is stored (never the plain password), and the config API strips the hash before responding. Note this is a shared view password, not user accounts.
+- Meta Ads access token is stored in the dashboard config and never returned to the browser: the connector Function reads it server-side by dashboard id. The config API strips the token from every response.
+- A link-shared Google Sheet is readable by anyone with the link, and a published dashboard has no login unless you set a password. Use data you are comfortable sharing by link, and set a password for anything sensitive.
 - Nothing sensitive lives in the code. No tokens, Account IDs, or KV ids are committed. Use `<...>` placeholders in any public repo.
 - Dashboard configurations are stored in Cloudflare KV, not in the source tree.
 - No external runtime dependencies, so there is no third-party script pulling data at render time.

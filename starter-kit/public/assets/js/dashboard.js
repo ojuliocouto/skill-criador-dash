@@ -5,10 +5,11 @@
 // A logica pura de agrupar o layout (juntar kpis consecutivos em blocos) esta
 // fatorada em planLayout(), que e testada em node:test sem tocar o DOM.
 
-import { getDashboard, fetchDataForSource } from './lib/api-client.js';
+import { getDashboard, fetchDataForSource, setDashboardAuth } from './lib/api-client.js';
 import { getTemplate } from './templates/index.js';
 import { computeAll, groupBy, timeSeries } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
+import { sha256Hex } from './lib/auth.js';
 import { render as renderKpi } from './widgets/kpi.js';
 import { render as renderTimeseries } from './widgets/timeseries.js';
 import { render as renderFunnel } from './widgets/funnel.js';
@@ -131,6 +132,36 @@ function cardWith(title, innerHtml, extraClass = '') {
     ? `<div class="widget-title">${esc(title)}</div>`
     : '';
   return `<div class="${cls}"><div class="widget">${titleHtml}${innerHtml}</div></div>`;
+}
+
+// Tela de senha para dashboards protegidos. Ao enviar, guarda o hash na sessao
+// e refaz o init. Se ja havia um hash guardado (tentativa anterior), avisa que
+// a senha esta incorreta.
+function renderPasswordPrompt(app, id) {
+  let jaTentou = false;
+  try { jaTentou = !!sessionStorage.getItem(`dashauth:${id}`); } catch { /* ignora */ }
+  app.innerHTML =
+    `<div class="empty-state">` +
+      `<h2>Dashboard protegido</h2>` +
+      `<p class="subtitle">Digite a senha para acessar este dashboard.</p>` +
+      `<div style="max-width:320px;margin:18px auto 0;display:flex;flex-direction:column;gap:10px">` +
+        `<input id="pwInput" class="input" type="password" placeholder="Senha" autocomplete="current-password" />` +
+        `<button id="pwBtn" class="btn" type="button">Acessar</button>` +
+        `<p class="error" id="pwErr">${jaTentou ? 'Senha incorreta. Tente de novo.' : ''}</p>` +
+      `</div>` +
+    `</div>`;
+  const input = document.getElementById('pwInput');
+  const btn = document.getElementById('pwBtn');
+  const submit = async () => {
+    if (!input.value) return;
+    btn.disabled = true;
+    const hash = await sha256Hex(input.value);
+    setDashboardAuth(id, hash);
+    init();
+  };
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  input.focus();
 }
 
 // Mostra a tela de erro amigavel com um botao de acao.
@@ -302,6 +333,10 @@ async function init() {
   try {
     config = await getDashboard(id);
   } catch (err) {
+    if (err && err.needsPassword) {
+      renderPasswordPrompt(app, id);
+      return;
+    }
     showError(app, err && err.message ? err.message : 'Falha ao carregar a configuracao.', {
       href: '/', label: 'Ver meus dashboards',
     });
@@ -330,7 +365,7 @@ async function init() {
   app.innerHTML = `<div class="empty-state"><p>Carregando dados...</p></div>`;
   let dataset;
   try {
-    dataset = await fetchDataForSource(config.source);
+    dataset = await fetchDataForSource(config.source, id);
   } catch (err) {
     showError(app, err && err.message ? err.message : 'Falha ao buscar os dados da fonte.', {
       href: `/config.html?id=${encodeURIComponent(id)}`, label: 'Reconfigurar',

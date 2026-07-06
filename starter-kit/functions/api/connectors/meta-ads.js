@@ -1,10 +1,56 @@
-// Conector Meta Ads (2a onda, ainda não implementado).
-// Quando implementado, deve autenticar na Graph API da Meta, buscar insights de
-// campanha e devolver um DataSet no mesmo formato do Contrato 1
-// ({ columns, rows, meta:{ source:'meta-ads', ... } }).
-export async function onRequest() {
-  return new Response(
-    JSON.stringify({ error: 'Conector Meta Ads é de 2a onda, ainda não implementado.' }),
-    { status: 501, headers: { 'content-type': 'application/json' } }
-  );
+// Conector Meta Ads (Facebook/Instagram) via Graph API.
+// A logica pura (montar URL, mapear resposta) vive em ../../lib/meta.mjs.
+//
+// Dois modos:
+//  - POST (preview): recebe { token, account, since, until } no corpo. Usado pelo
+//    wizard antes de salvar. O token NAO e gravado aqui, so usado na hora.
+//  - GET ?id=<dashboardId>: le a config no KV, pega o token guardado em
+//    source.meta e busca os dados. O token fica SO no servidor, nunca vai pro browser.
+
+import { buildInsightsUrl, mapInsightsToDataSet } from '../../lib/meta.mjs';
+
+const JSON_HEADERS = { 'content-type': 'application/json' };
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+const erro = (mensagem, status) => json({ error: mensagem }, status);
+
+async function fetchMeta({ token, account, since, until } = {}) {
+  const url = buildInsightsUrl({ token, accountId: account, since, until });
+  const res = await fetch(url);
+  const body = await res.json();
+  const ds = mapInsightsToDataSet(body); // lanca Error se a Graph API devolver {error}
+  ds.meta = ds.meta || {};
+  ds.meta.fetchedAt = new Date().toISOString();
+  return ds;
+}
+
+export async function onRequest(context) {
+  const { request, env } = context;
+  const method = request.method.toUpperCase();
+
+  try {
+    if (method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch { return erro('Corpo invalido. Envie token e account.', 400); }
+      return json(await fetchMeta(body));
+    }
+
+    if (method === 'GET') {
+      const { searchParams } = new URL(request.url);
+      const id = searchParams.get('id');
+      if (!id) return erro('Parametro "id" e obrigatorio.', 400);
+      const kv = env && env.DASHBOARDS_KV;
+      if (!kv) return erro('Binding DASHBOARDS_KV nao configurado.', 500);
+      const raw = await kv.get(`dash:${id}`);
+      if (!raw) return erro('Dashboard nao encontrado.', 404);
+      let config;
+      try { config = JSON.parse(raw); } catch { return erro('Configuracao corrompida.', 500); }
+      const m = config.source && config.source.meta;
+      if (!m || !m.token) return erro('Este dashboard nao tem conector Meta Ads configurado.', 400);
+      return json(await fetchMeta(m));
+    }
+
+    return erro(`Metodo ${method} nao suportado.`, 405);
+  } catch (e) {
+    return erro(e && e.message ? e.message : 'Falha ao consultar o Meta Ads.', 502);
+  }
 }

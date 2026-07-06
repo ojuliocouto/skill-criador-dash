@@ -53,8 +53,8 @@ E:
 Nao e:
 - Nao e um SaaS hospedado: voce mesmo publica no seu Cloudflare Pages.
 - Nao e um dashboard fechado de um unico nicho (lancamento, e-commerce, etc.).
-- Nao e integracao pronta com Meta Ads, CRM ou Hotmart: esses conectores sao stubs de 2a onda, documentados mas ainda nao prontos.
-- Nao pede OAuth nem API key no MVP: a planilha publica por link basta.
+- CRM e Hotmart ainda sao stubs de 2a onda (documentados, nao prontos). Meta Ads JA e um conector real (via access token da Graph API).
+- A fonte padrao (planilha/CSV) nao pede OAuth nem API key: a planilha publica por link basta. O Meta Ads exige um access token (caminho avancado, opcional).
 
 ## ARQUITETURA: 3 CAMADAS DESACOPLADAS
 
@@ -74,7 +74,16 @@ Fonte de dados -> Conector -> DataSet (schema comum) -> Template -> Widgets -> R
   como "qualquer pessoa com o link" e so cola o link. Sem OAuth, sem API key, sem publicar na web.
   O conector extrai o ID do link e busca `https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&gid={GID}`.
 - FALLBACK: upload de arquivo CSV (POST do texto, parse com deteccao de delimitador).
-- CONECTORES DE 2a ONDA (stubs documentados, ainda nao prontos): Meta Ads, CRM, Hotmart.
+- META ADS (nativo, avancado): busca insights de campanha na Graph API com um access token
+  (System User do Business Manager) + ID da conta de anuncios. O token fica SO no servidor
+  (guardado na config e nunca devolvido ao browser); a Function resolve o token por id do dashboard.
+  So aparece no wizard no dominio Marketing.
+- CONECTORES DE 2a ONDA (stubs documentados, ainda nao prontos): CRM, Hotmart.
+
+Protecao por senha (opcional): no wizard da pra definir uma senha por dashboard. Guarda-se
+so o hash SHA-256 (nunca a senha em texto puro). Ao abrir o link, o dashboard pede a senha;
+a config so e devolvida pela API com o hash correto no header `x-dash-auth`. Segredos (hash da
+senha e token do Meta) sao removidos da resposta da API.
 
 Dominios prontos e suas metricas:
 - MARKETING: investimento, impressoes, cliques, leads, conversoes, receita (base); CTR (cliques/impressoes), CPC (invest/cliques), CPL (invest/leads), CPA (invest/conversoes) e ROAS (receita/investimento) (derivadas). Layout: KPIs + funil de conversao (impressoes -> cliques -> leads -> conversoes com % entre etapas) + serie temporal de investimento + ranking por canal + tabela.
@@ -122,7 +131,7 @@ functions/
     connectors/
       sheets.js                 conector carro-chefe (gviz CSV)
       csv.js                     conector de upload
-      meta-ads.js                stub 2a onda
+      meta-ads.js                conector Meta Ads (Graph API, token no servidor)
       crm.js                     stub 2a onda
       hotmart.js                 stub 2a onda
   lib/
@@ -187,7 +196,7 @@ os valores das linhas como STRING crua (a normalizacao de numero/data e da camad
 2. Mantenha a logica pura de parse fora do handler (ex: em `functions/lib/csv.mjs`), para poder testar sem rede.
 3. Se a fonte falhar, lance `Error` com mensagem amigavel em PT-BR.
 4. Escreva o teste da logica pura antes (TDD).
-5. Os stubs `meta-ads.js`, `crm.js` e `hotmart.js` sao o ponto de partida da 2a onda.
+5. `meta-ads.js` ja e um exemplo de conector com credencial (token no servidor); `crm.js` e `hotmart.js` sao stubs, ponto de partida da 2a onda.
 
 ## CHECKLIST DE DEPLOY PARA NOVO CLIENTE
 

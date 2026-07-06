@@ -20,6 +20,30 @@ export function slugify(name) {
   return base || 'dashboard';
 }
 
+/** Indica se o dashboard exige senha para ser aberto. */
+export function needsAuth(config) {
+  return !!(config && config.auth && config.auth.hash);
+}
+
+/** Confere se o hash de senha fornecido bate com o guardado (ou se nao ha senha). */
+export function authOk(config, providedHash) {
+  if (!needsAuth(config)) return true;
+  return typeof providedHash === 'string' && providedHash === config.auth.hash;
+}
+
+/**
+ * Remove segredos antes de devolver a config ao browser: hash da senha e token
+ * de conectores (ex: Meta Ads). O token do Meta fica so no servidor.
+ */
+export function stripSecrets(config) {
+  if (!config || typeof config !== 'object') return config;
+  const clone = JSON.parse(JSON.stringify(config));
+  if (clone.auth) delete clone.auth.hash;
+  if (clone.source && clone.source.meta && clone.source.meta.token) delete clone.source.meta.token;
+  clone.protected = needsAuth(config);
+  return clone;
+}
+
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
 function json(body, status = 200) {
@@ -51,10 +75,11 @@ export async function onRequest(context) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   const method = request.method.toUpperCase();
+  const providedHash = request.headers.get('x-dash-auth') || '';
 
   try {
     if (method === 'GET') {
-      return id ? await getOne(kv, id) : await listAll(kv);
+      return id ? await getOne(kv, id, providedHash) : await listAll(kv);
     }
     if (method === 'POST') {
       return await create(kv, request);
@@ -78,19 +103,22 @@ async function listAll(kv) {
       try { return JSON.parse(raw); } catch { return null; }
     })
   );
-  const validas = configs.filter(Boolean);
+  const validas = configs.filter(Boolean).map(stripSecrets);
   validas.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   return json(validas);
 }
 
-async function getOne(kv, id) {
+async function getOne(kv, id, providedHash) {
   const raw = await kv.get(kvKey(id));
   if (!raw) {
     return erro('Dashboard não encontrado.', 404);
   }
   let config;
   try { config = JSON.parse(raw); } catch { return erro('Configuração do dashboard corrompida.', 500); }
-  return json(config);
+  if (!authOk(config, providedHash)) {
+    return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
+  }
+  return json(stripSecrets(config));
 }
 
 async function create(kv, request) {
@@ -118,7 +146,7 @@ async function create(kv, request) {
   if (!config.createdAt) config.createdAt = new Date().toISOString();
 
   await kv.put(kvKey(config.id), JSON.stringify(config));
-  return json(config);
+  return json(stripSecrets(config));
 }
 
 async function remove(kv, id) {

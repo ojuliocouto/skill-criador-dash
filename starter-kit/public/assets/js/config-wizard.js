@@ -1,9 +1,10 @@
 // Wizard de configuração do dashboard. 4 passos, tudo client-side vanilla ESM.
 // Importa apenas módulos prontos (read-only): api-client, templates, automap.
 
-import { fetchSheet, uploadCsv, saveDashboard } from './lib/api-client.js';
+import { fetchSheet, uploadCsv, saveDashboard, previewMeta } from './lib/api-client.js';
 import { templates, getTemplate } from './templates/index.js';
 import { autoMap } from './lib/automap.js';
+import { sha256Hex } from './lib/auth.js';
 
 // ---------------------------------------------------------------------------
 // Validação pura de slots obrigatórios (testável, named export).
@@ -185,6 +186,34 @@ function renderSource(body) {
   body.appendChild(sheetsCard);
   body.appendChild(csvCard);
 
+  // Opcao C: Meta Ads (nativo), so faz sentido no dominio Marketing.
+  let metaCard = null;
+  if (state.domain === 'marketing') {
+    metaCard = el('div', { class: 'card' }, [
+      el('h3', { text: 'Meta Ads (avançado)' }),
+      el('p', { class: 'hint', text: 'Puxa insights de campanha direto da Graph API. Precisa de um access token (System User do Business Manager) e do ID da conta de anuncios. O token fica so no servidor, nunca aparece no dashboard.' }),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'lbl', text: 'Access token' }),
+        el('input', { class: 'input', id: 'metaToken', type: 'password', placeholder: 'EAAB...', autocomplete: 'off' }),
+      ]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'lbl', text: 'ID da conta de anuncios' }),
+        el('input', { class: 'input', id: 'metaAccount', type: 'text', placeholder: 'act_1234567890 ou 1234567890' }),
+      ]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'lbl', text: 'De (opcional)' }),
+        el('input', { class: 'input', id: 'metaSince', type: 'date' }),
+      ]),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'lbl', text: 'Ate (opcional)' }),
+        el('input', { class: 'input', id: 'metaUntil', type: 'date' }),
+      ]),
+      el('button', { class: 'btn', type: 'button', id: 'connectMeta', text: 'Conectar Meta Ads' }),
+    ]);
+    metaCard.style.marginTop = '16px';
+    body.appendChild(metaCard);
+  }
+
   const feedback = el('div', { id: 'sourceFeedback' });
   body.appendChild(feedback);
 
@@ -204,6 +233,7 @@ function renderSource(body) {
     state.connecting = on;
     sheetsCard.querySelector('#connectSheet').disabled = on;
     csvCard.querySelector('#connectCsv').disabled = on;
+    if (metaCard) metaCard.querySelector('#connectMeta').disabled = on;
   }
 
   function onConnected(ds, source) {
@@ -264,6 +294,28 @@ function renderSource(body) {
     setConnecting(true);
     reader.readAsText(file);
   });
+
+  if (metaCard) {
+    metaCard.querySelector('#connectMeta').addEventListener('click', async () => {
+      if (state.connecting) return;
+      const token = metaCard.querySelector('#metaToken').value.trim();
+      const account = metaCard.querySelector('#metaAccount').value.trim();
+      const since = metaCard.querySelector('#metaSince').value || undefined;
+      const until = metaCard.querySelector('#metaUntil').value || undefined;
+      feedback.innerHTML = '';
+      if (!token || !account) { feedback.appendChild(errorBox('Informe o access token e o ID da conta de anuncios.')); return; }
+      setConnecting(true);
+      feedback.appendChild(el('p', { class: 'hint', text: 'Conectando ao Meta Ads...' }));
+      try {
+        const ds = await previewMeta({ token, account, since, until });
+        onConnected(ds, { type: 'meta', meta: { token, account, since, until } });
+      } catch (e) {
+        onError(e);
+      } finally {
+        setConnecting(false);
+      }
+    });
+  }
 }
 
 function preview(ds) {
@@ -366,6 +418,11 @@ function renderFinish(body) {
       el('span', { class: 'hint', text: 'Mostra o progresso (percentual da meta) no card principal.' }),
     ]));
   }
+  fields.push(el('label', { class: 'field' }, [
+    el('span', { class: 'lbl', text: 'Senha de acesso (opcional)' }),
+    el('input', { class: 'input', id: 'dashPassword', type: 'password', placeholder: 'Deixe em branco para dashboard aberto', autocomplete: 'new-password' }),
+    el('span', { class: 'hint', text: 'Com senha, quem abrir o link precisa digita-la. A senha nao e guardada em texto puro, so o hash.' }),
+  ]));
   const card = el('div', { class: 'card' }, fields);
   body.appendChild(card);
 
@@ -403,6 +460,13 @@ function renderFinish(body) {
     const goalVal = goalInput ? Number(goalInput.value) : NaN;
     if (primaryKey && Number.isFinite(goalVal) && goalVal > 0) {
       config.goal = { metricKey: primaryKey, value: goalVal };
+    }
+
+    // Senha opcional: guarda so o hash SHA-256 (nunca a senha em texto puro).
+    const pwInput = card.querySelector('#dashPassword');
+    const pw = pwInput ? pwInput.value : '';
+    if (pw) {
+      config.auth = { hash: await sha256Hex(pw) };
     }
 
     createBtn.disabled = true;
