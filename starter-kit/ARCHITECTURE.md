@@ -103,9 +103,12 @@ Conectores de 2a onda (fora do MVP, deixar como stub documentado): `crm.js`, `ho
  * @property {string} [format]    'currency'|'number'|'percent'|'integer'
  * @property {function} [compute] (ctx) => number   para agg 'derived' (ex: ROAS = receita/investimento)
  * @property {[string,string]} [ratioOf]  para agg 'ratio': [numeradorKey, denominadorKey]
+ * @property {'higher'|'lower'} [betterWhen]  direcao boa (pinta a tendencia verde/vermelho no KPI)
  */
 
-export function computeMetric(def, rows, colMap) {}  // -> number
+// computeMetric recebe tambem `computed` (metricas ja calculadas): ratio/derived
+// dependem dele, por isso computeAll processa as defs EM ORDEM (base antes das derivadas).
+export function computeMetric(def, rows, colMap, computed = {}) {}  // -> number
 export function computeAll(defs, rows, colMap) {}     // -> { [key]: number }
 export function groupBy(rows, colMap, dimensionSlot, valueSlot, agg) {} // -> [{ key, value }]
 export function timeSeries(rows, colMap, dateSlot, valueSlot, agg) {}   // -> [{ date: ISO, value }]
@@ -137,6 +140,7 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
  * @typedef {Object} Template
  * @property {string} id            'marketing' | 'vendas' | 'suporte'
  * @property {string} label
+ * @property {string} [primaryMetric]  metrica-chave do dominio (usada pela meta opcional no wizard)
  * @property {SlotDef[]} slots      slots semânticos que o usuário mapeia para colunas
  * @property {MetricDef[]} metrics  métricas do domínio (usam os slots)
  * @property {LayoutItem[]} layout  ordem/tipo de widgets a renderizar
@@ -154,6 +158,7 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
  * @property {Object} props   ex: { metricKey:'investimento' } ou { dateSlot:'data', valueSlot:'valor' }
  */
 
+// autoMap vive em `public/assets/js/lib/automap.js` (nao no template): e generico.
 export function autoMap(slots, columns) {} // -> { [slotKey]: columnName|null }  casa aliases vs columns
 ```
 
@@ -179,7 +184,7 @@ inclusão. Slot sem match vira `null` (usuário mapeia na mão no wizard).
 Cada widget é uma função pura de render (sem fetch, sem estado global):
 
 ```js
-export function render(props, data) {} // -> HTMLElement  (ou string HTML, ver padrão do kit)
+export function render(props, data) {} // -> string HTML (o kit padroniza string; o dashboard injeta via innerHTML)
 ```
 
 - `kpi.js`: card com label + valor formatado + (opcional) variação.

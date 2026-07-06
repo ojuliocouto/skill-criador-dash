@@ -8,7 +8,7 @@
 //    source.meta e busca os dados. O token fica SO no servidor, nunca vai pro browser.
 
 import { buildInsightsUrl, mapInsightsToDataSet } from '../../lib/meta.mjs';
-import { needsAuth, authOk } from '../dashboards.js';
+import { needsAuth, authOk } from '../../lib/auth-config.mjs';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });

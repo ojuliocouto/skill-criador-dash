@@ -40,13 +40,20 @@ test('timeseries: svg com polyline e pontos', () => {
   ];
   const html = renderTimeseries({ title: 'Evolucao' }, pts);
   assert.ok(html.includes('<svg'), 'tem svg');
-  assert.ok(html.includes('viewBox="0 0 600 200"'), 'viewBox responsivo');
+  assert.ok(html.includes('viewBox="0 0 600 240"'), 'viewBox responsivo com margem pros eixos');
+  assert.ok(!html.includes('preserveAspectRatio="none"'), 'nao distorce (sem preserveAspectRatio none)');
+  assert.ok(!html.includes('non-scaling-size'), 'sem o vetor invalido non-scaling-size');
   assert.ok(html.includes('<polyline'), 'tem polyline');
   assert.ok(html.includes('Evolucao'), 'contem titulo');
   // polyline com 3 pares de pontos
   const m = html.match(/points="([^"]+)"/);
   assert.ok(m, 'polyline tem atributo points');
   assert.equal(m[1].trim().split(/\s+/).length, 3, 'tres pontos');
+  // eixos enriquecidos: gridlines/ticks no Y e rotulos de data no X
+  assert.ok(html.includes('chart__grid'), 'tem gridlines');
+  assert.ok(html.includes('chart__ytick'), 'tem ticks do eixo Y');
+  assert.ok(html.includes('chart__xtick'), 'tem rotulos de data no eixo X');
+  assert.ok(html.includes('01/01') && html.includes('03/01'), 'datas curtas do primeiro e ultimo ponto');
 });
 
 test('timeseries: lista vazia mostra Sem dados', () => {

@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PECAS (biblioteca provada em `starter-kit/`)
 
-Codigo real e testado (145 testes verdes, TDD). Voce compoe a partir daqui.
+Codigo real e testado (169 testes verdes, TDD). Voce compoe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Nao sabem de metricas.
@@ -124,9 +124,15 @@ Recursos dos KPIs:
 - Meta vs realizado (opcional): meta na metrica principal do dominio (`primaryMetric`); o card mostra
   barra de progresso e percentual da meta.
 
-Protecao por senha (opcional): senha por dashboard; guarda-se so o hash SHA-256. O dashboard pede a
-senha; a API so devolve a config com o hash correto no header `x-dash-auth`. Segredos (hash, token do
-Meta) sao removidos das respostas da API.
+Protecao por senha (opcional): senha por dashboard; guarda-se so o hash SHA-256 (comparado em tempo
+constante). O dashboard pede a senha; a API so devolve a config E OS DADOS (conectores por id) com o
+hash correto no header `x-dash-auth`. `stripSecrets` remove recursivamente qualquer credencial da
+fonte (token/secret/apikey/senha/authorization) das respostas.
+
+Modelo de acesso (avise a pessoa): a API e ABERTA por padrao. Dashboard SEM senha pode ser lido,
+sobrescrito ou apagado por qualquer um que tenha o id (fluxo self-serve). Para dado sensivel: ponha
+senha. Para travar a instancia inteira, defina a env `ADMIN_TOKEN` no projeto Pages: com ela setada,
+POST/DELETE exigem o header `x-admin-token`, entao so o dono cria/apaga dashboards.
 
 Tema claro/escuro: botao na topbar (`lib/theme.js`), injetado em todas as paginas; persiste no
 localStorage e respeita a preferencia do sistema no primeiro acesso. A estetica e de ferramenta de
@@ -152,8 +158,10 @@ functions/
       crm.js  hotmart.js         stubs (ponto de partida)
   lib/
     csv.mjs                     parseCSV + detectDelimiter (puro, testavel)
+    sheets-url.mjs              sheetUrlToCsv (compartilhado por sheets.js e pelo worker)
     meta.mjs                    buildInsightsUrl + mapInsightsToDataSet (puro)
     snapshots.mjs               SQL do modo historico + rowToDataSet (puro)
+    auth-config.mjs             needsAuth/authOk/safeEqual (neutro; conectores importam daqui)
 workers/
   snapshot/                     Worker com cron que grava snapshots no D1
 public/
@@ -161,10 +169,10 @@ public/
   assets/css/main.css
   assets/js/
     config-wizard.js  dashboard.js  index-page.js
-    lib/ api-client.js  automap.js  format.js  metrics.js  auth.js
+    lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
-    widgets/ _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           145 testes (npm test  ->  node --test test/*.test.js)
+    widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
+test/                           169 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local:
@@ -259,8 +267,16 @@ Siga os Contratos 1 e 2 do `ARCHITECTURE.md`. Todo conector devolve exatamente u
 1. `functions/api/connectors/<nome>.js` com `export async function onRequest(context)` respondendo o DataSet.
 2. Logica pura de parse/mapeamento fora do handler (ex: `functions/lib/<nome>.mjs`), pra testar sem rede.
 3. Credencial (token) nunca vai pro browser: guarde na config e resolva no servidor por id (veja `meta-ads.js`).
+   Se o conector precisar checar senha, importe `needsAuth`/`authOk` de `functions/lib/auth-config.mjs`
+   (modulo neutro), NAO de `dashboards.js`.
 4. Erro da fonte: lance `Error` com mensagem amigavel em PT-BR.
 5. Escreva o teste da logica pura antes (TDD).
+
+IMPORTANTE (conector de fonte VIVA nao e so 1 arquivo): pra ele ser usado de ponta a ponta, plugue em 3 lugares:
+- `public/assets/js/lib/api-client.js`: um branch em `fetchDataForSource(source, id)` pro novo `source.type`.
+- `public/assets/js/config-wizard.js`: um card/opcao no passo 2 (Fonte) pra pessoa conectar (como o Meta).
+- Modo historico: um branch em `fetchDataSet` do `workers/snapshot/src/index.js` e no `podeHistorico` do wizard.
+Sheets/CSV/Meta ja estao plugados. Um conector SO com o arquivo do handler nunca e chamado.
 
 ## ADICIONAR UM NOVO WIDGET
 

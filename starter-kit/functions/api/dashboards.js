@@ -2,6 +2,12 @@
 // Cada dashboard é guardado na chave `dash:<id>`.
 // A lógica pura `slugify` é testável sem rede nem KV.
 
+// A auth (needsAuth/authOk/safeEqual) mora no modulo neutro auth-config.mjs para
+// que os conectores nao dependam desta camada de config. Reexportamos needsAuth e
+// authOk aqui para nao quebrar quem ja importa de dashboards.js (ex: os testes).
+import { needsAuth, authOk, safeEqual } from '../lib/auth-config.mjs';
+export { needsAuth, authOk } from '../lib/auth-config.mjs';
+
 /**
  * Gera um slug a partir do nome do dashboard.
  * lowercase, remove acento, troca não-alfanumérico por '-', colapsa e apara '-'.
@@ -18,27 +24,6 @@ export function slugify(name) {
     .replace(/-+/g, '-')             // colapsa hífens repetidos
     .replace(/^-+|-+$/g, '');        // apara hífens das pontas
   return base || 'dashboard';
-}
-
-/** Indica se o dashboard exige senha para ser aberto. */
-export function needsAuth(config) {
-  return !!(config && config.auth && config.auth.hash);
-}
-
-// Comparacao de strings em tempo constante (nao vaza onde diferem via timing).
-function safeEqual(a, b) {
-  const x = String(a == null ? '' : a);
-  const y = String(b == null ? '' : b);
-  if (x.length !== y.length) return false;
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
-  return diff === 0;
-}
-
-/** Confere se o hash de senha fornecido bate com o guardado (ou se nao ha senha). */
-export function authOk(config, providedHash) {
-  if (!needsAuth(config)) return true;
-  return typeof providedHash === 'string' && safeEqual(providedHash, config.auth.hash);
 }
 
 // Qualquer chave cujo nome soe a credencial e removida antes de ir pro browser.
@@ -79,6 +64,20 @@ const PREFIX = 'dash:';
 const kvKey = (id) => `${PREFIX}${id}`;
 
 /**
+ * Trava global opcional de mutacao. Se env.ADMIN_TOKEN estiver definido, exige o
+ * header x-admin-token igual a ele (comparacao em tempo constante). Devolve uma
+ * Response 401 quando o token esta definido mas o header falta/nao bate; devolve
+ * null (segue o fluxo) quando o token nao esta definido ou o header confere.
+ */
+function checkAdminToken(env, request) {
+  const adminToken = env && env.ADMIN_TOKEN;
+  if (!adminToken) return null; // sem token configurado: instancia aberta (comportamento atual).
+  const provided = request.headers.get('x-admin-token') || '';
+  if (safeEqual(provided, adminToken)) return null;
+  return json({ error: 'Token de administrador necessário ou incorreto.', needsAdmin: true }, 401);
+}
+
+/**
  * Handler Cloudflare Pages Function. Roteia por método HTTP.
  * @param {{ request: Request, env: Object }} context
  */
@@ -99,6 +98,15 @@ export async function onRequest(context) {
   const providedHash = request.headers.get('x-dash-auth') || '';
 
   try {
+    // Trava GLOBAL opcional de mutacao: se env.ADMIN_TOKEN estiver definido, POST e
+    // DELETE exigem o header x-admin-token igual a ele. Assim o operador fecha a
+    // instancia inteira sem quebrar o fluxo self-serve de quem nao setar o token.
+    // Roda ANTES da checagem per-dashboard e so vale para POST/DELETE (GET nao muda).
+    if (method === 'POST' || method === 'DELETE') {
+      const adminGate = checkAdminToken(env, request);
+      if (adminGate) return adminGate;
+    }
+
     if (method === 'GET') {
       return id ? await getOne(kv, id, providedHash) : await listAll(kv);
     }

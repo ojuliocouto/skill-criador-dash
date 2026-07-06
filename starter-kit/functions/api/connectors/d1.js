@@ -2,7 +2,7 @@
 // Em vez de bater na fonte ao vivo, lê o snapshot mais recente que o cron gravou.
 // A lógica pura de SQL e de reidratação vive em functions/lib/snapshots.mjs.
 import { latestSnapshotSQL, rowToDataSet } from '../../lib/snapshots.mjs';
-import { needsAuth, authOk } from '../dashboards.js';
+import { needsAuth, authOk } from '../../lib/auth-config.mjs';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 

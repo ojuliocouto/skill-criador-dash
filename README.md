@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (145 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (169 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -87,7 +87,7 @@ For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 145 unit tests: node --test 'test/*.test.js'
+npm test                      # 169 unit tests: node --test 'test/*.test.js'
 wrangler pages dev public     # local dev server with Functions + KV
 ```
 
@@ -112,14 +112,21 @@ For the MVP (Google Sheets or CSV) there is no secret or token to configure.
    `DASHBOARDS_KV` is required (it stores dashboard configs). `DASHBOARD_CACHE` is optional (5-minute data cache).
    Each command prints an `id = "..."`. Copy it.
 2. Put the returned ids into the `wrangler.toml` bindings, replacing `<SEU_KV_NAMESPACE_ID>` and `<SEU_KV_CACHE_ID>`. Use placeholders in any public repo; never commit real ids. There is no build step: `pages_build_output_dir` is already `public`.
-3. Deploy:
+3. Create the Pages project (once), then deploy:
    ```
+   wrangler pages project create <YOUR-PROJECT-NAME> --production-branch main
    wrangler pages deploy public --project-name=<YOUR-PROJECT-NAME> --branch main
    ```
 4. If the API responds 500 "Binding DASHBOARDS_KV nao configurado", attach the bindings in the panel: Cloudflare Pages > your project > Settings > Bindings > add the KV binding `DASHBOARDS_KV` (and `DASHBOARD_CACHE`).
 5. Optionally attach a custom domain in the Cloudflare Pages dashboard.
 6. Open `config.html` on the published domain and create the first dashboard.
 7. Historical mode: also create a D1 database (`wrangler d1 create ...`), apply `db/schema.sql` with `--remote`, deploy the Worker in `workers/snapshot/`, and bind D1 (`DASHBOARD_DB`) to the Pages project. See SKILL.md for the exact commands.
+
+### Access model (important)
+
+The dashboards API is open by default: anyone who can reach the site can create dashboards, and any dashboard WITHOUT a password can be read, overwritten, or deleted by anyone with its id. This fits the self-serve, single-owner deploy model. For anything sensitive:
+- Set a password on the dashboard (it also gates the data, not just the config).
+- To lock the whole instance, set an `ADMIN_TOKEN` env var on the Pages project: with it set, POST/DELETE require the `x-admin-token` header, so only you can create or delete dashboards.
 
 ## Project structure
 
@@ -181,7 +188,7 @@ starter-kit/
           funnel.js
           table.js
           ranking.js
-  test/                       # 18 test files, all green (node --test test/*.test.js)
+  test/                       # 20 test files, all green (node --test test/*.test.js)
     csv.test.js
     format.test.js
     metrics.test.js
@@ -197,12 +204,16 @@ starter-kit/
     trends.test.js
     vendas-metrics.test.js
     suporte-metrics.test.js
+    automap.test.js
+    handlers.test.js          # dashboards API handlers + password/data gates
+    admin-token.test.js       # optional global ADMIN_TOKEN gate on POST/DELETE
+    worker-cron.test.js       # the historical-mode scheduled() handler
     worker-parity.test.js     # guards the snapshot worker against parser drift
 ```
 
 ## Testing
 
-There are 145 unit tests, all green, written before the code (TDD). They cover the pure logic: CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, the wizard flow, and the dashboards CRUD.
+There are 169 unit tests, all green, written before the code (TDD). They cover the pure logic: CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, the wizard flow, and the dashboards CRUD.
 
 ```
 cd starter-kit
