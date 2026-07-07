@@ -200,10 +200,25 @@ token e re-tenta, igual ao salvar). Ou seja: se você fechou a instância com `A
 Meta continua funcionando pra você (que tem o token), e fica barrado pra anônimo.
 
 Tema claro/escuro: botão na topbar (`lib/theme.js`), injetado em todas as páginas; persiste no
-localStorage e respeita a preferência do sistema no primeiro acesso. A estética é de ferramenta de
-analytics (superfície chapada, borda de 1px, números tabulares, sem gradiente decorativo), pra NÃO
-ter cara de template de IA. A cor de destaque da marca funciona nos dois temas (o `--accent-soft`
-deriva dela via color-mix, então não fica um roxo genérico fixo).
+localStorage e respeita a preferência do sistema no primeiro acesso. A cor de destaque da marca
+funciona nos dois temas (o `--accent-soft` deriva dela via color-mix, então não fica um roxo genérico fixo).
+
+Estética (anti-"cara de IA", nível ferramenta premium tipo Linear/Vercel, NÃO landing enfeitada):
+- Tipografia PRÓPRIA self-hosted (não a fonte default do sistema, que lê como template): Geist Sans no
+  texto + Geist Mono tabular em TODO número (KPI, funil, ranking, eixo do gráfico, cabeçalho de tabela).
+  Arquivos em `public/assets/fonts/` (woff2 variável, SIL OFL), `@font-face` same-origin (casa com a CSP
+  `default-src 'self'` + `font-src 'self'`), `font-display: swap`. Trocar a fonte = trocar o `@font-face`
+  + o token `--font`/`--font-mono` no `main.css`.
+- KPIs num PAINEL único dividido por hairline (gap de 1px sobre fundo da cor da borda), não N cards com
+  barrinha colorida (isso era tell de IA). Títulos de painel em FRASE (sentence-case), uppercase-tracked
+  reservado só pros micro-rótulos de dado (label de KPI, cabeçalho de coluna). Superfície chapada, borda
+  de 1px, sombra mínima tingida, sem gradiente/glow.
+- Gráfico com eixo Y em números REDONDOS (`niceScale` em `timeseries.js`), não min/meio/max cru (que
+  gerava rótulo com casas decimais, cara de número de máquina). Valor do funil sai PRA FORA da barra
+  quando ela é curta (cor de texto), pra não sumir sobre a trilha clara.
+- Guards no `test/design.test.js` travam: sem radial-gradient, fonte Geist wired + woff2 válidos, números
+  em `--font-mono`. Antes de mexer no visual, rode a auditoria adversarial anti-IA (subagent crítico) e
+  confira nos DOIS temas, como manda a doutrina do dono.
 
 Árvore de arquivos (`starter-kit/`, sem node_modules):
 ```

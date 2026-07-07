@@ -17,7 +17,7 @@ export function render(props = {}, value) {
   const trendHtml = trend && trend.text
     ? `<div class="kpi__trend ${trend.good ? 'is-good' : 'is-bad'}">` +
         `${esc(trend.text)}` +
-        `<span class="kpi__trend-cap"> vs início do período</span>` +
+        `<span class="kpi__trend-cap"> vs. início</span>` +
       `</div>`
     : '';
   let goalHtml = '';

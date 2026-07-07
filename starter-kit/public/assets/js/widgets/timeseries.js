@@ -29,9 +29,12 @@ export function render(props = {}, points) {
   }
 
   const values = list.map((p) => Number(p.value) || 0);
-  let min = Math.min(...values);
-  let max = Math.max(...values);
-  if (min === max) { min -= 1; max += 1; } // evita divisao por zero na escala
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+  // Escala "bonita": dominio + ticks em passos redondos (1/2/2.5/5 x 10^n), em vez
+  // de min/meio/max cru (que gerava rotulo tipo "2.775,25" com casas decimais, cara
+  // de numero gerado por maquina). O dominio arredondado ainda da folga pra linha.
+  const { niceMin: min, niceMax: max, ticks: yTicksVals } = niceScale(dataMin, dataMax, 4);
 
   // area de plotagem (dentro das margens dos eixos).
   const plotX = M.left;
@@ -48,8 +51,7 @@ export function render(props = {}, points) {
     y: round(yAt(Number(p.value) || 0)),
   }));
 
-  // Eixo Y: 3 ticks (min, meio, max) com gridlines horizontais discretas.
-  const yTicksVals = [min, (min + max) / 2, max];
+  // Eixo Y: ticks redondos (de niceScale) com gridlines horizontais discretas.
   const gridHtml = yTicksVals
     .map((v) => {
       const y = round(yAt(v));
@@ -69,16 +71,22 @@ export function render(props = {}, points) {
     series = `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="4" />`;
   } else {
     const pts = coords.map((c) => `${c.x},${c.y}`).join(' ');
+    // Area preenchida sob a linha (do traço ate a base do plot): o grafico ganha
+    // corpo em vez de uma linha fina flutuando num card vazio (tell de "meio pronto"
+    // pego na auditoria). Fecha o poligono no rodape da area de plotagem.
+    const baseline = round(plotY + plotH);
+    const areaPts = `${coords[0].x},${baseline} ${pts} ${coords[coords.length - 1].x},${baseline}`;
     const dots = coords
       .map((c) => `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="3" />`)
       .join('');
-    series = `<polyline class="chart__line" fill="none" points="${pts}" />${dots}`;
+    series = `<polygon class="chart__area" points="${areaPts}" />` +
+      `<polyline class="chart__line" fill="none" points="${pts}" />${dots}`;
   }
 
   // aria-label descritivo para leitores de tela (o SVG e role=img).
   // Inclui titulo, numero de pontos e a faixa de valores pra dar contexto sem depender do visual.
   const pointsLabel = n === 1 ? '1 ponto' : `${n} pontos`;
-  const rangeLabel = `de ${fmtNumber(min)} a ${fmtNumber(max)}`;
+  const rangeLabel = `de ${fmtNumber(dataMin)} a ${fmtNumber(dataMax)}`;
   const label = title
     ? `Grafico de linha: ${title}, ${pointsLabel}, ${rangeLabel}`
     : `Grafico de linha, ${pointsLabel}, ${rangeLabel}`;
@@ -126,4 +134,33 @@ function shortDate(raw) {
 
 function round(n) {
   return Math.round(n * 100) / 100;
+}
+
+// Arredonda um intervalo pro "numero bonito" mais proximo (1/2/2.5/5 x 10^n).
+// round=true escolhe o passo mais proximo; round=false arredonda pra cima o alcance.
+function niceNum(range, round) {
+  if (!(range > 0)) return 1;
+  const exp = Math.floor(Math.log10(range));
+  const f = range / Math.pow(10, exp);
+  let nf;
+  if (round) nf = f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10;
+  else nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return nf * Math.pow(10, exp);
+}
+
+// Escala de eixo com dominio e ticks redondos. Exportada pra testar a logica pura.
+export function niceScale(dataMin, dataMax, maxTicks = 4) {
+  let min = Number.isFinite(dataMin) ? dataMin : 0;
+  let max = Number.isFinite(dataMax) ? dataMax : 1;
+  if (min === max) { min -= 1; max += 1; }
+  const step = niceNum(niceNum(max - min, false) / Math.max(1, maxTicks - 1), true);
+  const niceMin = Math.floor(min / step) * step;
+  const niceMax = Math.ceil(max / step) * step;
+  const ticks = [];
+  // Passo em ponto flutuante pode acumular erro; arredonda cada tick pra multiplo do passo.
+  const decimals = step < 1 ? Math.ceil(-Math.log10(step)) : 0;
+  for (let v = niceMin; v <= niceMax + step * 0.5; v += step) {
+    ticks.push(decimals ? Number(v.toFixed(decimals)) : Math.round(v));
+  }
+  return { niceMin, niceMax, ticks };
 }

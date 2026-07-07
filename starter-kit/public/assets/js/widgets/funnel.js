@@ -31,12 +31,20 @@ export function render(props = {}, steps) {
       const conv = prev > 0 ? val / prev : 0;
       convHtml = `<div class="funnel__conv">${esc(fmtPercent(conv))}</div>`;
     }
+    // Valor DENTRO da barra so quando ela e larga o bastante pra caber o numero
+    // legivel (texto claro sobre o preenchimento). Barra curta -> valor FORA, a
+    // direita da barra, em cor de texto normal: senao o numero cai sobre a trilha
+    // clara e some (contraste reprova, cara de bug). Limiar ~28% da largura.
+    const inside = width >= 28;
+    const valueHtml = inside
+      ? `<span class="funnel__value">${esc(fmtBy('number', val))}</span>`
+      : `<span class="funnel__value funnel__value--out" style="left:calc(${round(width)}% + 8px)">${esc(fmtBy('number', val))}</span>`;
     return (
       `<div class="funnel__step">` +
         `<div class="funnel__label" title="${esc(s.label)}">${esc(s.label)}</div>` +
         `<div class="funnel__bar-wrap">` +
           `<div class="funnel__bar" style="width:${round(width)}%"></div>` +
-          `<span class="funnel__value">${esc(fmtBy('number', val))}</span>` +
+          valueHtml +
         `</div>` +
         convHtml +
       `</div>`

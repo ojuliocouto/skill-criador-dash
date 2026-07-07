@@ -42,7 +42,7 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Content-Security-Policy':
-    `default-src 'self'; script-src 'self' ${ANTI_FLASH_SCRIPT_HASH}; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'`,
+    `default-src 'self'; script-src 'self' ${ANTI_FLASH_SCRIPT_HASH}; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'`,
 };
 
 function withHeaders(response, extra = {}) {

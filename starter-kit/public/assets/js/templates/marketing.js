@@ -58,7 +58,7 @@ export const template = {
       { label: 'Leads', metricKey: 'leads' },
       { label: 'Conversões', metricKey: 'conversoes' },
     ] } },
-    { widget: 'ranking', col: 4, props: { dimensionSlot: 'canal', valueSlot: 'investimento', title: 'Ranking por canal' } },
-    { widget: 'table', col: 8, props: {} },
+    { widget: 'ranking', col: 12, props: { dimensionSlot: 'canal', valueSlot: 'investimento', title: 'Ranking por canal' } },
+    { widget: 'table', col: 12, props: {} },
   ],
 };

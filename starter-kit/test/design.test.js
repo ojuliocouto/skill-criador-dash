@@ -24,6 +24,28 @@ test('CSS: contem tokens de acessibilidade e tema', () => {
   assert.ok(css.includes('tabular-nums'), 'precisa de tabular-nums para numeros');
 });
 
+// Anti-"cara de IA": tipografia PROPRIA self-hosted (nao a fonte default do
+// sistema, que le como template) + numeros em mono tabular de ferramenta.
+test('CSS: fonte propria (Geist) self-hosted via @font-face same-origin', () => {
+  assert.ok(css.includes('@font-face'), 'precisa declarar @font-face');
+  assert.ok(css.includes('Geist-Variable.woff2'), 'precisa referenciar a Geist Sans local');
+  assert.ok(css.includes('GeistMono-Variable.woff2'), 'precisa referenciar a Geist Mono local');
+  assert.ok(css.includes("font-display: swap"), 'font-display: swap pra nao piscar em branco');
+  // Os arquivos de fonte tem que existir de verdade (senao o @font-face aponta pro vazio).
+  for (const f of ['Geist-Variable.woff2', 'GeistMono-Variable.woff2']) {
+    const buf = readFileSync(join(root, 'public', 'assets', 'fonts', f));
+    assert.equal(buf.slice(0, 4).toString('latin1'), 'wOF2', `${f} precisa ser um woff2 valido`);
+  }
+});
+
+test('CSS: numeros (KPI/funil/ranking) em mono tabular', () => {
+  assert.ok(css.includes('--font-mono'), 'precisa do token --font-mono');
+  assert.ok(
+    /\.kpi__value[^{]*\{[^}]*var\(--font-mono\)/.test(css) || /\.kpi__value,[^{]*var\(--font-mono\)/.test(css) || css.includes('.kpi .kpi-value, .kpi__value { font-family: var(--font-mono)'),
+    'o valor do KPI precisa usar var(--font-mono)',
+  );
+});
+
 // Identidade visual: classe do logo e cor secundaria no fundo suave.
 test('CSS: tem .brand-logo com limites de tamanho', () => {
   assert.ok(/\.brand-logo\s*\{/.test(css), 'precisa da classe .brand-logo');

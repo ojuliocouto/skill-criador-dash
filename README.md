@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (505 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (510 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -33,8 +33,9 @@ The person chooses per dashboard:
 - Widgets: KPI cards (with optional trend badge), time series (pure SVG), funnel, table, ranking. No external libraries.
 - 4-step no-code wizard with automatic column mapping by header name; widgets whose columns are not mapped are skipped instead of shown empty.
 - Brand accent color per dashboard.
-- Light/dark theme toggle in the topbar, persisted per browser (respects the OS preference on first load). Analytics-tool aesthetic: flat surfaces, hairline borders, tabular figures, no decorative gradient.
-- 2D desktop grid layout: non-KPI widgets flow into a 12-column grid (each layout item declares an optional `col` span 4..8), so the time series sits next to the funnel and rankings pair up, instead of a single vertical stack. Collapses to one column on mobile.
+- Light/dark theme toggle in the topbar, persisted per browser (respects the OS preference on first load).
+- Engineered-tool visual system (deliberately not an "AI template" look): self-hosted Geist Sans for text and Geist Mono tabular for every number (KPIs, funnel, ranking, chart axis, table headers); KPIs live in one hairline-divided panel rather than N cards with a colored bar; the chart Y-axis uses round nice-number ticks and a filled area under the line; flat surfaces, hairline borders, tinted minimal shadow, no decorative gradient or glow. The brand accent works in both themes and is swappable per dashboard. Regression guards in `test/design.test.js` (no radial-gradient, fonts wired, numbers in mono).
+- 2D desktop grid layout: non-KPI widgets flow into a 12-column grid (each layout item declares an optional `col` span 3..8), so the time series sits next to the funnel and rankings pair up, instead of a single vertical stack. Collapses to one column on mobile.
 - Built-in client-side filters: a filter bar (period from/to plus one selector per categorical dimension) recomputes every KPI, trend, funnel, series, ranking and table in the browser on change, without reloading or re-hitting the source.
 - Dashboard groups (tabs): combine several dashboards of the same business under a single link with tabs (`kind:'group'` config). Each tab lazy-loads its child dashboard with its own filters; the active tab is reflected in the URL. Create one from the landing page ('New group' wizard) or via the API.
 - Configs stored in Cloudflare KV; optional 5-minute data cache.
@@ -90,7 +91,7 @@ For the MVP data source (Google Sheets or CSV) you need no token, no OAuth, and 
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 505 unit tests: node --test 'test/*.test.js'
+npm test                      # 510 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
@@ -205,7 +206,7 @@ starter-kit/
 
 ## Testing
 
-There are 505 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 510 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit

@@ -38,7 +38,7 @@ export const template = {
       { label: 'Atendimentos', metricKey: 'atendimentos' },
       { label: 'Resolvidos', metricKey: 'resolvidos' },
     ] } },
-    { widget: 'ranking', col: 4, props: { dimensionSlot: 'canal', valueSlot: 'atendimentos', title: 'Atendimentos por canal' } },
-    { widget: 'table', col: 8, props: {} },
+    { widget: 'ranking', col: 12, props: { dimensionSlot: 'canal', valueSlot: 'atendimentos', title: 'Atendimentos por canal' } },
+    { widget: 'table', col: 12, props: {} },
   ],
 };

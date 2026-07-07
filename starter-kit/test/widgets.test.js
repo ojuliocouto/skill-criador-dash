@@ -1,11 +1,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { render as renderKpi } from '../public/assets/js/widgets/kpi.js';
-import { render as renderTimeseries } from '../public/assets/js/widgets/timeseries.js';
+import { render as renderTimeseries, niceScale } from '../public/assets/js/widgets/timeseries.js';
 import { render as renderFunnel } from '../public/assets/js/widgets/funnel.js';
 import { render as renderTable } from '../public/assets/js/widgets/table.js';
 import { render as renderRanking } from '../public/assets/js/widgets/ranking.js';
 import { registry, getWidget } from '../public/assets/js/widgets/index.js';
+
+// ---------- niceScale (eixo Y redondo, anti fake-precision) ----------
+test('niceScale: dominio e ticks redondos, sem casas decimais no eixo', () => {
+  const { niceMin, niceMax, ticks } = niceScale(2230.5, 3320, 4);
+  assert.ok(niceMin <= 2230.5 && niceMax >= 3320, 'dominio cobre os dados');
+  // Todos os ticks sao inteiros redondos (nada de "2.775,25").
+  for (const t of ticks) assert.equal(t, Math.round(t), `tick ${t} deve ser inteiro`);
+  // Passo constante e redondo (multiplo de 250/500/1000...).
+  const step = ticks[1] - ticks[0];
+  assert.ok(step > 0 && ticks.every((t, i) => i === 0 || Math.abs(t - ticks[i - 1] - step) < 1e-6), 'passo constante');
+});
+test('niceScale: min==max nao quebra (abre uma faixa)', () => {
+  const { niceMin, niceMax, ticks } = niceScale(5, 5, 4);
+  assert.ok(niceMax > niceMin, 'faixa nao nula');
+  assert.ok(ticks.length >= 2, 'gera ticks');
+});
+test('niceScale: valores pequenos com decimais mantem passo redondo', () => {
+  const { ticks } = niceScale(4.2, 4.9, 4);
+  // passo redondo tipo 0.2/0.25/0.5, ticks limpos (sem lixo de ponto flutuante)
+  for (const t of ticks) assert.ok(String(t).replace('-', '').length <= 4, `tick ${t} limpo`);
+});
 
 // ---------- kpi ----------
 test('kpi: label, valor em moeda e hint', () => {
@@ -46,10 +67,14 @@ test('timeseries: svg com polyline e pontos', () => {
   assert.ok(!html.includes('non-scaling-size'), 'sem o vetor invalido non-scaling-size');
   assert.ok(html.includes('<polyline'), 'tem polyline');
   assert.ok(html.includes('Evolucao'), 'contem titulo');
-  // polyline com 3 pares de pontos
-  const m = html.match(/points="([^"]+)"/);
+  // polyline (a LINHA) com 3 pares de pontos
+  const m = html.match(/<polyline[^>]*points="([^"]+)"/);
   assert.ok(m, 'polyline tem atributo points');
   assert.equal(m[1].trim().split(/\s+/).length, 3, 'tres pontos');
+  // area preenchida sob a linha: poligono com os 3 pontos + 2 cantos na base = 5
+  const area = html.match(/<polygon class="chart__area"[^>]*points="([^"]+)"/);
+  assert.ok(area, 'tem area preenchida (polygon chart__area)');
+  assert.equal(area[1].trim().split(/\s+/).length, 5, 'area = 3 pontos + 2 cantos da base');
   // eixos enriquecidos: gridlines/ticks no Y e rotulos de data no X
   assert.ok(html.includes('chart__grid'), 'tem gridlines');
   assert.ok(html.includes('chart__ytick'), 'tem ticks do eixo Y');

@@ -225,7 +225,7 @@ function renderSingle(item, ctx) {
 
 // Spans de coluna permitidos no grid de 12 colunas. Um `col` fora dessa lista
 // (ou ausente) cai no full-width (span 12), sem classe. Espelha o .span-N do CSS.
-const ALLOWED_SPANS = new Set([4, 5, 6, 7, 8]);
+const ALLOWED_SPANS = new Set([3, 4, 5, 6, 7, 8]);
 export function cellSpanClass(col) {
   return ALLOWED_SPANS.has(col) ? ` span-${col}` : '';
 }
