@@ -5,7 +5,7 @@ import { render as renderTimeseries } from '../public/assets/js/widgets/timeseri
 import { render as renderFunnel } from '../public/assets/js/widgets/funnel.js';
 import { render as renderTable } from '../public/assets/js/widgets/table.js';
 import { render as renderRanking } from '../public/assets/js/widgets/ranking.js';
-import { registry } from '../public/assets/js/widgets/index.js';
+import { registry, getWidget } from '../public/assets/js/widgets/index.js';
 
 // ---------- kpi ----------
 test('kpi: label, valor em moeda e hint', () => {
@@ -167,6 +167,21 @@ test('ranking: escapa key e trata vazio', () => {
   assert.ok(renderRanking({ title: 'V' }, []).includes('Sem dados'));
   const html = renderRanking({ title: 'X' }, [{ key: '<b>x</b>', value: 1 }]);
   assert.ok(!html.includes('<b>x</b>'), 'escapa key');
+});
+
+// ---------- getWidget: fronteira de despacho (fix 3) ----------
+// O dashboard.js despacha widget por getWidget(tipo), nao por registry[tipo] direto.
+test('getWidget: retorna a entrada do registry para widget valido', () => {
+  for (const tipo of ['kpi', 'timeseries', 'ranking', 'funnel', 'table']) {
+    const entry = getWidget(tipo);
+    assert.equal(entry, registry[tipo], `getWidget('${tipo}') e a mesma entrada do registry`);
+    assert.equal(typeof entry.toHtml, 'function', `${tipo} tem toHtml`);
+  }
+});
+
+test('getWidget: retorna undefined para widget desconhecido', () => {
+  assert.equal(getWidget('inexistente'), undefined);
+  assert.equal(getWidget(undefined), undefined);
 });
 
 // ---------- registry: agregacao deriva da MetricDef (fix 2) ----------

@@ -257,6 +257,52 @@ test('dashboards GET listAll -> 200 array sem hash, com flag protected', async (
   assert.equal(byId.b.protected, true);
 });
 
+// 8b. MINOR (metadados): na listagem publica, dashboard PROTEGIDO nao expoe
+//     nome/dominio/accent, so { id, protected:true }. Dashboard aberto segue igual.
+test('dashboards listAll: protegido esconde nome/dominio (so id+protected)', async () => {
+  const hash = await sha256Hex('x');
+  const kv = fakeKV({
+    'dash:aberto': JSON.stringify(makeConfig({ id: 'aberto', name: 'Publico', domain: 'pub.com', createdAt: '2026-01-01T00:00:00.000Z' })),
+    'dash:privado': JSON.stringify(makeConfig({ id: 'privado', name: 'Cliente Secreto', domain: 'cliente-secreto.com', auth: await saltedAuth(hash), createdAt: '2026-02-01T00:00:00.000Z' })),
+  });
+  const res = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  assert.equal(res.status, 200);
+  const arr = await readJSON(res);
+  const byId = Object.fromEntries(arr.map((x) => [x.id, x]));
+
+  // Aberto: metadados seguem expostos (a landing precisa mostrar).
+  assert.equal(byId.aberto.name, 'Publico');
+  assert.equal(byId.aberto.domain, 'pub.com');
+  assert.equal(byId.aberto.protected, false);
+
+  // Protegido: SO id + protected. Nome e dominio do cliente NAO vazam sem senha.
+  assert.equal(byId.privado.protected, true);
+  assert.equal(byId.privado.name, undefined, 'nome de dashboard protegido nao pode vazar');
+  assert.equal(byId.privado.domain, undefined, 'dominio (cliente) de dashboard protegido nao pode vazar');
+});
+
+// 8c. RATE LIMIT (GRAVE 2): brute force online da senha no GET ?id. 8 senhas
+//     erradas do mesmo IP -> 401; a 9a -> 429 Retry-After. Senha certa nao conta.
+test('dashboards GET protegido: brute force da senha estoura em 429', async () => {
+  const hash = await sha256Hex('gate-brute');
+  const cfg = makeConfig({ id: 'sec', auth: await saltedAuth(hash) });
+  const kv = fakeKV({ 'dash:sec': JSON.stringify(cfg) });
+  const env = { DASHBOARDS_KV: kv, DASHBOARD_CACHE: fakeCache() };
+  const headers = { 'CF-Connecting-IP': '198.51.100.10', 'x-dash-auth': 'errada' };
+
+  for (let i = 0; i < 8; i++) {
+    const r = await dashboards(ctx('GET', { id: 'sec', headers, env }));
+    assert.equal(r.status, 401, `tentativa ${i + 1}`);
+  }
+  const bloqueada = await dashboards(ctx('GET', { id: 'sec', headers, env }));
+  assert.equal(bloqueada.status, 429);
+  assert.ok(Number(bloqueada.headers.get('Retry-After')) > 0);
+
+  // Senha CERTA do mesmo IP ainda passa (contador so conta as erradas).
+  const ok = await dashboards(ctx('GET', { id: 'sec', headers: { 'CF-Connecting-IP': '198.51.100.10', 'x-dash-auth': hash }, env }));
+  assert.equal(ok.status, 200, 'uso legitimo nao pode tomar 429');
+});
+
 // ---------------------------------------------------------------------------
 // CONECTOR D1 (functions/api/connectors/d1.js)
 // ---------------------------------------------------------------------------

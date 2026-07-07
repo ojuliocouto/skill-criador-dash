@@ -65,7 +65,11 @@ test('middleware: toda resposta inclui os 3 headers de seguranca', async () => {
   assert.equal(res.headers.get('X-Frame-Options'), 'DENY');
   const csp = res.headers.get('Content-Security-Policy') || '';
   assert.match(csp, /default-src 'self'/);
-  assert.match(csp, /script-src 'self' 'unsafe-inline'/);
+  // script-src usa HASH do inline anti-flash em vez de 'unsafe-inline' (endurecido).
+  assert.match(csp, /script-src 'self' 'sha256-[A-Za-z0-9+/=]+'/);
+  const scriptSrc = (csp.match(/script-src[^;]*/) || [''])[0];
+  assert.doesNotMatch(scriptSrc, /unsafe-inline/, "script-src nao pode ter 'unsafe-inline'");
+  // style-src mantem 'unsafe-inline' (widgets usam style="..." inline em runtime).
   assert.match(csp, /style-src 'self' 'unsafe-inline'/);
   assert.match(csp, /frame-ancestors 'none'/);
   // Nao pode quebrar o no-store existente.

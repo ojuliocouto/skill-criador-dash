@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { autoMap, normalizeHeader } from '../public/assets/js/lib/automap.js';
+import { autoMap, normalizeHeader, tokenize } from '../public/assets/js/lib/automap.js';
 
 const slots = [
   { key: 'data', aliases: ['data', 'dia', 'date'] },
@@ -56,6 +56,46 @@ test('autoMap: slot sem coluna correspondente vira null', () => {
 test('normalizeHeader: remove acento, minuscula, colapsa espacos', () => {
   assert.equal(normalizeHeader('  Conversões  '), 'conversoes');
   assert.equal(normalizeHeader('Valor   Gasto'), 'valor gasto');
+});
+
+// GRAVE 1: tokenize precisa quebrar camelCase de verdade (antes nunca disparava
+// porque recebia header ja em minusculo). Quebra entre [a-z0-9]->[A-Z] e entre
+// letra->digito, entao normaliza (minuscula, sem acento).
+test('tokenize: quebra camelCase e letra->digito', () => {
+  assert.deepEqual(tokenize('ValorTotal'), ['valor', 'total']);
+  assert.deepEqual(tokenize('DataVenda'), ['data', 'venda']);
+  assert.deepEqual(tokenize('nomeCliente'), ['nome', 'cliente']);
+  assert.deepEqual(tokenize('Receita2026'), ['receita', '2026']);
+  assert.deepEqual(tokenize('CPFCliente'), ['cpf', 'cliente']); // acronimo + palavra
+  assert.deepEqual(tokenize('Valor Gasto'), ['valor', 'gasto']); // espaco continua
+  assert.deepEqual(tokenize('valor_total'), ['valor', 'total']); // snake continua
+});
+
+test('tokenize: remove acento ao normalizar (Conversões -> conversoes)', () => {
+  assert.deepEqual(tokenize('Conversões'), ['conversoes']);
+});
+
+// GRAVE 1: colunas camelCase comuns nao eram tokenizadas, entao autoMap falhava.
+test('autoMap: casa headers camelCase por token', () => {
+  const r = autoMap(
+    [
+      { key: 'valor', aliases: ['valor', 'preco', 'total'] },
+      { key: 'data', aliases: ['data', 'dia'] },
+      { key: 'cliente', aliases: ['cliente', 'nome'] },
+    ],
+    ['ValorTotal', 'DataVenda', 'nomeCliente'],
+  );
+  assert.equal(r.valor, 'ValorTotal');   // token 'valor'
+  assert.equal(r.data, 'DataVenda');     // token 'data'
+  assert.equal(r.cliente, 'nomeCliente'); // token 'cliente'
+});
+
+// GRAVE 1: quebrar camelCase NAO pode reintroduzir o falso positivo de prefixo.
+// 'data' NAO casa 'Database' mesmo apos tokenizar (Database e um token unico).
+test('autoMap: camelCase nao reintroduz falso positivo (data x Database)', () => {
+  assert.deepEqual(autoMap([{ key: 'data', aliases: ['data'] }], ['Database']), { data: null });
+  // DataBase (camelCase de verdade) SIM casa por token 'data', e legitimo.
+  assert.equal(autoMap([{ key: 'data', aliases: ['data'] }], ['DataBase']).data, 'DataBase');
 });
 
 // GRAVE 2: match por substring embutida gera falso positivo.

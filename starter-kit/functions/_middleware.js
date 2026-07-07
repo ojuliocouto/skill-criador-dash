@@ -16,18 +16,28 @@ const CORS = {
 
 const CACHE_TTL = 300; // segundos
 
+// Hash SHA-256 do UNICO <script> inline das paginas (o anti-flash de tema no
+// <head>, byte a byte identico em index/config/dashboard.html). Com o hash no
+// script-src, o CSP libera exatamente esse inline SEM precisar de 'unsafe-inline'.
+// Os demais scripts sao <script type="module" src="/assets/..."> cobertos por
+// 'self'. Nao ha handlers inline (onclick=), eval ou new Function nas paginas.
+// IMPORTANTE: se o texto do <script> anti-flash mudar, este hash precisa ser
+// recalculado, senao o inline para de rodar (o tema pisca). Comando:
+//   node -e "import('node:crypto').then(c=>console.log('sha256-'+c.createHash('sha256').update(CONTEUDO,'utf8').digest('base64')))"
+const ANTI_FLASH_SCRIPT_HASH = "'sha256-s81Hgk0mA2pQZt3tfYry+Pma8+DQ6+PEFZO+zskz388='";
+
 // Headers de seguranca (defesa em profundidade) aplicados a TODAS as respostas.
 // - X-Content-Type-Options: impede o browser de "adivinhar" (sniff) o tipo do conteudo.
 // - X-Frame-Options: nega enquadrar as paginas em iframe (anti-clickjacking).
-// - Content-Security-Policy: politica PRAGMATICA que NAO quebra o app.
-//   'unsafe-inline' em script-src e style-src e NECESSARIO porque as paginas usam
-//   um <script> inline (anti-flash de tema no head) e os widgets usam atributos
-//   style="..." inline. Isso e uma camada extra, nao a unica protecao.
+// - Content-Security-Policy: politica que NAO quebra o app.
+//   script-src usa HASH (sem 'unsafe-inline'): so o inline anti-flash exato roda.
+//   style-src MANTEM 'unsafe-inline': os widgets usam atributos style="..." inline
+//   (dezenas de estilos gerados em runtime), que nao dao para cobrir por hash.
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+    `default-src 'self'; script-src 'self' ${ANTI_FLASH_SCRIPT_HASH}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'`,
 };
 
 function withHeaders(response, extra = {}) {

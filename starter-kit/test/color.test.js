@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   aplicarAccent, contrastRatio, accentForeground, accentText,
   composite, fgForBackground, funnelBarBg, badgeSoftBg, badgeText,
+  accentGraph, THEME_SURFACES,
   BG_DARK, BG_LIGHT, DEFAULT_ACCENT,
 } from '../public/assets/js/lib/color.js';
 
@@ -215,6 +216,67 @@ test('aplicarAccent: toggle recalcula --funnel-fg/--badge-fg pro tema novo', () 
   const crBadge = contrastRatio(el._vars['--badge-fg'], badgeSoftBg(accent, false));
   assert.ok(crFunnel >= 4.5, `pos-toggle claro funnel cr=${crFunnel.toFixed(2)} < 4.5`);
   assert.ok(crBadge >= 4.5, `pos-toggle claro badge cr=${crBadge.toFixed(2)} < 4.5`);
+});
+
+// --- Regressao GRAVE: --accent-graph (linha/barras do grafico) e --accent-text
+// (links) tem que passar contraste contra a superficie do CARD (--bg-elev), nao
+// so contra o fundo do tema. Antes o --accent-graph (mix 70/30 fixo do CSS) com
+// accent claro no tema claro media 2.06:1 contra o card e reprovava WCAG 1.4.11
+// (objeto grafico exige 3:1). accent-text media contra --bg e passava fora do
+// card mas reprovava DENTRO dele no escuro. ---
+
+const ACCENTS_GRAPH = [
+  '#ffff00', // amarelo claro extremo
+  '#22d3ee', // ciano claro extremo
+  '#6366f1', // indigo mainstream
+  '#6d28d9', // roxo padrao (mainstream)
+];
+
+for (const accent of ACCENTS_GRAPH) {
+  test(`accent-graph: ${accent} passa 3:1 sobre --bg-elev do tema (2 temas)`, () => {
+    for (const isDark of [true, false]) {
+      const el = fakeEl();
+      aplicarAccent(el, accent, isDark);
+      const surface = (isDark ? THEME_SURFACES.dark : THEME_SURFACES.light).card;
+      const graph = el._vars['--accent-graph-calc'];
+      assert.ok(graph, `${accent} (${isDark ? 'escuro' : 'claro'}): faltou --accent-graph-calc`);
+      const cr = contrastRatio(graph, surface);
+      assert.ok(
+        cr >= 3,
+        `${accent} (${isDark ? 'escuro' : 'claro'}): --accent-graph ${graph} sobre card ${surface} cr=${cr.toFixed(2)} < 3`,
+      );
+    }
+  });
+
+  test(`accent-text: ${accent} passa 4.5:1 sobre --bg-elev (dentro do card, 2 temas)`, () => {
+    for (const isDark of [true, false]) {
+      const el = fakeEl();
+      aplicarAccent(el, accent, isDark);
+      const surface = (isDark ? THEME_SURFACES.dark : THEME_SURFACES.light).card;
+      const txt = el._vars['--accent-text'];
+      const cr = contrastRatio(txt, surface);
+      assert.ok(
+        cr >= 4.5,
+        `${accent} (${isDark ? 'escuro' : 'claro'}): --accent-text ${txt} sobre card ${surface} cr=${cr.toFixed(2)} < 4.5`,
+      );
+    }
+  });
+}
+
+// aplicarAccent grava --accent-graph-calc (a var que o main.css consome com
+// fallback pro color-mix).
+test('aplicarAccent: seta --accent-graph-calc', () => {
+  const el = fakeEl();
+  aplicarAccent(el, '#22d3ee', false);
+  assert.ok(el._vars['--accent-graph-calc'], 'faltou --accent-graph-calc');
+});
+
+// accentGraph preserva o tom quando o mix 70/30 ja passa 3:1 (nao empurra a toa).
+test('accentGraph: preserva o mix quando ja passa 3:1', () => {
+  // Roxo padrao no escuro: o mix accent 70% + text 30% deve passar folgado.
+  const g = accentGraph('#6d28d9', true);
+  assert.notEqual(g, '#ffffff');
+  assert.notEqual(g, '#000000');
 });
 
 // badgeText mantem o TOM da marca (nao vira branco/preto chapado) quando o

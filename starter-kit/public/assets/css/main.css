@@ -7,9 +7,11 @@
   /* accent-soft segue a cor de destaque automaticamente (nao fica um roxo fixo generico) */
   --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
   --accent-line: color-mix(in srgb, var(--accent) 40%, transparent);
-  /* Cor do accent puxada pro texto: garante que linha/barras nao sumam quando o
-     accent e muito claro sobre o fundo claro (mistura 30% da cor do texto). */
-  --accent-graph: color-mix(in srgb, var(--accent) 70%, var(--text) 30%);
+  /* Cor da linha/barras do grafico. Em runtime, aplicarAccent (color.js) grava
+     --accent-graph-calc calibrado pra >=3:1 (WCAG 1.4.11) contra --bg-elev, pra
+     a serie nao sumir com accent claro sobre fundo claro. Aqui fica o fallback
+     seguro (mesmo mix de antes) pro primeiro paint/SSR antes do runtime. */
+  --accent-graph: var(--accent-graph-calc, color-mix(in srgb, var(--accent) 70%, var(--text) 30%));
   --bg: #0c0e12;
   --bg-elev: #14171d;
   --bg-elev-2: #1b1f27;
@@ -19,6 +21,10 @@
   /* Clareado de #646b78 (reprovava AA, ~3.4:1) pra 5.82:1 sobre --bg-elev e 6.26:1 sobre --bg. */
   --text-faint: #8b93a4;
   --good: #34d399;
+  /* Texto sobre --good (numero da meta concluida). No escuro --good e verde
+     claro (#34d399): texto escuro passa AA (8.48:1). No claro --good escurece e
+     o texto vira branco (ver [data-theme="light"]). */
+  --on-good: #06251b;
   --bad: #f87171;
   /* Cor de destaque so para TEXTO (links, badges): clareada no escuro pra passar no contraste WCAG AA.
      Derivada do --accent em runtime, entao acompanha a marca. */
@@ -51,6 +57,9 @@
   /* Tons escurecidos de good/bad so no claro: os originais (verde/vermelho claros)
      reprovam no contraste WCAG AA sobre fundo branco. */
   --good: #0f7a52;
+  /* No claro --good e verde escuro: texto branco passa AA (5.35:1); o
+     #06251b antigo dava so 3.05:1 e reprovava. */
+  --on-good: #fff;
   --bad: #c0362c;
   /* No claro o texto de destaque pode ser o proprio accent, levemente escurecido pra garantir AA. */
   --accent-text: color-mix(in srgb, var(--accent) 88%, black);
@@ -208,7 +217,7 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 .steps .step-chip .num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--bg-elev-2); border: 1px solid var(--border); font-size: 12px; }
 .steps .step-chip.active { color: var(--text); }
 .steps .step-chip.active .num { background: var(--accent); border-color: var(--accent); color: var(--accent-fg, #fff); }
-.steps .step-chip.done .num { background: var(--good); border-color: var(--good); color: #06251b; }
+.steps .step-chip.done .num { background: var(--good); border-color: var(--good); color: var(--on-good, #06251b); }
 
 /* Domain choice cards */
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }

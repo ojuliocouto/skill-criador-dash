@@ -46,6 +46,16 @@ function fakeKV(initial = {}) {
   };
 }
 
+// KV de cache fake (usado pelo rate limiter): get/put simples em memoria.
+function fakeCache() {
+  const map = new Map();
+  return {
+    async get(k) { return map.has(k) ? map.get(k) : null; },
+    async put(k, v) { map.set(k, String(v)); },
+    _map: map,
+  };
+}
+
 // D1 fake. .prepare(sql).bind(...p).first() devolve a primeira row (ou null).
 function fakeD1(rows = []) {
   return {
@@ -312,4 +322,76 @@ test('d1 GET ?id sem DASHBOARD_DB -> 500', async () => {
   assert.equal(res.status, 500);
   const j = await readJSON(res);
   assert.match(j.error, /DASHBOARD_DB/);
+});
+
+// ---------------------------------------------------------------------------
+// RATE LIMIT anti brute force da senha (GRAVE 2) nos conectores protegidos.
+// So conta TENTATIVAS ERRADAS: a senha certa nao consome o balde. Limite 8/janela.
+// ---------------------------------------------------------------------------
+
+// 12. d1 GET protegido: 8 senhas erradas -> 401; a 9a do mesmo IP -> 429 Retry-After.
+test('d1 GET protegido: brute force estoura em 429 apos o limite de senhas erradas', async () => {
+  const hash = await sha256Hex('d1-brute');
+  const cfg = { name: 'Hist', auth: await saltedAuth(hash) };
+  const kv = fakeKV({ 'dash:hist': JSON.stringify(cfg) });
+  const db = fakeD1([{ id: 1, dashboard_id: 'hist', captured_at: 'x', dataset_json: JSON.stringify({ columns: [], rows: [], meta: {} }) }]);
+  const env = { DASHBOARDS_KV: kv, DASHBOARD_DB: db, DASHBOARD_CACHE: fakeCache() };
+  const headers = { 'CF-Connecting-IP': '203.0.113.50', 'x-dash-auth': 'senha-errada' };
+
+  for (let i = 0; i < 8; i++) {
+    const r = await d1(ctx('GET', { path: 'connectors/d1', id: 'hist', headers, env }));
+    assert.equal(r.status, 401, `tentativa errada ${i + 1} -> 401`);
+    assert.equal((await readJSON(r)).needsPassword, true);
+  }
+  const bloqueada = await d1(ctx('GET', { path: 'connectors/d1', id: 'hist', headers, env }));
+  assert.equal(bloqueada.status, 429);
+  assert.ok(Number(bloqueada.headers.get('Retry-After')) > 0);
+  assert.match((await readJSON(bloqueada)).error, /tentativas|aguarde/i);
+});
+
+// 13. Senha CERTA nunca e barrada, mesmo depois de varias tentativas erradas: o
+//     contador so conta as erradas, entao o uso legitimo nao toma 429.
+test('d1 GET: senha correta nao consome o balde (uso legitimo nao toma 429)', async () => {
+  const hash = await sha256Hex('d1-ok');
+  const cfg = { name: 'Hist', auth: await saltedAuth(hash) };
+  const kv = fakeKV({ 'dash:hist': JSON.stringify(cfg) });
+  const dataset = { columns: ['a'], rows: [{ a: 1 }], meta: {} };
+  const db = fakeD1([{ id: 1, dashboard_id: 'hist', captured_at: 'x', dataset_json: JSON.stringify(dataset) }]);
+  const env = { DASHBOARDS_KV: kv, DASHBOARD_DB: db, DASHBOARD_CACHE: fakeCache() };
+  const ip = '203.0.113.51';
+
+  // 5 tentativas erradas (abaixo do limite 8).
+  for (let i = 0; i < 5; i++) {
+    const r = await d1(ctx('GET', { path: 'connectors/d1', id: 'hist', headers: { 'CF-Connecting-IP': ip, 'x-dash-auth': 'errada' }, env }));
+    assert.equal(r.status, 401);
+  }
+  // Senha certa passa (e nao e barrada mesmo com erradas antes).
+  const ok = await d1(ctx('GET', { path: 'connectors/d1', id: 'hist', headers: { 'CF-Connecting-IP': ip, 'x-dash-auth': hash }, env }));
+  assert.equal(ok.status, 200);
+  // Muitas mais senhas certas seguidas nunca estouram (nao consomem o balde).
+  for (let i = 0; i < 20; i++) {
+    const r = await d1(ctx('GET', { path: 'connectors/d1', id: 'hist', headers: { 'CF-Connecting-IP': ip, 'x-dash-auth': hash }, env }));
+    assert.equal(r.status, 200, 'senha certa nunca toma 429');
+  }
+});
+
+// 14. meta-ads GET protegido: brute force da senha tambem estoura em 429.
+test('meta-ads GET protegido: brute force da senha estoura em 429', async () => {
+  const hash = await sha256Hex('meta-brute');
+  const cfg = { name: 'Meta', auth: await saltedAuth(hash), source: { meta: { token: 'X', account: 'act_1' } } };
+  const kv = fakeKV({ 'dash:m': JSON.stringify(cfg) });
+  const env = { DASHBOARDS_KV: kv, DASHBOARD_CACHE: fakeCache() };
+  const headers = { 'CF-Connecting-IP': '203.0.113.60', 'x-dash-auth': 'errada' };
+  // Stub que falharia o teste se a rede fosse tocada sem senha.
+  const stub = () => fakeResponse({ ok: true, status: 200, json: { data: [] } });
+
+  await comFetchStub(stub, async (contador) => {
+    for (let i = 0; i < 8; i++) {
+      const r = await metaAds(ctx('GET', { path: 'connectors/meta-ads', id: 'm', headers, env }));
+      assert.equal(r.status, 401);
+    }
+    const bloqueada = await metaAds(ctx('GET', { path: 'connectors/meta-ads', id: 'm', headers, env }));
+    assert.equal(bloqueada.status, 429);
+    assert.equal(contador.chamadas, 0, 'brute force nunca toca a Graph API');
+  });
 });

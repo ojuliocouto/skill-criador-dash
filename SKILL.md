@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PEÇAS (biblioteca provada em `starter-kit/`)
 
-Código real e testado (337 testes verdes, TDD). Você compõe a partir daqui.
+Código real e testado (377 testes verdes, TDD). Você compõe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Não sabem de métricas.
@@ -124,9 +124,11 @@ Recursos dos KPIs:
 - Meta vs realizado (opcional): meta na métrica principal do domínio (`primaryMetric`); o card mostra
   barra de progresso e percentual da meta.
 
-Proteção por senha (opcional): senha por dashboard; guarda-se só o hash SHA-256 (comparado em tempo
-constante). O dashboard pede a senha; a API só devolve a config E OS DADOS (conectores por id) com o
-hash correto no header `x-dash-auth`. `stripSecrets` remove recursivamente qualquer credencial da
+Proteção por senha (opcional): senha por dashboard. O cliente manda um SHA-256 da senha no header
+`x-dash-auth`; o servidor guarda só um verifier PBKDF2-SHA256 salgado por dashboard (nunca a senha, nunca
+um hash reenviável), recomputa e compara em tempo constante. O dashboard pede a senha; a API só devolve a
+config E OS DADOS (conectores por id) com o header correto. Tentativas erradas têm rate limit por KV.
+`stripSecrets` remove recursivamente qualquer credencial da
 fonte (token/secret/apikey/senha/authorization) das respostas.
 
 Modelo de acesso (avise a pessoa): a API é ABERTA por padrão. Dashboard SEM senha pode ser lido,
@@ -178,7 +180,7 @@ functions/
     snapshots.mjs               SQL do modo historico + rowToDataSet (puro)
     auth-config.mjs             needsAuth/authOk/safeEqual (neutro; conectores importam daqui)
 workers/
-  snapshot/                     Worker com cron que grava snapshots no D1
+  snapshot/ src/index.js        Worker com cron que grava snapshots no D1 (SNAPSHOT_FETCHERS)
 public/
   index.html  config.html (wizard)  dashboard.html
   assets/css/main.css
@@ -188,7 +190,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js  color.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           337 testes (npm test  ->  node --test test/*.test.js)
+test/                           377 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local (o `npm run dev` já embute a `--compatibility-date` do `package.json`):
@@ -229,13 +231,16 @@ mora o `wrangler.toml`, o `db/schema.sql` e o `package.json`).
 Base (os dois modos):
 ```
 wrangler kv namespace create DASHBOARDS_KV
-# O comando IMPRIME algo como:  id = "abc123...".  Copie esse id.
+# O comando IMPRIME o id do namespace. Dependendo da versao do wrangler (3.x vs 4.x) o formato varia:
+# pode vir como  id = "abc123..."  ou dentro de um bloco [[kv_namespaces]]. Em qualquer caso, copie o valor do id.
 wrangler kv namespace create DASHBOARD_CACHE      # opcional (cache 5 min); imprime outro id
 ```
 Abra `wrangler.toml` e troque os placeholders pelos ids impressos: `<SEU_KV_NAMESPACE_ID>` pelo id do
 DASHBOARDS_KV e `<SEU_KV_CACHE_ID>` pelo id do DASHBOARD_CACHE. Nunca commite id real em repo público.
 Troque também o `name = "meu-dashboard"` do topo do `wrangler.toml` pelo `<NOME-DO-PROJETO>` que você vai
 usar abaixo, pra os dois baterem (o `name` do `wrangler.toml` e o `--project-name` do deploy têm que ser iguais).
+ANTES do deploy, confira que NENHUM placeholder `<...>` sobrou no `wrangler.toml`: se um id de KV ficar como
+placeholder, o deploy compila mesmo assim e a falha só aparece em runtime (API 500 "Binding ... nao configurado").
 ```
 wrangler pages project create <NOME-DO-PROJETO> --production-branch main   # cria o projeto Pages
 wrangler pages deploy public --project-name=<NOME-DO-PROJETO> --branch main
@@ -304,9 +309,9 @@ Siga os Contratos 1 e 2 do `ARCHITECTURE.md`. Todo conector devolve exatamente u
 IMPORTANTE (conector de fonte VIVA não é só 1 arquivo): pra ele ser usado de ponta a ponta, plugue em 4 lugares. Comece SEMPRE pelo registro, que é a fonte de verdade:
 1. `public/assets/js/sources/index.js`: registre a fonte `{ type, label, canHistory }`. Sem isso, `getSource(type)` volta `undefined` e `fetchDataForSource` lança "Tipo de fonte desconhecido". E o `label`/`podeHistorico` do wizard saem daqui.
 2. `public/assets/js/lib/api-client.js`: adicione o fetcher live em `LIVE_FETCHERS` (chave = `type`). Há uma guarda no import: se um `type` do registry (menos `d1`) ficar sem fetcher, o módulo lança no load apontando qual faltou. Não há como esquecer em silêncio.
-3. `public/assets/js/config-wizard.js`: um card/opção no passo 2 (Fonte) pra pessoa conectar. Atenção: o card do Meta é filtrado por domínio (só aparece em Marketing); se a sua fonte serve qualquer domínio, não replique esse gate.
+3. `public/assets/js/config-wizard.js`: um card/opção no passo 2 (Fonte) pra pessoa conectar. Atenção: o card do Meta é filtrado por domínio (só aparece em Marketing); se a sua fonte serve qualquer domínio, não replique esse gate. Este é o passo que era manual e silencioso; agora `test/wizard-cards.test.js` faz a paridade (toda fonte viva do registry precisa de card), então esquecer o card também quebra o teste.
 4. Modo histórico (só se `canHistory:true`): adicione o fetcher em `SNAPSHOT_FETCHERS` de `workers/snapshot/src/index.js`. Outra guarda no import exige que as chaves batam EXATAMENTE com `historyTypes()` do registry.
-As guardas de import e o `test/sources.test.js` (paridade) quebram na hora se um passo faltar, nunca em produção. Sheets/CSV/Meta já estão plugados. Um conector SÓ com o arquivo do handler nunca é chamado.
+As guardas de import + `test/sources.test.js` + `test/wizard-cards.test.js` quebram na hora se qualquer um dos 4 passos faltar, nunca em produção. Sheets/CSV/Meta já estão plugados. Um conector SÓ com o arquivo do handler nunca é chamado.
 
 ## ADICIONAR UM NOVO WIDGET
 

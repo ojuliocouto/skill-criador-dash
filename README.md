@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (337 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (377 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -29,7 +29,7 @@ The person chooses per dashboard:
 - Support metrics: tickets handled, resolved, resolution rate, average response time, and CSAT. Resolution funnel plus ranking by channel.
 - Period trend badges on KPIs: each KPI compares the second half of the period to the first (equal-sized halves) and colors the change green or red by whether higher or lower is better.
 - Optional goal tracking: set a target for the domain primary metric in the wizard and the main KPI shows a progress bar and percent of goal (green once reached).
-- Optional per-dashboard password: protect a published dashboard with a password. Only the SHA-256 hash is stored (never the plain password); the config API returns data only with the correct hash.
+- Optional per-dashboard password: protect a published dashboard with a password. The client sends a SHA-256 of the password in the `x-dash-auth` header; the server stores only a salted PBKDF2-SHA256 verifier per dashboard (never the plain password, never a replayable hash), and the config API returns data only when the recomputed verifier matches.
 - Widgets: KPI cards (with optional trend badge), time series (pure SVG), funnel, table, ranking. No external libraries.
 - 4-step no-code wizard with automatic column mapping by header name; widgets whose columns are not mapped are skipped instead of shown empty.
 - Brand accent color per dashboard.
@@ -87,7 +87,7 @@ For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 337 unit tests: node --test 'test/*.test.js'
+npm test                      # 377 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
@@ -197,7 +197,7 @@ starter-kit/
 
 ## Testing
 
-There are 337 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 377 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit
@@ -209,7 +209,7 @@ The full browser flow (Marketing and Sales, including the brand accent color swa
 ## Security
 
 - No token is required for the default source: a link-shared public Google Sheet or a CSV upload is enough.
-- Optional password per dashboard: only the SHA-256 hash is stored (never the plain password), and the config API strips the hash before responding. Note this is a shared view password, not user accounts.
+- Optional password per dashboard: the server stores a salted PBKDF2-SHA256 verifier per dashboard (never the plain password, never a directly replayable hash), and the config API strips the whole `auth` block (salt, verifier, iterations) before responding. There is no server-side rate limit beyond the KV throttle on failed attempts, and the `x-dash-auth` header (a SHA-256 of the password) is a bearer-style credential protected by TLS in transit: this is a shared view password, not user accounts. For anything sensitive, also set an `ADMIN_TOKEN`.
 - Meta Ads access token is stored in the dashboard config and never returned to the browser: the connector Function reads it server-side by dashboard id. The config API strips the token from every response.
 - A link-shared Google Sheet is readable by anyone with the link, and a published dashboard has no login unless you set a password. Use data you are comfortable sharing by link, and set a password for anything sensitive.
 - Nothing sensitive lives in the code. No tokens, Account IDs, or KV ids are committed. Use `<...>` placeholders in any public repo.

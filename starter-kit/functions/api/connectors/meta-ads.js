@@ -9,10 +9,25 @@
 
 import { buildInsightsUrl, mapInsightsToDataSet } from '../../lib/meta.mjs';
 import { needsAuth, authOk, checkAdminToken } from '../../lib/auth-config.mjs';
+import { rateLimit, authRateLimit, clientIp } from '../../lib/rate-limit.mjs';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 const erro = (mensagem, status) => json({ error: mensagem }, status);
+
+// 429 com Retry-After e mensagem generica PT-BR. Nao revela contadores nem limites.
+const RATE_LIMIT_MSG = 'Muitas tentativas em pouco tempo. Aguarde um instante e tente de novo.';
+function tooMany(retryAfter) {
+  return new Response(
+    JSON.stringify({ error: RATE_LIMIT_MSG, rateLimited: true }),
+    { status: 429, headers: { ...JSON_HEADERS, 'Retry-After': String(retryAfter || 60) } }
+  );
+}
+
+// Limite do preview: por IP, poucas chamadas por minuto. Vale MESMO sem
+// ADMIN_TOKEN (fecha o relay/SSRF anonimo: deixa de ser proxy ilimitado da Graph API).
+const PREVIEW_LIMIT = 10;
+const PREVIEW_WINDOW = 60;
 
 // Mensagem generica de preview: NAO repassa o texto cru da Graph API para o
 // cliente, senao o endpoint vira um oraculo de validacao de token/conta (qualquer
@@ -35,9 +50,16 @@ export async function onRequest(context) {
 
   try {
     if (method === 'POST') {
+      // RATE LIMIT por IP ANTES de tocar a rede. Vale mesmo SEM ADMIN_TOKEN: fecha
+      // o relay/SSRF anonimo (o preview deixa de ser um proxy ilimitado da Graph
+      // API que valida tokens em lote do IP do dono). Exige o KV de cache; sem ele
+      // rateLimit devolve ok:true (documentado no README).
+      const rl = await rateLimit(env, `meta-preview:${clientIp(request)}`, { limit: PREVIEW_LIMIT, windowSec: PREVIEW_WINDOW });
+      if (!rl.ok) return tooMany(rl.retryAfter);
+
       // AUTORIZACAO do preview: se ADMIN_TOKEN estiver setado no env, exige o header
-      // x-admin-token (mesma logica das mutacoes de dashboards). Sem essa trava, o
-      // preview seria um relay anonimo da Graph API, sem auth nem rate limit.
+      // x-admin-token (mesma logica das mutacoes de dashboards). O gate admin fica
+      // POR CIMA do rate limit (defesa em camadas).
       const adminGate = checkAdminToken(env, request);
       if (adminGate) return adminGate;
 
@@ -63,8 +85,15 @@ export async function onRequest(context) {
       let config;
       try { config = JSON.parse(raw); } catch { return erro('Configuracao corrompida.', 500); }
       // Protecao por senha: dashboard protegido exige a senha tambem para os DADOS.
-      if (needsAuth(config) && !(await authOk(config, request.headers.get('x-dash-auth') || ''))) {
-        return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
+      if (needsAuth(config)) {
+        const senhaOk = await authOk(config, request.headers.get('x-dash-auth') || '');
+        if (!senhaOk) {
+          // RATE LIMIT anti brute force: so conta as tentativas ERRADAS (a senha
+          // certa nunca chega aqui). Estourou -> 429 Retry-After.
+          const rl = await authRateLimit(env, request, id);
+          if (!rl.ok) return tooMany(rl.retryAfter);
+          return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
+        }
       }
       const m = config.source && config.source.meta;
       if (!m || !m.token) return erro('Este dashboard nao tem conector Meta Ads configurado.', 400);

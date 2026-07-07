@@ -27,6 +27,25 @@ test('parseNumberBR: invalidos viram NaN', () => {
   assert.ok(Number.isNaN(parseNumberBR(undefined)));
 });
 
+// MINOR (armadilha 100x): parseNumberBR trata o sufixo '%' apenas removendo o
+// simbolo e devolvendo o numero COMO ESTA ('50%' -> 50, NAO 0.5). Nao ha divisao
+// por 100 escondida aqui: converter por-cento -> fracao e responsabilidade da
+// metrica que consome o valor. Travado pra nao virar comportamento-surpresa.
+test('parseNumberBR: sufixo % e removido e o numero volta como esta (nao divide por 100)', () => {
+  assert.equal(parseNumberBR('50%'), 50);
+  assert.equal(parseNumberBR('42%'), 42);
+  assert.equal(parseNumberBR('100%'), 100);
+  assert.equal(parseNumberBR('12,5%'), 12.5); // decimal BR com %
+  assert.equal(parseNumberBR('0%'), 0);
+});
+
+test('parseNumberBR: somar coluna de percentuais nao encolhe 100x', () => {
+  // Se o parser dividisse por 100, a soma seria 0.8 (bug 100x). Aqui e 80.
+  const coluna = ['50%', '30%'];
+  const soma = coluna.reduce((acc, v) => acc + parseNumberBR(v), 0);
+  assert.equal(soma, 80);
+});
+
 test('parseDateBR: normaliza para ISO YYYY-MM-DD', () => {
   assert.equal(parseDateBR('31/12/2026'), '2026-12-31');
   assert.equal(parseDateBR('01/02/2026'), '2026-02-01');

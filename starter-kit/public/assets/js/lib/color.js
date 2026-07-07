@@ -93,16 +93,24 @@ export function mixSrgb(accentHex, otherHex, pctAccent) {
  */
 export function accentText(hex, isDark, target = 4.5) {
   const base = parseHex(hex) ? hex : DEFAULT_ACCENT;
+  // Mede contra o fundo do tema (--bg) E contra a superficie do CARD (--bg-elev)
+  // e exige >=target nos DOIS. Links vivem tanto sobre --bg quanto DENTRO de
+  // cards; conforme o tema, a pior superficie muda (no escuro o card e mais
+  // claro e reprova o texto claro; no claro o --bg e mais escuro que o card e
+  // reprova o texto escuro). Garantir os dois cobre link em qualquer lugar.
+  const S = isDark ? THEME_SURFACES.dark : THEME_SURFACES.light;
   const bg = isDark ? BG_DARK : BG_LIGHT;
+  const card = S.card;
+  const passes = (c) => contrastRatio(c, bg) >= target && contrastRatio(c, card) >= target;
   const toward = isDark ? '#ffffff' : '#000000';
-  // Se o accent puro ja passa, usa ele (mantem a cor da marca sem alterar).
+  // Se o accent puro ja passa nos dois, usa ele (mantem a cor da marca).
   const pure = toHex(parseHex(base));
-  if (contrastRatio(pure, bg) >= target) return pure;
+  if (passes(pure)) return pure;
   // Senao, mistura progressivamente na direcao do extremo (branco/preto)
-  // ate o contraste alcancar o alvo.
+  // ate o contraste alcancar o alvo em ambas as superficies.
   for (let p = 95; p >= 0; p -= 5) {
     const cand = mixSrgb(base, toward, p);
-    if (contrastRatio(cand, bg) >= target) return cand;
+    if (passes(cand)) return cand;
   }
   return toward; // nem o extremo puro passou (nao deve acontecer)
 }
@@ -220,6 +228,38 @@ export function badgeText(hex, isDark, target = 4.5) {
 }
 
 /**
+ * Cor da LINHA/BARRAS do grafico (--accent-graph). Parte do mix atual do CSS
+ * (accent 70% + text 30%), a mesma cor que o main.css calcula. Se essa cor ja
+ * tem contraste >= target (3:1 pra objeto grafico, WCAG 1.4.11) contra a
+ * superficie onde o grafico e desenhado (--bg-elev, o fundo do .card), mantem
+ * (preserva o tom da marca). Senao empurra progressivamente na direcao do
+ * extremo legivel (escurece no claro, clareia no escuro) ate passar 3:1. Nao
+ * vira preto/branco chapado a nao ser que nada antes disso passe.
+ *
+ * @param {string} hex accent da marca (#rgb ou #rrggbb)
+ * @param {boolean} isDark tema escuro?
+ * @param {number} [target=3] razao minima desejada (objeto grafico = 3:1)
+ * @returns {string} hex com contraste >= target sobre --bg-elev do tema
+ */
+export function accentGraph(hex, isDark, target = 3) {
+  const base = parseHex(hex) ? hex : DEFAULT_ACCENT;
+  const S = isDark ? THEME_SURFACES.dark : THEME_SURFACES.light;
+  const surface = S.card; // --bg-elev, superficie do card onde o grafico e pintado
+  // Cor "crua" do grafico: o mesmo mix que o CSS faz (accent 70% + text 30%).
+  const graph = mixSrgb(base, S.text, ACCENT_GRAPH_PCT);
+  if (contrastRatio(graph, surface) >= target) return graph;
+  // Nao passou: empurra o graph na direcao do extremo legivel do tema
+  // (branco no escuro, preto no claro) ate alcancar o alvo. Preserva o
+  // maximo do tom (comeca com pouca mistura).
+  const toward = isDark ? '#ffffff' : '#000000';
+  for (let p = 5; p <= 100; p += 5) {
+    const cand = mixSrgb(toward, graph, p);
+    if (contrastRatio(cand, surface) >= target) return cand;
+  }
+  return toward;
+}
+
+/**
  * Aplica no elemento (normalmente documentElement) as variaveis CSS derivadas
  * do accent, calibradas pro tema atual:
  *   --accent      cor da marca crua
@@ -244,6 +284,13 @@ export function aplicarAccent(el, hex, isDark) {
   el.style.setProperty('--accent-fg', accentForeground(accent));
   el.style.setProperty('--accent-text', txt);
   el.style.setProperty('--focus-ring', txt);
+  // Cor da linha/barras do grafico: calibrada pra >=3:1 (WCAG 1.4.11, objeto
+  // grafico) contra a superficie do card (--bg-elev), pra a serie nao sumir
+  // quando o accent e claro sobre fundo claro. Preserva o tom quando ja passa.
+  // Grava em --accent-graph-calc; o main.css usa
+  // --accent-graph: var(--accent-graph-calc, <mix fallback>). Nao setamos
+  // --accent-graph direto pra evitar auto-referencia da custom property.
+  el.style.setProperty('--accent-graph-calc', accentGraph(accent, isDark));
   // Texto sobre a barra do funil: mede contra a cor VISIVEL (composta) da barra,
   // nao contra o accent cru (que e mais escuro e levava a branco reprovando AA).
   el.style.setProperty('--funnel-fg', fgForBackground(funnelBarBg(accent, isDark)));

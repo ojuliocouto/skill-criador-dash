@@ -3,11 +3,20 @@
 // A lógica pura de SQL e de reidratação vive em functions/lib/snapshots.mjs.
 import { latestSnapshotSQL, rowToDataSet } from '../../lib/snapshots.mjs';
 import { needsAuth, authOk } from '../../lib/auth-config.mjs';
+import { authRateLimit } from '../../lib/rate-limit.mjs';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+}
+
+// 429 com Retry-After e mensagem generica PT-BR (nao revela contadores/limites).
+function tooMany(retryAfter) {
+  return new Response(
+    JSON.stringify({ error: 'Muitas tentativas em pouco tempo. Aguarde um instante e tente de novo.', rateLimited: true }),
+    { status: 429, headers: { ...JSON_HEADERS, 'Retry-After': String(retryAfter || 60) } }
+  );
 }
 
 // Carrega a config do dashboard no KV para checar protecao por senha.
@@ -48,8 +57,15 @@ export async function onRequest(context) {
   // Protecao por senha: se o dashboard e protegido, os DADOS tambem exigem a senha
   // (senao a senha protegeria so a config e nao o conteudo).
   const config = await loadConfig(env, id);
-  if (config && needsAuth(config) && !(await authOk(config, request.headers.get('x-dash-auth') || ''))) {
-    return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
+  if (config && needsAuth(config)) {
+    const senhaOk = await authOk(config, request.headers.get('x-dash-auth') || '');
+    if (!senhaOk) {
+      // RATE LIMIT anti brute force: so conta as tentativas ERRADAS (senha certa
+      // nao chega aqui). Estourou -> 429 Retry-After.
+      const rl = await authRateLimit(env, request, id);
+      if (!rl.ok) return tooMany(rl.retryAfter);
+      return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
+    }
   }
 
   try {

@@ -30,15 +30,30 @@ export function normalizeHeader(s) {
 const MIN_SUBSTR = 3;
 
 /**
- * Quebra um header normalizado em tokens: separa por espaco, _, -, / e por
- * camelCase (ValorTotal -> valor total, ja normalizado vira minusculo).
- * @param {string} norm header ja normalizado (minusculo, sem acento)
+ * Quebra um header CRU em tokens. Faz a segmentacao ANTES de normalizar, pra o
+ * split de camelCase realmente disparar (se recebesse o header ja em minusculo,
+ * nao haveria maiuscula pra quebrar). Insere separador:
+ *  - camelCase: entre [a-z0-9] e [A-Z]  (ValorTotal -> Valor Total)
+ *  - acronimo + palavra: entre [A-Z]+ e [A-Z][a-z]  (CPFCliente -> CPF Cliente)
+ *  - letra <-> digito: entre letra e digito e vice-versa (Receita2026 -> Receita 2026)
+ * So entao normaliza (minuscula, sem acento) e separa por espaco, _, -, /, ., etc.
+ * Aceita header cru (com maiusculas/acento); passar algo ja normalizado tambem
+ * funciona (so nao tera camelCase pra quebrar).
+ * @param {string} raw header cru (aceita maiusculas e acento)
  * @returns {string[]}
  */
-export function tokenize(norm) {
-  return String(norm == null ? '' : norm)
-    // camelCase: insere separador entre minuscula/numero e maiuscula (antes do lowercase da norm)
+export function tokenize(raw) {
+  return String(raw == null ? '' : raw)
+    // camelCase: minuscula/digito seguido de maiuscula. ValorTotal -> Valor Total
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    // acronimo seguido de palavra: sequencia de maiusculas + maiuscula/minuscula.
+    // CPFCliente -> CPF Cliente (mantem o acronimo inteiro como um token)
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    // fronteira letra -> digito e digito -> letra. Receita2026 -> Receita 2026
+    .replace(/([a-zA-Z])([0-9])/g, '$1 $2')
+    .replace(/([0-9])([a-zA-Z])/g, '$1 $2')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .split(/[\s_\-/.]+/)
     .filter(Boolean);
@@ -77,7 +92,9 @@ export function autoMap(slots, columns) {
       if (!aliasTokens.length) continue;
       const hit = cols.find((c) => {
         if (usados.has(c.original) || c.norm.length < MIN_SUBSTR) return false;
-        return headerMatchesAlias(tokenize(c.norm), aliasTokens);
+        // Tokeniza o header CRU (c.original), nao o normalizado: assim o split de
+        // camelCase dispara (ValorTotal -> ['valor','total']). tokenize ja normaliza.
+        return headerMatchesAlias(tokenize(c.original), aliasTokens);
       });
       if (hit) { result[slot.key] = hit.original; usados.add(hit.original); break; }
     }

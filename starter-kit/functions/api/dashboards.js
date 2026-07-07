@@ -7,6 +7,7 @@
 // Reexportamos needsAuth e authOk aqui para nao quebrar quem ja importa de
 // dashboards.js (ex: os testes).
 import { needsAuth, authOk, checkAdminToken, derivePasswordAuth } from '../lib/auth-config.mjs';
+import { authRateLimit } from '../lib/rate-limit.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -64,6 +65,14 @@ function erro(mensagem, status) {
   return json({ error: mensagem }, status);
 }
 
+// 429 com Retry-After e mensagem generica PT-BR (nao revela contadores/limites).
+function tooMany(retryAfter) {
+  return new Response(
+    JSON.stringify({ error: 'Muitas tentativas em pouco tempo. Aguarde um instante e tente de novo.', rateLimited: true }),
+    { status: 429, headers: { ...JSON_HEADERS, 'Retry-After': String(retryAfter || 60) } }
+  );
+}
+
 const PREFIX = 'dash:';
 const kvKey = (id) => `${PREFIX}${id}`;
 
@@ -112,13 +121,13 @@ export async function onRequest(context) {
     }
 
     if (method === 'GET') {
-      return id ? await getOne(kv, id, providedHash) : await listAll(kv);
+      return id ? await getOne(kv, id, providedHash, env, request) : await listAll(kv);
     }
     if (method === 'POST') {
-      return await create(kv, request, providedHash);
+      return await create(kv, request, providedHash, env);
     }
     if (method === 'DELETE') {
-      return await remove(kv, id, providedHash);
+      return await remove(kv, id, providedHash, env, request);
     }
     return erro(`Método ${method} não suportado.`, 405);
   } catch (err) {
@@ -139,19 +148,28 @@ async function listAll(kv) {
   // A listagem e publica (a landing lista todos): devolve so campos seguros.
   // NAO expoe `source` (link da planilha, conta do Meta) nem nada da fonte, senao
   // vazaria a origem de um dashboard PROTEGIDO pra qualquer anonimo.
-  const validas = configs.filter(Boolean).map((c) => ({
-    id: c.id,
-    name: c.name,
-    domain: c.domain,
-    accent: c.accent,
-    createdAt: c.createdAt,
-    protected: needsAuth(c),
-  }));
+  //
+  // MINOR (metadados): para dashboards PROTEGIDOS, nao expor nome/dominio/accent
+  // sem a senha, so { id, protected }. Antes, um anonimo lia o nome e o cliente
+  // (dominio) de dashboards privados sem nunca provar a senha. Dashboards SEM
+  // senha seguem expostos como antes (a landing precisa lista-los).
+  const validas = configs.filter(Boolean).map((c) => {
+    const prot = needsAuth(c);
+    if (prot) return { id: c.id, protected: true };
+    return {
+      id: c.id,
+      name: c.name,
+      domain: c.domain,
+      accent: c.accent,
+      createdAt: c.createdAt,
+      protected: false,
+    };
+  });
   validas.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   return json(validas);
 }
 
-async function getOne(kv, id, providedHash) {
+async function getOne(kv, id, providedHash, env, request) {
   const raw = await kv.get(kvKey(id));
   if (!raw) {
     return erro('Dashboard não encontrado.', 404);
@@ -159,6 +177,10 @@ async function getOne(kv, id, providedHash) {
   let config;
   try { config = JSON.parse(raw); } catch { return erro('Configuração do dashboard corrompida.', 500); }
   if (!(await authOk(config, providedHash))) {
+    // RATE LIMIT anti brute force online da senha: so conta a tentativa ERRADA
+    // (a senha certa nao passa por aqui). Estourou -> 429 Retry-After.
+    const rl = await authRateLimit(env, request, id);
+    if (!rl.ok) return tooMany(rl.retryAfter);
     return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
   }
   return json(stripSecrets(config));
@@ -171,7 +193,7 @@ async function loadConfig(kv, id) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-async function create(kv, request, providedHash) {
+async function create(kv, request, providedHash, env) {
   let config;
   try {
     config = await request.json();
@@ -206,6 +228,9 @@ async function create(kv, request, providedHash) {
   // um com o id apagaria/trocaria a config de um dashboard protegido).
   const existente = await loadConfig(kv, config.id);
   if (existente && needsAuth(existente) && !(await authOk(existente, providedHash))) {
+    // RATE LIMIT: sobrescrever dashboard protegido tambem e superficie de brute force.
+    const rl = await authRateLimit(env, request, config.id);
+    if (!rl.ok) return tooMany(rl.retryAfter);
     return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para sobrescrever.', needsPassword: true }, 401);
   }
 
@@ -222,13 +247,16 @@ async function create(kv, request, providedHash) {
   return json(stripSecrets(config));
 }
 
-async function remove(kv, id, providedHash) {
+async function remove(kv, id, providedHash, env, request) {
   if (!id) {
     return erro('Parâmetro "id" é obrigatório para excluir um dashboard.', 400);
   }
   // Nao deixa EXCLUIR um dashboard protegido sem a senha dele.
   const existente = await loadConfig(kv, id);
   if (existente && needsAuth(existente) && !(await authOk(existente, providedHash))) {
+    // RATE LIMIT: excluir dashboard protegido tambem e superficie de brute force.
+    const rl = await authRateLimit(env, request, id);
+    if (!rl.ok) return tooMany(rl.retryAfter);
     return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para excluir.', needsPassword: true }, 401);
   }
   await kv.delete(kvKey(id));

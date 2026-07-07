@@ -10,7 +10,14 @@ export function parseNumberBR(v) {
   if (v == null) return NaN;
   let s = String(v).trim();
   if (!s) return NaN;
-  // remove moeda, %, espacos e caracteres nao numericos das pontas uteis
+  // Remove moeda, %, espacos. DECISAO (travada em teste): o '%' e apenas removido
+  // e o numero volta COMO ESTA, sem dividir por 100. Ou seja '50%' -> 50 (o valor
+  // "por cento" como numero 50), NAO 0.5. Converter de por-cento para fracao e
+  // responsabilidade da metrica que consome o dado (ex: uma MetricDef de ratio ou
+  // um compute que divide por 100), nunca deste parser cru. Assim parseNumberBR
+  // continua sendo um leitor de NUMERO da celula, sem semantica de percentual
+  // embutida, e somar uma coluna de '50%'/'30%' da 80 (nao 0.8), coerente com
+  // metrics.js, que trata a celula como numero cru.
   s = s.replace(/R\$/gi, '').replace(/%/g, '').replace(/\s/g, '').trim();
   if (!s) return NaN;
   const hasComma = s.includes(',');

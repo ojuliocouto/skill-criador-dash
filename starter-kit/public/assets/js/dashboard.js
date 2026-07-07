@@ -11,7 +11,7 @@ import { computeAll } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
 import { sha256Hex } from './lib/auth.js';
 import { render as renderKpi } from './widgets/kpi.js';
-import { registry } from './widgets/index.js';
+import { getWidget } from './widgets/index.js';
 import { getSource } from './sources/index.js';
 import { DEFAULT_ACCENT, aplicarAccent } from './lib/color.js';
 
@@ -204,9 +204,15 @@ function renderKpiBlock(items, template, computed, trends = {}, goal = null) {
 // preparacao de dados especifica e chama o render puro. Passamos os helpers de UI
 // (findMetricDef, cardWith) no ctx pra o registry nao precisar reimplementa-los.
 function renderSingle(item, ctx) {
-  const entry = item && registry[item.widget];
-  // Widget desconhecido (ou sem toHtml): nao quebra a pagina.
-  if (!entry || typeof entry.toHtml !== 'function') return '';
+  // Despacha pela fronteira getWidget() em vez de acessar o registry direto.
+  const entry = item ? getWidget(item.widget) : undefined;
+  // Widget desconhecido (ou sem toHtml): loga um erro claro e nao quebra a pagina
+  // (uma config com widget invalido nao deve derrubar o dashboard inteiro).
+  if (!entry || typeof entry.toHtml !== 'function') {
+    const tipo = item && item.widget;
+    console.error(`[dashboard] widget desconhecido no layout: "${tipo}". Nao existe no registry de widgets.`);
+    return '';
+  }
   return entry.toHtml(item, { ...ctx, findMetricDef, card: cardWith });
 }
 
