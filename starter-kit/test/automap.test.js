@@ -57,3 +57,17 @@ test('normalizeHeader: remove acento, minuscula, colapsa espacos', () => {
   assert.equal(normalizeHeader('  Conversões  '), 'conversoes');
   assert.equal(normalizeHeader('Valor   Gasto'), 'valor gasto');
 });
+
+// GRAVE 2: match por substring embutida gera falso positivo.
+// 'data' NAO pode casar 'Metadata'; 'total' NAO pode casar 'Subtotal'.
+// O match deve ser por TOKEN completo (ou prefixo de token), nao pedaco no meio da palavra.
+test('autoMap: alias NAO casa quando e substring no meio de outra palavra', () => {
+  // Sem match, o slot fica null (autoMap sempre inicializa a chave do slot).
+  assert.deepEqual(autoMap([{ key: 'data', aliases: ['data'] }], ['Metadata']), { data: null });
+  assert.deepEqual(autoMap([{ key: 'valor', aliases: ['total'] }], ['Subtotal']), { valor: null });
+});
+
+test('autoMap: alias casa como token completo dentro do header (casos legitimos)', () => {
+  assert.equal(autoMap([{ key: 'data', aliases: ['data'] }], ['Data da venda']).data, 'Data da venda');
+  assert.equal(autoMap([{ key: 'valor', aliases: ['total'] }], ['Valor total']).valor, 'Valor total');
+});

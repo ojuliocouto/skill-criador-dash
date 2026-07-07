@@ -5,7 +5,7 @@
 // A auth (needsAuth/authOk/safeEqual) mora no modulo neutro auth-config.mjs para
 // que os conectores nao dependam desta camada de config. Reexportamos needsAuth e
 // authOk aqui para nao quebrar quem ja importa de dashboards.js (ex: os testes).
-import { needsAuth, authOk, safeEqual } from '../lib/auth-config.mjs';
+import { needsAuth, authOk, safeEqual, derivePasswordAuth } from '../lib/auth-config.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -44,7 +44,10 @@ function scrubSecrets(obj) {
 export function stripSecrets(config) {
   if (!config || typeof config !== 'object') return config;
   const clone = JSON.parse(JSON.stringify(config));
-  if (clone.auth) delete clone.auth.hash;
+  // Remove TODO o material de senha do bloco auth (nao so o hash legado): sal,
+  // verifier e iterations tambem sao segredos que nunca vao pro browser. Um dump
+  // da resposta GET nao pode conter nada reenviavel nem util pra forca bruta.
+  delete clone.auth;
   if (clone.source) scrubSecrets(clone.source);
   clone.protected = needsAuth(config);
   return clone;
@@ -73,7 +76,7 @@ const HEX_COLOR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
  * Response 401 quando o token esta definido mas o header falta/nao bate; devolve
  * null (segue o fluxo) quando o token nao esta definido ou o header confere.
  */
-function checkAdminToken(env, request) {
+export function checkAdminToken(env, request) {
   const adminToken = env && env.ADMIN_TOKEN;
   if (!adminToken) return null; // sem token configurado: instancia aberta (comportamento atual).
   const provided = request.headers.get('x-admin-token') || '';
@@ -106,6 +109,11 @@ export async function onRequest(context) {
     // DELETE exigem o header x-admin-token igual a ele. Assim o operador fecha a
     // instancia inteira sem quebrar o fluxo self-serve de quem nao setar o token.
     // Roda ANTES da checagem per-dashboard e so vale para POST/DELETE (GET nao muda).
+    //
+    // AVISO DE SEGURANCA (ver README): SEM env.ADMIN_TOKEN a instancia fica ABERTA.
+    // Qualquer anonimo pode criar, SOBRESCREVER ou APAGAR qualquer dashboard que NAO
+    // tenha senha per-dashboard (os protegidos ainda exigem x-dash-auth). Em producao
+    // multiusuario, defina ADMIN_TOKEN para exigir o header x-admin-token nas mutacoes.
     if (method === 'POST' || method === 'DELETE') {
       const adminGate = checkAdminToken(env, request);
       if (adminGate) return adminGate;
@@ -158,7 +166,7 @@ async function getOne(kv, id, providedHash) {
   }
   let config;
   try { config = JSON.parse(raw); } catch { return erro('Configuração do dashboard corrompida.', 500); }
-  if (!authOk(config, providedHash)) {
+  if (!(await authOk(config, providedHash))) {
     return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
   }
   return json(stripSecrets(config));
@@ -205,8 +213,17 @@ async function create(kv, request, providedHash) {
   // Nao deixa SOBRESCREVER um dashboard protegido sem a senha dele (senao qualquer
   // um com o id apagaria/trocaria a config de um dashboard protegido).
   const existente = await loadConfig(kv, config.id);
-  if (existente && needsAuth(existente) && !authOk(existente, providedHash)) {
+  if (existente && needsAuth(existente) && !(await authOk(existente, providedHash))) {
     return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para sobrescrever.', needsPassword: true }, 401);
+  }
+
+  // SEGURANCA: nunca grava o hash cru que o cliente envia no header. Se a config
+  // trouxe `auth.hash` (o sha256Hex que o header carrega), derivamos um bloco
+  // salgado { salt, verifier, iterations } via PBKDF2 e guardamos SO ele. Assim um
+  // dump do KV nao expoe nada reenviavel no header, e o sal mata rainbow table.
+  // Um bloco ja no formato v2 (com verifier) e mantido como esta.
+  if (config.auth && typeof config.auth === 'object' && config.auth.hash && !config.auth.verifier) {
+    config.auth = await derivePasswordAuth(String(config.auth.hash));
   }
 
   await kv.put(kvKey(config.id), JSON.stringify(config));
@@ -219,7 +236,7 @@ async function remove(kv, id, providedHash) {
   }
   // Nao deixa EXCLUIR um dashboard protegido sem a senha dele.
   const existente = await loadConfig(kv, id);
-  if (existente && needsAuth(existente) && !authOk(existente, providedHash)) {
+  if (existente && needsAuth(existente) && !(await authOk(existente, providedHash))) {
     return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para excluir.', needsPassword: true }, 401);
   }
   await kv.delete(kvKey(id));

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { accentForeground, accentText } from '../public/assets/js/dashboard.js';
+import { accentForeground, accentText } from '../public/assets/js/lib/color.js';
 
 // Fundos reais dos temas (espelham --bg no main.css).
 const BG_DARK = '#0c0e12';

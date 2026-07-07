@@ -48,7 +48,7 @@ export async function onRequest(context) {
   // Protecao por senha: se o dashboard e protegido, os DADOS tambem exigem a senha
   // (senao a senha protegeria so a config e nao o conteudo).
   const config = await loadConfig(env, id);
-  if (config && needsAuth(config) && !authOk(config, request.headers.get('x-dash-auth') || '')) {
+  if (config && needsAuth(config) && !(await authOk(config, request.headers.get('x-dash-auth') || ''))) {
     return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
   }
 

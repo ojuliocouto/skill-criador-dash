@@ -25,9 +25,24 @@ export function normalizeHeader(s) {
  * @param {string[]} columns
  * @returns {{ [slotKey:string]: string|null }}
  */
-// Tamanho minimo para considerar match por SUBSTRING (evita casos como a coluna
+// Tamanho minimo para considerar match por token (evita casos como a coluna
 // "da" casar o alias "data", ou um cabecalho vazio casar qualquer slot).
 const MIN_SUBSTR = 3;
+
+/**
+ * Quebra um header normalizado em tokens: separa por espaco, _, -, / e por
+ * camelCase (ValorTotal -> valor total, ja normalizado vira minusculo).
+ * @param {string} norm header ja normalizado (minusculo, sem acento)
+ * @returns {string[]}
+ */
+export function tokenize(norm) {
+  return String(norm == null ? '' : norm)
+    // camelCase: insere separador entre minuscula/numero e maiuscula (antes do lowercase da norm)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[\s_\-/.]+/)
+    .filter(Boolean);
+}
 
 export function autoMap(slots, columns) {
   // Descarta colunas com header vazio: nunca devem casar (planilha Google costuma
@@ -50,19 +65,50 @@ export function autoMap(slots, columns) {
     }
   }
 
-  // Passada 2: match por SUBSTRING (bidirecional), so para slots ainda sem coluna,
-  // e so quando os dois lados tem tamanho suficiente pra evitar match espurio.
+  // Passada 2: match por TOKEN (nao por substring embutida), so para slots ainda
+  // sem coluna. O alias tem que aparecer no header como sequencia de tokens completos
+  // (ou o ultimo token do alias como prefixo de um token do header). Assim 'data' casa
+  // 'Data da venda' mas NAO 'Metadata'; 'total' casa 'Valor total' mas NAO 'Subtotal'.
   for (const slot of slots || []) {
     if (result[slot.key]) continue;
     for (const alias of aliasesDe(slot)) {
       if (alias.length < MIN_SUBSTR) continue;
+      const aliasTokens = tokenize(alias);
+      if (!aliasTokens.length) continue;
       const hit = cols.find((c) => {
         if (usados.has(c.original) || c.norm.length < MIN_SUBSTR) return false;
-        return c.norm.includes(alias) || alias.includes(c.norm);
+        return headerMatchesAlias(tokenize(c.norm), aliasTokens);
       });
       if (hit) { result[slot.key] = hit.original; usados.add(hit.original); break; }
     }
   }
 
   return result;
+}
+
+/**
+ * Verdadeiro se a sequencia de tokens do alias aparece nos tokens do header como
+ * um run contiguo de tokens completos. O ULTIMO token do alias pode casar por prefixo
+ * de um token do header (ex alias 'data' casa token 'data'; nao casa 'metadata').
+ * @param {string[]} headerTokens
+ * @param {string[]} aliasTokens
+ * @returns {boolean}
+ */
+function headerMatchesAlias(headerTokens, aliasTokens) {
+  const n = headerTokens.length;
+  const k = aliasTokens.length;
+  if (!k || k > n) return false;
+  for (let i = 0; i + k <= n; i += 1) {
+    let ok = true;
+    for (let j = 0; j < k; j += 1) {
+      const ht = headerTokens[i + j];
+      const at = aliasTokens[j];
+      // tokens do meio precisam ser iguais; o ultimo token do alias aceita prefixo.
+      if (j === k - 1) {
+        if (!ht.startsWith(at)) { ok = false; break; }
+      } else if (ht !== at) { ok = false; break; }
+    }
+    if (ok) return true;
+  }
+  return false;
 }

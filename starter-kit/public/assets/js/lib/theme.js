@@ -1,6 +1,9 @@
 // Alterna tema claro/escuro. Aplica o tema salvo (ou o preferido do sistema) o mais
 // cedo possivel e injeta um botao de alternar na topbar. Persiste em localStorage.
-// ESM, sem dependencias. Basta incluir <script type="module" src=".../lib/theme.js">.
+// ESM. Depende so de lib/color.js pra recalibrar o accent ao trocar de tema.
+// Basta incluir <script type="module" src=".../lib/theme.js">.
+
+import { DEFAULT_ACCENT, aplicarAccent } from './color.js';
 
 const KEY = 'cd-theme';
 
@@ -19,7 +22,17 @@ function preferido() {
 }
 
 function aplicar(tema) {
-  document.documentElement.dataset.theme = tema;
+  const root = document.documentElement;
+  root.dataset.theme = tema;
+  // Recalibra as cores derivadas do accent pro tema novo. O --accent-text e o
+  // --focus-ring dependem do fundo do tema (WCAG AA/2.4.7): sem recalcular, ao
+  // trocar de tema eles ficam presos no valor do tema anterior e reprovam
+  // contraste. O accent atual vem do dataset (gravado pelo dashboard/wizard) ou
+  // da var CSS --accent ja setada; se nao houver custom, usa o padrao.
+  const custom = root.dataset.accent;
+  const cssAccent = root.style.getPropertyValue('--accent').trim();
+  const accent = custom || cssAccent || DEFAULT_ACCENT;
+  aplicarAccent(root, accent, tema !== 'light');
 }
 
 // Aplica o quanto antes para reduzir o flash.

@@ -5,6 +5,7 @@ import { render as renderTimeseries } from '../public/assets/js/widgets/timeseri
 import { render as renderFunnel } from '../public/assets/js/widgets/funnel.js';
 import { render as renderTable } from '../public/assets/js/widgets/table.js';
 import { render as renderRanking } from '../public/assets/js/widgets/ranking.js';
+import { registry } from '../public/assets/js/widgets/index.js';
 
 // ---------- kpi ----------
 test('kpi: label, valor em moeda e hint', () => {
@@ -166,4 +167,60 @@ test('ranking: escapa key e trata vazio', () => {
   assert.ok(renderRanking({ title: 'V' }, []).includes('Sem dados'));
   const html = renderRanking({ title: 'X' }, [{ key: '<b>x</b>', value: 1 }]);
   assert.ok(!html.includes('<b>x</b>'), 'escapa key');
+});
+
+// ---------- registry: agregacao deriva da MetricDef (fix 2) ----------
+// Helpers de ctx reutilizados pelos testes do registry.
+function findMetricDef(template, key) {
+  const list = Array.isArray(template.metrics) ? template.metrics : [];
+  return list.find((m) => m.key === key);
+}
+const card = (_title, inner) => `<div class="card">${inner}</div>`;
+
+// Dataset com 2 linhas no mesmo canal e mesma data, valor 10 e 30.
+// sum = 40; avg = 20. Isso distingue observavelmente qual agregacao foi usada.
+const rows = [
+  { Canal: 'Meta', Nota: '10', Data: '01/01/2026' },
+  { Canal: 'Meta', Nota: '30', Data: '01/01/2026' },
+];
+const colMap = { canal: 'Canal', nota: 'Nota', data: 'Data' };
+const dataset = { rows, columns: ['Canal', 'Nota', 'Data'] };
+
+test('ranking: deriva agg avg da MetricDef quando presente', () => {
+  const template = {
+    metrics: [{ key: 'nota', label: 'Nota', agg: 'avg', column: 'nota', format: 'number' }],
+  };
+  const item = { widget: 'ranking', props: { dimensionSlot: 'canal', valueSlot: 'nota' } };
+  const html = registry.ranking.toHtml(item, { template, dataset, colMap, findMetricDef, card });
+  // avg(10,30) = 20; sum daria 40. Confirma que usou avg.
+  assert.ok(html.includes('20'), 'usa avg da MetricDef');
+  assert.ok(!html.includes('40'), 'nao caiu no sum literal');
+});
+
+test('ranking: fallback sum quando MetricDef nao tem agg', () => {
+  // Sem MetricDef casando com o valueSlot -> fallback seguro pra sum.
+  const template = { metrics: [] };
+  const item = { widget: 'ranking', props: { dimensionSlot: 'canal', valueSlot: 'nota' } };
+  const html = registry.ranking.toHtml(item, { template, dataset, colMap, findMetricDef, card });
+  assert.ok(html.includes('40'), 'fallback sum soma 10+30=40');
+});
+
+test('timeseries: deriva agg avg da MetricDef quando presente', () => {
+  const template = {
+    metrics: [{ key: 'nota', label: 'Nota', agg: 'avg', column: 'nota', format: 'number' }],
+  };
+  const item = { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'nota' } };
+  const html = registry.timeseries.toHtml(item, { template, dataset, colMap, findMetricDef, card });
+  // Ponto unico com avg(10,30)=20 vira o tick central do eixo Y. Sum daria 40.
+  // Checa o texto exato do ytick pra evitar falso-positivo com "240" do viewBox.
+  assert.ok(/chart__ytick[^>]*>20</.test(html), 'timeseries usa avg da MetricDef (tick 20)');
+  assert.ok(!/chart__ytick[^>]*>40</.test(html), 'nao usou sum (sem tick 40)');
+});
+
+test('timeseries: fallback sum quando MetricDef nao tem agg', () => {
+  const template = { metrics: [] };
+  const item = { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'nota' } };
+  const html = registry.timeseries.toHtml(item, { template, dataset, colMap, findMetricDef, card });
+  // avg(10,30)=20 nao aparece; sum=40 vira o tick central.
+  assert.ok(/chart__ytick[^>]*>40</.test(html), 'timeseries fallback sum soma 10+30=40');
 });

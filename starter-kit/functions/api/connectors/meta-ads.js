@@ -9,10 +9,16 @@
 
 import { buildInsightsUrl, mapInsightsToDataSet } from '../../lib/meta.mjs';
 import { needsAuth, authOk } from '../../lib/auth-config.mjs';
+import { checkAdminToken } from '../dashboards.js';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 const erro = (mensagem, status) => json({ error: mensagem }, status);
+
+// Mensagem generica de preview: NAO repassa o texto cru da Graph API para o
+// cliente, senao o endpoint vira um oraculo de validacao de token/conta (qualquer
+// um testaria tokens roubados e leria a resposta detalhada da Meta).
+const PREVIEW_ERRO_GENERICO = 'Nao foi possivel validar o token/conta do Meta Ads. Confira o access token e o id da conta e tente de novo.';
 
 async function fetchMeta({ token, account, since, until } = {}) {
   const url = buildInsightsUrl({ token, accountId: account, since, until });
@@ -30,9 +36,21 @@ export async function onRequest(context) {
 
   try {
     if (method === 'POST') {
+      // AUTORIZACAO do preview: se ADMIN_TOKEN estiver setado no env, exige o header
+      // x-admin-token (mesma logica das mutacoes de dashboards). Sem essa trava, o
+      // preview seria um relay anonimo da Graph API, sem auth nem rate limit.
+      const adminGate = checkAdminToken(env, request);
+      if (adminGate) return adminGate;
+
       let body;
       try { body = await request.json(); } catch { return erro('Corpo invalido. Envie token e account.', 400); }
-      return json(await fetchMeta(body));
+      // No preview, mapeia QUALQUER falha para uma mensagem generica: nao vaza o
+      // texto cru da Graph API (que revelaria se o token/conta e valido).
+      try {
+        return json(await fetchMeta(body));
+      } catch {
+        return erro(PREVIEW_ERRO_GENERICO, 400);
+      }
     }
 
     if (method === 'GET') {
@@ -46,7 +64,7 @@ export async function onRequest(context) {
       let config;
       try { config = JSON.parse(raw); } catch { return erro('Configuracao corrompida.', 500); }
       // Protecao por senha: dashboard protegido exige a senha tambem para os DADOS.
-      if (needsAuth(config) && !authOk(config, request.headers.get('x-dash-auth') || '')) {
+      if (needsAuth(config) && !(await authOk(config, request.headers.get('x-dash-auth') || ''))) {
         return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
       }
       const m = config.source && config.source.meta;

@@ -11,6 +11,13 @@ import { onRequest as dashboards } from '../functions/api/dashboards.js';
 import { onRequest as d1 } from '../functions/api/connectors/d1.js';
 import { onRequest as middleware } from '../functions/_middleware.js';
 import { sha256Hex } from '../public/assets/js/lib/auth.js';
+import { authOk, derivePasswordAuth } from '../functions/lib/auth-config.mjs';
+
+// Deriva o bloco auth v2 (salgado) a partir do hash que o cliente enviaria no
+// header. Usado para semear o KV fake no formato ja gravado pelo servidor.
+async function saltedAuth(clientHash) {
+  return derivePasswordAuth(clientHash);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers de infra fake
@@ -120,7 +127,7 @@ test('dashboards POST sem campos obrigatorios -> 400', async () => {
 });
 
 // 2. POST valido -> 200, gera id (slug) e createdAt; resposta NAO expoe auth.hash.
-test('dashboards POST valido -> 200 gera slug/createdAt e nao expoe auth.hash', async () => {
+test('dashboards POST valido -> 200 gera slug/createdAt, salga a senha e nao vaza auth', async () => {
   const kv = fakeKV();
   const hash = await sha256Hex('segredo');
   const res = await dashboards(
@@ -130,12 +137,18 @@ test('dashboards POST valido -> 200 gera slug/createdAt e nao expoe auth.hash', 
   const j = await readJSON(res);
   assert.equal(j.id, 'cafe-da-manha'); // slug com acento removido
   assert.ok(j.createdAt, 'deve gerar createdAt');
-  // Gate de seguranca: hash nunca vaza pro cliente.
-  assert.equal(j.auth && j.auth.hash, undefined);
+  // Gate de seguranca: nenhum material de auth vaza pro cliente.
+  assert.equal(j.auth, undefined);
   assert.equal(j.protected, true);
-  // Mas foi persistido COM hash no KV.
+  // Persistido no KV JA SALGADO: nunca o hash cru que o header carrega.
   const stored = JSON.parse(kv._map.get('dash:cafe-da-manha'));
-  assert.equal(stored.auth.hash, hash);
+  assert.equal(stored.auth.hash, undefined, 'nao pode gravar o hash cru reenviavel');
+  assert.ok(stored.auth.salt && stored.auth.verifier, 'grava salt + verifier');
+  assert.equal(stored.auth.algo, 'PBKDF2-SHA256');
+  assert.notEqual(stored.auth.verifier, hash, 'verifier != hash do header');
+  // O verifier salgado autentica o header original, mas nao a si mesmo.
+  assert.equal(await authOk(stored, hash), true);
+  assert.equal(await authOk(stored, stored.auth.verifier), false);
 });
 
 // 3. GET ?id de dashboard existente NAO protegido -> 200 com a config.

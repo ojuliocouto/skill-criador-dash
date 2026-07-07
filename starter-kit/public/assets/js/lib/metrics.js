@@ -13,17 +13,34 @@ import { parseNumberBR, parseDateBR } from './format.js';
  * @property {function} [compute] (ctx) => number   para agg 'derived'
  */
 
-// Resolve o nome de coluna real a partir do slot semântico. Se o slot não
-// existir no colMap, cai de volta pro próprio nome (permite passar coluna direta).
-function resolveColumn(slot, colMap) {
+// Descobre se existe uma coluna com o nome EXATO `name` no dataset, olhando as
+// chaves da primeira linha (as linhas do DataSet compartilham as mesmas chaves).
+// Serve pra permitir passar coluna direta pelo nome real, sem mascarar slot.
+function datasetHasColumn(rows, name) {
+  if (!Array.isArray(rows) || rows.length === 0) return false;
+  const first = rows[0];
+  return first != null && Object.prototype.hasOwnProperty.call(first, name);
+}
+
+// Resolve o nome de coluna real a partir do slot semântico.
+// Ordem de resolução:
+//   1) se o slot está mapeado no colMap, usa a coluna mapeada;
+//   2) senão, se existe uma coluna com esse nome EXATO no dataset, usa o próprio
+//      nome (permite passar coluna direta);
+//   3) caso contrário, retorna null (slot ausente, não inventa coluna).
+// Antes, o passo 3 caía de volta no próprio nome do slot, acoplando nome de slot
+// a nome de coluna e mascarando slots não mapeados. Agora null sinaliza ausência.
+function resolveColumn(slot, colMap, rows) {
   if (!slot) return null;
   if (colMap && Object.prototype.hasOwnProperty.call(colMap, slot)) return colMap[slot];
-  return slot;
+  if (datasetHasColumn(rows, slot)) return slot;
+  return null;
 }
 
 // Valor cru de uma linha para um slot. Retorna '' se coluna ausente/nula.
-function cellRaw(row, slot, colMap) {
-  const col = resolveColumn(slot, colMap);
+// `rows` é o dataset inteiro (usado só pra checar existência de coluna direta).
+function cellRaw(row, slot, colMap, rows) {
+  const col = resolveColumn(slot, colMap, rows);
   if (col == null) return '';
   const v = row[col];
   return v == null ? '' : v;
@@ -42,11 +59,14 @@ function isNonEmpty(v) {
  * @returns {number}
  */
 export function computeMetric(def, rows, colMap, computed = {}) {
+  // Guarda de robustez: sem def ou sem linhas válidas, retorna valor seguro.
+  if (!def) return 0;
+  rows = Array.isArray(rows) ? rows : [];
   switch (def.agg) {
     case 'sum': {
       let acc = 0;
       for (const row of rows) {
-        const n = parseNumberBR(cellRaw(row, def.column, colMap));
+        const n = parseNumberBR(cellRaw(row, def.column, colMap, rows));
         if (Number.isFinite(n)) acc += n;
       }
       return acc;
@@ -55,7 +75,7 @@ export function computeMetric(def, rows, colMap, computed = {}) {
       let acc = 0;
       let count = 0;
       for (const row of rows) {
-        const n = parseNumberBR(cellRaw(row, def.column, colMap));
+        const n = parseNumberBR(cellRaw(row, def.column, colMap, rows));
         if (Number.isFinite(n)) {
           acc += n;
           count += 1;
@@ -66,14 +86,14 @@ export function computeMetric(def, rows, colMap, computed = {}) {
     case 'count': {
       let count = 0;
       for (const row of rows) {
-        if (isNonEmpty(cellRaw(row, def.column, colMap))) count += 1;
+        if (isNonEmpty(cellRaw(row, def.column, colMap, rows))) count += 1;
       }
       return count;
     }
     case 'countDistinct': {
       const set = new Set();
       for (const row of rows) {
-        const v = cellRaw(row, def.column, colMap);
+        const v = cellRaw(row, def.column, colMap, rows);
         if (isNonEmpty(v)) set.add(String(v).trim());
       }
       return set.size;
@@ -128,8 +148,9 @@ function aggregate(values, agg) {
  */
 export function groupBy(rows, colMap, dimensionSlot, valueSlot, agg = 'sum') {
   const buckets = new Map(); // key -> array de números (ou contagem)
-  for (const row of rows) {
-    const dim = cellRaw(row, dimensionSlot, colMap);
+  const safeRows = Array.isArray(rows) ? rows : [];
+  for (const row of safeRows) {
+    const dim = cellRaw(row, dimensionSlot, colMap, safeRows);
     if (!isNonEmpty(dim)) continue;
     const key = String(dim).trim();
     if (!buckets.has(key)) buckets.set(key, []);
@@ -137,7 +158,7 @@ export function groupBy(rows, colMap, dimensionSlot, valueSlot, agg = 'sum') {
       // apenas marca presença da linha; o count usa o tamanho do array
       buckets.get(key).push(1);
     } else {
-      const n = parseNumberBR(cellRaw(row, valueSlot, colMap));
+      const n = parseNumberBR(cellRaw(row, valueSlot, colMap, safeRows));
       if (Number.isFinite(n)) buckets.get(key).push(n);
     }
   }
@@ -156,14 +177,15 @@ export function groupBy(rows, colMap, dimensionSlot, valueSlot, agg = 'sum') {
  */
 export function timeSeries(rows, colMap, dateSlot, valueSlot, agg = 'sum') {
   const buckets = new Map(); // 'YYYY-MM-DD' -> array de números
-  for (const row of rows) {
-    const iso = parseDateBR(cellRaw(row, dateSlot, colMap));
+  const safeRows = Array.isArray(rows) ? rows : [];
+  for (const row of safeRows) {
+    const iso = parseDateBR(cellRaw(row, dateSlot, colMap, safeRows));
     if (!iso) continue;
     if (!buckets.has(iso)) buckets.set(iso, []);
     if (valueSlot == null && agg === 'count') {
       buckets.get(iso).push(1);
     } else {
-      const n = parseNumberBR(cellRaw(row, valueSlot, colMap));
+      const n = parseNumberBR(cellRaw(row, valueSlot, colMap, safeRows));
       if (Number.isFinite(n)) buckets.get(iso).push(n);
     }
   }

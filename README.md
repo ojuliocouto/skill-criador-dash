@@ -88,7 +88,7 @@ git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
 npm test                      # 274 unit tests: node --test 'test/*.test.js'
-wrangler pages dev public     # local dev server with Functions + KV
+npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
 Then open `config.html` and create your first dashboard through the 4-step wizard:

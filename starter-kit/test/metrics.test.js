@@ -136,3 +136,67 @@ test('timeSeries agrupa por data, ordena asc, ignora inválida', () => {
     { date: '2026-01-02', value: 765.44 },
   ]);
 });
+
+// ---------- robustez: slot ausente no colMap ----------
+// Fix 1: quando o slot nao esta no colMap e nao existe coluna com esse nome
+// exato no dataset, a metrica nao deve inventar uma coluna a partir do nome do
+// slot. Deve tratar como coluna ausente (valor seguro), sem acoplar slot->coluna.
+test('computeMetric com slot ausente no colMap retorna valor seguro', () => {
+  // 'gasto' nao esta no colMap e nao existe coluna 'gasto' nas linhas.
+  const somaAusente = computeMetric({ key: 'x', agg: 'sum', column: 'gasto' }, rows, colMap);
+  assert.equal(somaAusente, 0, 'sum de slot ausente = 0');
+  const avgAusente = computeMetric({ key: 'x', agg: 'avg', column: 'gasto' }, rows, colMap);
+  assert.equal(avgAusente, 0, 'avg de slot ausente = 0');
+  const countAusente = computeMetric({ key: 'x', agg: 'count', column: 'gasto' }, rows, colMap);
+  assert.equal(countAusente, 0, 'count de slot ausente = 0');
+  const distAusente = computeMetric({ key: 'x', agg: 'countDistinct', column: 'gasto' }, rows, colMap);
+  assert.equal(distAusente, 0, 'countDistinct de slot ausente = 0');
+});
+
+test('groupBy com dimensao ausente no colMap retorna vazio', () => {
+  const res = groupBy(rows, colMap, 'setor', 'investimento', 'sum');
+  assert.deepEqual(res, [], 'sem dimensao mapeada nao ha o que agrupar');
+});
+
+test('groupBy com valueSlot ausente soma zero por bucket', () => {
+  // Dimensao existe (canal), valueSlot ausente ('gasto'): nenhum numero valido.
+  const res = groupBy(rows, colMap, 'canal', 'gasto', 'sum');
+  assert.ok(res.every((r) => r.value === 0), 'value 0 quando valueSlot ausente');
+});
+
+test('timeSeries com valueSlot ausente soma zero por data', () => {
+  const res = timeSeries(rows, colMap, 'data', 'gasto', 'sum');
+  assert.ok(res.every((r) => r.value === 0), 'value 0 quando valueSlot ausente');
+});
+
+// Slot que casa por NOME exato de coluna no dataset (sem estar no colMap) ainda
+// deve funcionar: mantemos a possibilidade de passar coluna direta.
+test('computeMetric aceita nome de coluna direto quando existe no dataset', () => {
+  // 'Investimento' e o nome real da coluna; nao e chave do colMap.
+  const soma = computeMetric({ key: 'x', agg: 'sum', column: 'Investimento' }, rows, colMap);
+  assert.equal(soma, 4000, 'coluna direta pelo nome real do dataset soma normal');
+});
+
+// ---------- robustez: dataset vazio ----------
+test('funcoes lidam com dataset vazio sem lancar', () => {
+  const empty = [];
+  assert.doesNotThrow(() => {
+    assert.equal(computeMetric({ key: 'x', agg: 'sum', column: 'investimento' }, empty, colMap), 0);
+    assert.equal(computeMetric({ key: 'x', agg: 'avg', column: 'investimento' }, empty, colMap), 0);
+    assert.equal(computeMetric({ key: 'x', agg: 'count', column: 'canal' }, empty, colMap), 0);
+    assert.equal(computeMetric({ key: 'x', agg: 'countDistinct', column: 'canal' }, empty, colMap), 0);
+    assert.deepEqual(groupBy(empty, colMap, 'canal', 'investimento', 'sum'), []);
+    assert.deepEqual(timeSeries(empty, colMap, 'data', 'investimento', 'sum'), []);
+    assert.deepEqual(computeAll([{ key: 'inv', agg: 'sum', column: 'investimento' }], empty, colMap), { inv: 0 });
+  });
+});
+
+// ---------- robustez: colMap ausente/indefinido ----------
+test('funcoes lidam com colMap indefinido sem lancar', () => {
+  assert.doesNotThrow(() => {
+    // Sem colMap, 'investimento' nao casa nenhuma coluna real -> 0.
+    assert.equal(computeMetric({ key: 'x', agg: 'sum', column: 'investimento' }, rows, undefined), 0);
+    assert.deepEqual(groupBy(rows, undefined, 'canal', 'investimento', 'sum'), []);
+    assert.deepEqual(timeSeries(rows, undefined, 'data', 'investimento', 'sum'), []);
+  });
+});

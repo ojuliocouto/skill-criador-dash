@@ -21,6 +21,21 @@ import { render as renderTable } from './table.js';
 import { render as renderRanking } from './ranking.js';
 import { groupBy, timeSeries } from '../lib/metrics.js';
 
+// Agregacoes que groupBy/timeSeries sabem aplicar por bucket. 'ratio'/'derived'
+// nao fazem sentido por bucket (dependem de multiplas metricas), entao caem no
+// fallback abaixo.
+const BUCKET_AGGS = new Set(['sum', 'avg', 'count', 'countDistinct']);
+
+// Deriva a agregacao de bucket a partir da MetricDef que casa com o valueSlot.
+// Se a MetricDef trouxer um `agg` valido para bucket, usa-o; senao (metrica
+// ausente, sem agg, ou agg nao aplicavel por bucket) faz fallback seguro pra
+// 'sum', preservando o comportamento historico.
+function bucketAggFor(template, findMetricDef, valueSlot) {
+  const def = valueSlot != null ? findMetricDef(template, valueSlot) : undefined;
+  const agg = def && def.agg;
+  return BUCKET_AGGS.has(agg) ? agg : 'sum';
+}
+
 export const registry = {
   // kpi: agrupado no dashboard.js (bloco 'kpis'); nunca renderiza como single.
   kpi: {
@@ -33,11 +48,14 @@ export const registry = {
   timeseries: {
     render: renderTimeseries,
     toHtml(item, ctx) {
-      const { dataset, colMap, card } = ctx;
+      const { template, dataset, colMap, findMetricDef, card } = ctx;
       const props = (item && item.props) || {};
       // Sem coluna de data mapeada, nao ha o que plotar: pula o widget.
       if (!colMap[props.dateSlot]) return '';
-      const points = timeSeries(dataset.rows, colMap, props.dateSlot, props.valueSlot, 'sum');
+      // Agregacao por dia deriva do `agg` da MetricDef do valueSlot (ex: 'avg'
+      // para CSAT/tempo), com fallback seguro pra 'sum' quando nao ha MetricDef.
+      const agg = bucketAggFor(template, findMetricDef, props.valueSlot);
+      const points = timeSeries(dataset.rows, colMap, props.dateSlot, props.valueSlot, agg);
       const title = props.title || 'Evolução no tempo';
       return card(null, renderTimeseries({ title }, points), 'chart');
     },
@@ -50,7 +68,10 @@ export const registry = {
       const props = (item && item.props) || {};
       // Sem a coluna da dimensao (ex canal, vendedor), pula em vez de mostrar vazio.
       if (!colMap[props.dimensionSlot]) return '';
-      const items = groupBy(dataset.rows, colMap, props.dimensionSlot, props.valueSlot, 'sum');
+      // Agregacao por dimensao deriva do `agg` da MetricDef do valueSlot (ex:
+      // 'avg' para CSAT), com fallback seguro pra 'sum' quando nao ha MetricDef.
+      const agg = bucketAggFor(template, findMetricDef, props.valueSlot);
+      const items = groupBy(dataset.rows, colMap, props.dimensionSlot, props.valueSlot, agg);
       if (!items.length) return '';
       const title = props.title || `Ranking por ${props.dimensionSlot || ''}`.trim();
       // formato herda da MetricDef que casa com o valueSlot, se houver; senao number.
@@ -74,6 +95,10 @@ export const registry = {
         if (s.metricKey != null && computed[s.metricKey] != null) {
           value = Number(computed[s.metricKey]) || 0;
         } else if (s.valueSlot != null) {
+          // Etapa de funil e sempre VOLUME TOTAL da coluna (nao deriva da
+          // MetricDef): um funil conta quanto passou por cada etapa, entao 'sum'
+          // e o unico agg coerente aqui. Aplicar 'avg' por bucket somaria medias,
+          // o que nao faz sentido para uma etapa de funil.
           const rows = groupBy(dataset.rows, colMap, s.valueSlot, s.valueSlot, 'sum');
           value = rows.reduce((a, b) => a + (Number(b.value) || 0), 0);
         }

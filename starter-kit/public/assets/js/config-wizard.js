@@ -6,6 +6,13 @@ import { templates, getTemplate } from './templates/index.js';
 import { autoMap } from './lib/automap.js';
 import { getSource } from './sources/index.js';
 import { sha256Hex } from './lib/auth.js';
+import { aplicarAccent } from './lib/color.js';
+
+// Le o tema atual do documento (o theme.js grava dataset.theme). Serve pra
+// calibrar o accent do preview com o contraste certo do tema em uso.
+function temaEscuroAtual() {
+  return typeof document !== 'undefined' && document.documentElement.dataset.theme !== 'light';
+}
 
 // ---------------------------------------------------------------------------
 // Validação pura de slots obrigatórios (testável, named export).
@@ -412,7 +419,13 @@ function renderFinish(body) {
     ]),
     el('label', { class: 'field' }, [
       el('span', { class: 'lbl', text: 'Cor de destaque' }),
-      el('input', { class: 'input', id: 'dashAccent', type: 'color', value: state.accent || '#6d28d9' }),
+      el('input', {
+        class: 'input', id: 'dashAccent', type: 'color', value: state.accent || '#6d28d9',
+        // Ao escolher a cor, calibra --accent/--accent-fg/--accent-text/--focus-ring
+        // pro tema atual (contraste WCAG) e grava em dataset.accent pra o theme.js
+        // achar no toggle. Assim o preview do wizard reflete o contraste correto.
+        oninput: (ev) => aplicarAccent(document.documentElement, ev.target.value, temaEscuroAtual()),
+      }),
     ]),
   ];
   if (primaryKey) {
@@ -445,6 +458,9 @@ function renderFinish(body) {
   const card = el('div', { class: 'card' }, fields);
   body.appendChild(card);
 
+  // Aplica o accent atual ao entrar no passo, pra o preview ja sair calibrado.
+  aplicarAccent(document.documentElement, state.accent || '#6d28d9', temaEscuroAtual());
+
   const feedback = el('div', { id: 'finishFeedback' });
   body.appendChild(feedback);
 
@@ -462,6 +478,8 @@ function renderFinish(body) {
     const accent = card.querySelector('#dashAccent').value || '#6d28d9';
     state.name = name;
     state.accent = accent;
+    // Garante que as variaveis CSS refletem o accent final antes de salvar.
+    aplicarAccent(document.documentElement, accent, temaEscuroAtual());
     feedback.innerHTML = '';
 
     if (!name) { feedback.appendChild(errorBox('Dê um nome ao dashboard.')); return; }

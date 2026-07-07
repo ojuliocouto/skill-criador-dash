@@ -16,13 +16,24 @@ export function parseNumberBR(v) {
   const hasComma = s.includes(',');
   const hasDot = s.includes('.');
   if (hasComma && hasDot) {
-    // assume padrao BR: ponto = milhar, virgula = decimal
-    s = s.replace(/\./g, '').replace(',', '.');
+    // Ambos os separadores presentes: o DECIMAL e o que aparece por ULTIMO na string.
+    // Se o ultimo for '.', formato US (virgula = milhar): '1,234.56' -> 1234.56.
+    // Se o ultimo for ',', formato BR (ponto = milhar): '1.234,56' -> 1234.56.
+    if (s.lastIndexOf('.') > s.lastIndexOf(',')) {
+      // US: remove virgulas (milhar), mantem ponto decimal.
+      s = s.replace(/,/g, '');
+    } else {
+      // BR: remove pontos (milhar), troca virgula por ponto decimal.
+      s = s.replace(/\./g, '').replace(',', '.');
+    }
   } else if (hasComma) {
     // so virgula -> decimal BR
     s = s.replace(',', '.');
   } else if (hasDot) {
-    // so ponto: se parece milhar (ex 1.234 ou 1.234.567), remove; senao mantem decimal
+    // So ponto, ambiguo (ex '100.000' pode ser 100 mil ou 100.0). Regra adotada:
+    // se cada grupo apos o 1o ponto tem exatamente 3 digitos, e milhar -> remove os pontos
+    // ('100.000' -> 100000, '1.234.567' -> 1234567). Caso contrario, mantem ponto decimal
+    // ('1234.56' -> 1234.56).
     const parts = s.split('.');
     const looksThousand = parts.length > 1 && parts.slice(1).every((p) => p.length === 3);
     if (looksThousand) s = parts.join('');
@@ -32,15 +43,17 @@ export function parseNumberBR(v) {
 }
 
 /**
- * Normaliza data em ISO YYYY-MM-DD. Aceita DD/MM/AAAA, AAAA-MM-DD, D/M/AAAA.
+ * Normaliza data em ISO YYYY-MM-DD. Aceita ISO AAAA-MM-DD e AAAA/MM/DD (com barra),
+ * alem de BR DD/MM/AAAA e D/M/AAAA (separador /, . ou -).
+ * NAO adivinha formato US MM/DD/AAAA por ser ambiguo com o BR DD/MM/AAAA.
  * Retorna null se inválida.
  */
 export function parseDateBR(v) {
   if (v == null) return null;
   const s = String(v).trim();
   if (!s) return null;
-  // ja ISO
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  // ja ISO (aceita hifen ou barra como separador: AAAA-MM-DD ou AAAA/MM/DD)
+  let m = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
   if (m) {
     const iso = `${m[1]}-${m[2]}-${m[3]}`;
     return isValidYMD(+m[1], +m[2], +m[3]) ? iso : null;
