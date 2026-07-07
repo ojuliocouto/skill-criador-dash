@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
-    "dev": "wrangler pages dev public --compatibility-date=2026-01-01"
+    "dev": "npx wrangler pages dev public --compatibility-date=2026-01-01"
   },
   "license": "MIT"
 }

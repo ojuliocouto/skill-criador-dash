@@ -244,7 +244,7 @@ nao o widget. Adicionar um widget = criar `widgets/<nome>.js` (render puro) + um
   colMap: { data:'Data', investimento:'Investimento', ... },
   accent: '#6d28d9',        // cor de destaque (branding)
   goal: { metricKey:'investimento', value: 10000 },   // opcional: meta vs realizado na métrica principal
-  auth: { hash: '<sha256 da senha>' },                // opcional: senha do dashboard (só o hash SHA-256)
+  auth: { salt, verifier, iterations, algo },         // opcional: senha (verifier PBKDF2-SHA256 salgado; ver abaixo)
   storage: 'd1',                                      // opcional: modo histórico (cron grava snapshots no D1)
   createdAt: ISO
 }
@@ -254,15 +254,23 @@ Campos opcionais da config (o código só os grava quando o usuário os preenche
 - `source.meta`: presente quando `source.type === 'meta'`. Guarda `{ token, account, since, until }`.
   O `token` fica **só no servidor** (KV): nunca é devolvido ao browser (ver `meta-ads.js` e Contrato 2).
 - `goal`: `{ metricKey, value }`. Habilita a comparação meta vs realizado na métrica principal do domínio.
-- `auth`: `{ hash }` com o SHA-256 da senha (nunca a senha em texto puro). Ao ler/escrever a config
-  protegida, o cliente manda a senha no header `x-dash-auth`; o `hash` nunca é exposto na resposta.
+- `auth`: o cliente manda um SHA-256 da senha no header `x-dash-auth`; o servidor NUNCA grava esse hash
+  (seria reenviável): deriva e grava só um verifier PBKDF2-SHA256 salgado por dashboard
+  (`{ salt, verifier, iterations, algo }`, ver `functions/lib/auth-config.mjs`), recomputa a cada
+  requisição e compara em tempo constante. O bloco `auth` inteiro é removido de toda resposta.
 - `storage: 'd1'`: liga o modo histórico. Nesse modo o Worker de snapshot (cron) grava o `DataSet`
   no D1 e o dashboard lê o snapshot mais recente. Ausente (ou diferente de `'d1'`) = modo ao vivo.
 
-Trava global de mutação (opcional): a env `ADMIN_TOKEN` no projeto Pages. Quando definida, `POST` e
+Trava global de mutação (FAIL-CLOSED, obrigatória): a env `ADMIN_TOKEN` no projeto Pages. `POST` e
 `DELETE` de `/api/dashboards` exigem o header `x-admin-token` igual a ela (comparação em tempo constante);
-sem/errado devolve 401 `{ needsAdmin: true }`. O cliente guarda o token em `localStorage` (`cd-admin-token`)
-e o injeta em `saveDashboard`/`deleteDashboard`. Sem `ADMIN_TOKEN` definida, a API fica aberta (self-serve).
+token errado devolve 401 `{ needsAdmin: true }`. O cliente guarda o token em `localStorage`
+(`cd-admin-token`) e o injeta em `saveDashboard`/`deleteDashboard`. Sem `ADMIN_TOKEN` definida no
+servidor, TODA mutação é BLOQUEADA com 403 `{ adminNotConfigured: true }` (a API NÃO fica aberta):
+configurar o token faz parte do setup. Em dev local, defina em `starter-kit/.dev.vars`.
+
+O POST valida a forma de `source` nos tipos conhecidos (csv exige `data`, sheets exige `url`, meta exige
+`meta.token` + `meta.account`) e devolve 400 apontando o campo; tipo desconhecido (conector sob medida)
+passa sem exigências (`functions/lib/source-shape.mjs`).
 
 Fluxo do wizard (`config.html` + `config-wizard.js`), 4 passos:
 1. Escolher domínio (marketing/vendas/suporte)

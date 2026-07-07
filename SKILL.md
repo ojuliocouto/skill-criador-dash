@@ -90,7 +90,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PEÇAS (biblioteca provada em `starter-kit/`)
 
-Código real e testado (476 testes verdes, TDD). Você compõe a partir daqui.
+Código real e testado (500+ testes verdes, TDD; `npm test` mostra a contagem atual). Você compõe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Não sabem de métricas.
@@ -126,7 +126,7 @@ Recursos dos KPIs:
   barra de progresso e percentual da meta.
 
 Layout em grid 2D (desktop): os widgets não-kpi entram num grid de 12 colunas. Cada item do `layout`
-do template pode declarar `col` (spans permitidos 4..8; ausente ou 12 = largura toda). Assim série e
+do template pode declarar `col` (spans permitidos 3..8; ausente ou 12 = largura toda). Assim série e
 funil ficam lado a lado, rankings pareiam, e a tabela ocupa a linha inteira, em vez de tudo empilhado
 verticalmente. No mobile (≤900px) tudo colapsa pra 1 coluna. A lógica pura é `cellSpanClass(col)` em
 `dashboard.js` (testada); o CSS são as classes `.dash-grid`/`.dash-cell.span-N` em `main.css`.
@@ -269,7 +269,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  filters.js (filtro puro)  auth.js  theme.js  color.js  html.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           476 testes (npm test  ->  node --test test/*.test.js)
+test/                           500+ testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local (o `npm run dev` já embute a `--compatibility-date` do `package.json`):
@@ -278,6 +278,21 @@ cd starter-kit
 npm test                       # suite completa (TDD)
 npm run dev                    # sobe local com Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
+Para TESTAR o fluxo completo local (criar dashboard pelo wizard ou por curl), o servidor local também
+precisa do `ADMIN_TOKEN` (mutação é fail-closed até em dev). Crie `starter-kit/.dev.vars` com uma linha
+`ADMIN_TOKEN=<um-valor-qualquer-de-dev>` antes do `npm run dev` (o wrangler lê esse arquivo sozinho;
+ele já é gitignored, nunca o commite).
+
+Seed de um dashboard comum por API (o formato de `source` por tipo está no Contrato 7 do `ARCHITECTURE.md`;
+atenção: csv usa o campo `data`, sheets usa `url`, meta usa `meta:{token,account}`):
+```
+curl -X POST "$BASE/api/dashboards" -H "content-type: application/json" -H "x-admin-token: $ADMIN" \
+  -d '{"name":"Meu Marketing","domain":"marketing","accent":"#0ea5e9",
+       "source":{"type":"csv","data":"Data,Canal,Investimento\n01/07/2026,Instagram,\"1.250,00\""},
+       "colMap":{"data":"Data","canal":"Canal","investimento":"Investimento"}}'
+```
+O POST valida a forma da fonte nos tipos conhecidos (csv/sheets/meta) e devolve 400 apontando o campo
+errado; tipo desconhecido (conector sob medida) passa, a forma é do conector.
 
 ## OS DOIS MODOS DE DADOS
 

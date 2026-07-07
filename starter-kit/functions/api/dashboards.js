@@ -9,6 +9,7 @@
 import { needsAuth, authOk, checkAdminToken, derivePasswordAuth } from '../lib/auth-config.mjs';
 import { authRateLimit } from '../lib/rate-limit.mjs';
 import { DOMAINS, isDomain } from '../lib/domains.mjs';
+import { validarFonte } from '../lib/source-shape.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -271,6 +272,15 @@ async function create(kv, request, providedHash, env) {
     // editar esta validacao: basta registrar a chave em domains.mjs + criar o
     // template. Dominios fora da lista continuam rejeitados (contrato preservado).
     return erro(`Domínio inválido: "${config.domain}". Use um de: ${DOMAINS.join(', ')}.`, 400);
+  }
+
+  // Valida a FORMA da fonte (só dashboard comum; grupo não tem fonte). Estrita
+  // nos tipos que o wizard grava (csv/sheets/meta), permissiva em conector sob
+  // medida. Sem isso, uma fonte malformada era gravada com 200 e o erro só
+  // estourava na renderização, longe da causa (functions/lib/source-shape.mjs).
+  if (!isGroup) {
+    const fonteInvalida = validarFonte(config.source);
+    if (fonteInvalida) return erro(fonteInvalida, 400);
   }
 
   // Valida a cor de destaque no servidor: se vier e nao for hex (#rgb/#rrggbb),

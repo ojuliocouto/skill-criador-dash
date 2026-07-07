@@ -150,6 +150,31 @@ test('dashboards POST sem ADMIN_TOKEN -> 403 adminNotConfigured (fail-closed)', 
   assert.equal(kv._map.size, 0, 'nada gravado sem ADMIN_TOKEN');
 });
 
+// 1c. Fonte malformada de tipo CONHECIDO -> 400 apontando o campo, em vez de
+//     gravar e deixar o erro estourar so na renderizacao (achado de auditoria:
+//     csv com "csvText" no lugar de "data" era aceito com 200).
+test('dashboards POST com fonte csv sem "data" -> 400 apontando o campo', async () => {
+  const kv = fakeKV();
+  const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ source: { type: 'csv', csvText: 'a,b\n1,2' } }), headers: adminHeaders(), env })
+  );
+  assert.equal(res.status, 400);
+  const j = await readJSON(res);
+  assert.match(j.error, /"data"/);
+  assert.equal(kv._map.size, 0, 'fonte malformada nao pode ser gravada');
+});
+
+// 1d. Tipo desconhecido (conector sob medida) segue aceito: a validacao de forma
+//     e estrita so nos tipos que o wizard grava.
+test('dashboards POST com fonte de conector sob medida -> 200', async () => {
+  const env = { DASHBOARDS_KV: fakeKV(), ADMIN_TOKEN: ADMIN };
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ source: { type: 'meu-crm', endpoint: 'https://x' } }), headers: adminHeaders(), env })
+  );
+  assert.equal(res.status, 200);
+});
+
 // 2. POST valido -> 200, gera id (slug) e createdAt; resposta NAO expoe auth.hash.
 test('dashboards POST valido -> 200 gera slug/createdAt, salga a senha e nao vaza auth', async () => {
   const kv = fakeKV();
