@@ -79,7 +79,7 @@ Before you start:
 - Your data as a Google Sheet or a CSV file.
 - If you use a Google Sheet, share it as "anyone with the link". Without that sharing the connector fetch fails.
 
-For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
+For the MVP data source (Google Sheets or CSV) you need no token, no OAuth, and no API key. (Managing dashboards still needs an `ADMIN_TOKEN` set at deploy time, since mutations are fail-closed: see Deploy and Access model below.)
 
 ## Quick start
 
@@ -102,7 +102,7 @@ The dashboard (`dashboard.html`) reads `?id=`, loads the config from KV, fetches
 
 ## Deploy to Cloudflare Pages
 
-For the MVP (Google Sheets or CSV) there is no secret or token to configure.
+The data source needs no secret for the MVP (a link-shared Google Sheet or a CSV upload). You do set one server secret, `ADMIN_TOKEN`, because mutations are fail-closed (step 5 below): without it, creating or deleting dashboards is rejected.
 
 1. Create the KV namespaces:
    ```
