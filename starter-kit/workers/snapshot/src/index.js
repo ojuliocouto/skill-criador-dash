@@ -17,7 +17,7 @@ import { insertSnapshotSQL } from '../../../functions/lib/snapshots.mjs';
 // Registry de fontes: qual tipo suporta snapshot historico (canHistory). Mesma
 // fonte de verdade que o wizard usa, pra decidir aqui quais fontes tirar snapshot.
 // O modulo e puro (sem DOM/browser), roda igual no runtime do Worker.
-import { getSource } from '../../../public/assets/js/sources/index.js';
+import { getSource, historyTypes } from '../../../public/assets/js/sources/index.js';
 
 // Reexporta a lógica pura compartilhada para que o teste de paridade
 // (test/worker-parity.test.js) possa importar daqui e conferir que é a MESMA
@@ -61,7 +61,7 @@ export default {
         const descriptor = getSource(type);
         if (!descriptor || !descriptor.canHistory) continue;
 
-        const dataset = await fetchDataSet(type, source);
+        const dataset = await fetchSnapshotDataSet(type, source);
         if (!dataset) continue;
 
         // Monta o INSERT pela MESMA função pura que os handlers de Pages usam
@@ -78,20 +78,48 @@ export default {
   },
 };
 
+// Fetchers de snapshot (server-side) por tipo de fonte. Cada closure fala com a
+// API externa (gviz / Graph API) direto: e o "como buscar" do lado Worker, que
+// NAO pode morar no registry puro (sources/index.js) porque este arquivo tambem
+// importa aquele. O que colamos ao registry e a CHAVE: todo type com
+// canHistory:true no registry TEM de ter uma entrada aqui, e vice-versa. A guarda
+// abaixo (roda no import) falha alto se divergir, e o teste de paridade
+// (test/sources.test.js) trava fonte nova sem fetcher antes de chegar em producao.
+const SNAPSHOT_FETCHERS = {
+  sheets: (source) => fetchSheetsDataSet(source),
+  meta: (source) => fetchMetaDataSet(source),
+};
+
+// Guarda de co-localizacao (roda no import): as chaves de SNAPSHOT_FETCHERS tem
+// de bater EXATAMENTE com os historyTypes() do registry. Sem isso, adicionar uma
+// fonte historica sem fetcher (ou o contrario) passaria batido ate rodar o cron.
+for (const type of Object.keys(SNAPSHOT_FETCHERS)) {
+  const d = getSource(type);
+  if (!d || !d.canHistory) {
+    throw new Error(`SNAPSHOT_FETCHERS tem '${type}', mas o registry nao marca canHistory:true. Ajuste sources/index.js.`);
+  }
+}
+for (const type of historyTypes()) {
+  if (!SNAPSHOT_FETCHERS[type]) {
+    throw new Error(`Fonte '${type}' tem canHistory:true no registry mas nao tem fetcher no Worker de snapshot.`);
+  }
+}
+
+// Exposto para o teste de paridade conferir a cobertura sem duplicar a lista.
+export function snapshotFetcherTypes() {
+  return Object.keys(SNAPSHOT_FETCHERS);
+}
+
 /**
  * Busca o DataSet atual da fonte viva. Devolve null se não souber lidar com o tipo.
  * @param {string} type
  * @param {Object} source
  * @returns {Promise<Object|null>} DataSet (Contrato 1)
  */
-async function fetchDataSet(type, source) {
-  if (type === 'sheets') {
-    return await fetchSheetsDataSet(source);
-  }
-  if (type === 'meta') {
-    return await fetchMetaDataSet(source);
-  }
-  return null;
+async function fetchSnapshotDataSet(type, source) {
+  const fetcher = SNAPSHOT_FETCHERS[type];
+  if (!fetcher) return null;
+  return await fetcher(source);
 }
 
 /**

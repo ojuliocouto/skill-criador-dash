@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PECAS (biblioteca provada em `starter-kit/`)
 
-Codigo real e testado (242 testes verdes, TDD). Voce compoe a partir daqui.
+Codigo real e testado (274 testes verdes, TDD). Voce compoe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Nao sabem de metricas.
@@ -177,7 +177,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           242 testes (npm test  ->  node --test test/*.test.js)
+test/                           274 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local:
@@ -284,11 +284,12 @@ Siga os Contratos 1 e 2 do `ARCHITECTURE.md`. Todo conector devolve exatamente u
 4. Erro da fonte: lance `Error` com mensagem amigavel em PT-BR.
 5. Escreva o teste da logica pura antes (TDD).
 
-IMPORTANTE (conector de fonte VIVA nao e so 1 arquivo): pra ele ser usado de ponta a ponta, plugue em 3 lugares:
-- `public/assets/js/lib/api-client.js`: um branch em `fetchDataForSource(source, id)` pro novo `source.type`.
-- `public/assets/js/config-wizard.js`: um card/opcao no passo 2 (Fonte) pra pessoa conectar (como o Meta).
-- Modo historico: um branch em `fetchDataSet` do `workers/snapshot/src/index.js` e no `podeHistorico` do wizard.
-Sheets/CSV/Meta ja estao plugados. Um conector SO com o arquivo do handler nunca e chamado.
+IMPORTANTE (conector de fonte VIVA nao e so 1 arquivo): pra ele ser usado de ponta a ponta, plugue em 4 lugares. Comece SEMPRE pelo registro, que e a fonte de verdade:
+1. `public/assets/js/sources/index.js`: registre a fonte `{ type, label, canHistory }`. Sem isso, `getSource(type)` volta `undefined` e `fetchDataForSource` lanca "Tipo de fonte desconhecido". E o `label`/`podeHistorico` do wizard saem daqui.
+2. `public/assets/js/lib/api-client.js`: adicione o fetcher live em `LIVE_FETCHERS` (chave = `type`). Ha uma guarda no import: se um `type` do registry (menos `d1`) ficar sem fetcher, o modulo lanca no load apontando qual faltou. Nao ha como esquecer em silencio.
+3. `public/assets/js/config-wizard.js`: um card/opcao no passo 2 (Fonte) pra pessoa conectar (como o Meta).
+4. Modo historico (so se `canHistory:true`): adicione o fetcher em `SNAPSHOT_FETCHERS` de `workers/snapshot/src/index.js`. Outra guarda no import exige que as chaves batam EXATAMENTE com `historyTypes()` do registry.
+As guardas de import e o `test/sources.test.js` (paridade) quebram na hora se um passo faltar, nunca em producao. Sheets/CSV/Meta ja estao plugados. Um conector SO com o arquivo do handler nunca e chamado.
 
 ## ADICIONAR UM NOVO WIDGET
 

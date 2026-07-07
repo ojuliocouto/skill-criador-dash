@@ -16,6 +16,89 @@ import { getSource } from './sources/index.js';
 
 const DEFAULT_ACCENT = '#6d28d9';
 
+// Fundo real de cada tema (mesmos valores de --bg no main.css). Usados para
+// medir a razao de contraste do texto de accent contra o fundo do tema.
+const BG_DARK = '#0c0e12';
+const BG_LIGHT = '#f5f6f8';
+
+// ---- Helpers de cor (WCAG) reaproveitados por accentForeground e accentText ----
+
+// Faz o parse de um hex (#rgb ou #rrggbb) em [r,g,b]. Retorna null se invalido.
+function parseHex(hex) {
+  if (typeof hex !== 'string') return null;
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return null;
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
+
+// Converte [r,g,b] de volta em hex, com clamp em 0..255.
+function toHex(rgb) {
+  const c = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return '#' + c(rgb[0]) + c(rgb[1]) + c(rgb[2]);
+}
+
+// Luminancia relativa WCAG a partir de [r,g,b].
+function luminance(rgb) {
+  const lin = (c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+}
+
+// Razao de contraste WCAG entre dois hex. Hex invalido conta como preto.
+function contrastRatio(hexA, hexB) {
+  const la = luminance(parseHex(hexA) || [0, 0, 0]) + 0.05;
+  const lb = luminance(parseHex(hexB) || [0, 0, 0]) + 0.05;
+  return la > lb ? la / lb : lb / la;
+}
+
+// Mistura srgb simples: pct% do accent + (100-pct)% da outra cor. Espelha o
+// comportamento do color-mix(in srgb, ...) usado no CSS.
+function mixSrgb(accentHex, otherHex, pctAccent) {
+  const a = parseHex(accentHex) || [0, 0, 0];
+  const o = parseHex(otherHex) || [0, 0, 0];
+  const t = pctAccent / 100;
+  return toHex([
+    a[0] * t + o[0] * (1 - t),
+    a[1] * t + o[1] * (1 - t),
+    a[2] * t + o[2] * (1 - t),
+  ]);
+}
+
+/**
+ * Cor derivada do accent para uso como TEXTO (links, badges) ou anel de foco.
+ * Garante razao de contraste >= target contra o fundo do tema: no escuro clareia
+ * o accent (mistura com branco) e no claro escurece (mistura com preto), iterando
+ * ate a razao passar. Assim um accent claro escolhido no wizard nao vira texto
+ * ilegivel. Hex invalido cai no accent padrao.
+ *
+ * @param {string} hex cor do accent (#rgb ou #rrggbb)
+ * @param {boolean} isDark true = tema escuro (fundo BG_DARK), false = claro
+ * @param {number} [target=4.5] razao de contraste minima desejada
+ * @returns {string} hex de 6 digitos com contraste >= target (ou o extremo)
+ */
+export function accentText(hex, isDark, target = 4.5) {
+  const base = parseHex(hex) ? hex : DEFAULT_ACCENT;
+  const bg = isDark ? BG_DARK : BG_LIGHT;
+  const toward = isDark ? '#ffffff' : '#000000';
+  // Se o accent puro ja passa, usa ele (mantem a cor da marca sem alterar).
+  const pure = toHex(parseHex(base));
+  if (contrastRatio(pure, bg) >= target) return pure;
+  // Senao, mistura progressivamente na direcao do extremo (branco/preto)
+  // ate o contraste alcancar o alvo.
+  for (let p = 95; p >= 0; p -= 5) {
+    const cand = mixSrgb(base, toward, p);
+    if (contrastRatio(cand, bg) >= target) return cand;
+  }
+  return toward; // nem o extremo puro passou (nao deve acontecer)
+}
+
 /**
  * Decide a cor do texto que fica SOBRE o accent (fundo de botao, chip ativo).
  * Em vez de um limiar de luminancia (que reprova WCAG em accents de tom medio),
@@ -340,9 +423,18 @@ async function init() {
 
   // 2. Cor de destaque + topbar
   const accent = config.accent || DEFAULT_ACCENT;
-  document.documentElement.style.setProperty('--accent', accent);
+  const root = document.documentElement;
+  root.style.setProperty('--accent', accent);
   // Texto sobre o accent: preto em accent claro, branco em accent escuro (contraste WCAG).
-  document.documentElement.style.setProperty('--accent-fg', accentForeground(accent));
+  root.style.setProperty('--accent-fg', accentForeground(accent));
+  // Texto de destaque (links, badges) e anel de foco derivados do accent com
+  // contraste garantido contra o fundo do tema atual. accentText clareia no
+  // escuro / escurece no claro ate passar 4.5:1 (texto). O focus-ring reusa a
+  // mesma cor, que ja passa folgado o minimo de 3:1 do foco.
+  const isDark = root.dataset.theme !== 'light';
+  const accentTxt = accentText(accent, isDark);
+  root.style.setProperty('--accent-text', accentTxt);
+  root.style.setProperty('--focus-ring', accentTxt);
   renderTopbar(config, id);
 
   // 3. Template

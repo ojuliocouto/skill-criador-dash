@@ -33,7 +33,7 @@ export function render(props = {}, steps) {
     }
     return (
       `<div class="funnel__step">` +
-        `<div class="funnel__label">${esc(s.label)}</div>` +
+        `<div class="funnel__label" title="${esc(s.label)}">${esc(s.label)}</div>` +
         `<div class="funnel__bar-wrap">` +
           `<div class="funnel__bar" style="width:${round(width)}%"></div>` +
           `<span class="funnel__value">${esc(fmtBy('number', val))}</span>` +

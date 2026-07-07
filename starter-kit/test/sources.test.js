@@ -3,13 +3,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getSource, SOURCES } from '../public/assets/js/sources/index.js';
+import { getSource, SOURCES, sourceTypes, historyTypes } from '../public/assets/js/sources/index.js';
 import {
   adminHeader,
   setAdminToken,
   saveDashboard,
   deleteDashboard,
+  liveFetcherTypes,
 } from '../public/assets/js/lib/api-client.js';
+import { snapshotFetcherTypes } from '../workers/snapshot/src/index.js';
 
 // Stub de fetch: captura chamadas e devolve a Response dada (ou funcao).
 function stubFetch(respond) {
@@ -70,6 +72,49 @@ test('canHistory: so sheets e meta suportam historico', () => {
   assert.equal(pode('csv'), false);
   assert.equal(pode('d1'), false);
   assert.equal(pode('nada'), false);
+});
+
+// ---------------------------------------------------------------------------
+// Paridade: registry x fetchers do api-client (live) e do Worker (snapshot)
+// ---------------------------------------------------------------------------
+// O "como buscar" mora em dois ambientes (browser via Functions, Worker via API
+// externa), mas as CHAVES sao coladas ao registry. Estes testes garantem que
+// adicionar uma fonte nova sem o fetcher correspondente quebra AQUI, nao em
+// producao.
+
+test('paridade worker: todo type com canHistory:true tem fetcher no Worker de snapshot', () => {
+  const historicos = historyTypes().sort();
+  const fetchers = snapshotFetcherTypes().sort();
+  // Todo historico precisa de fetcher no Worker...
+  for (const type of historicos) {
+    assert.ok(
+      fetchers.includes(type),
+      `fonte '${type}' tem canHistory:true mas nao tem fetcher no Worker de snapshot`,
+    );
+  }
+  // ...e nenhum fetcher do Worker pode ser de fonte sem canHistory (ou fora do registry).
+  for (const type of fetchers) {
+    assert.ok(getSource(type), `Worker tem fetcher '${type}' que nao existe no registry`);
+    assert.equal(getSource(type).canHistory, true, `Worker tem fetcher '${type}' mas ele nao e canHistory`);
+  }
+  // Cobertura exata: os dois conjuntos batem.
+  assert.deepEqual(fetchers, historicos, 'fetchers do Worker devem cobrir exatamente os historyTypes()');
+});
+
+test('paridade api-client: todo type em LIVE_FETCHERS existe no registry', () => {
+  for (const type of liveFetcherTypes()) {
+    assert.ok(getSource(type), `LIVE_FETCHERS tem '${type}' que nao existe no registry de fontes`);
+  }
+});
+
+test('paridade api-client: todo type do registry (menos d1) tem fetcher live', () => {
+  // 'd1' e servido pela funcao dedicada fetchD1(id), fora do roteamento de LIVE_FETCHERS.
+  const dedicados = new Set(['d1']);
+  const live = new Set(liveFetcherTypes());
+  for (const type of sourceTypes()) {
+    if (dedicados.has(type)) continue;
+    assert.ok(live.has(type), `fonte '${type}' esta no registry mas sem fetcher live em api-client.js`);
+  }
 });
 
 // ---------------------------------------------------------------------------

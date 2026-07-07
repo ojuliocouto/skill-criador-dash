@@ -32,12 +32,17 @@ function montarBotao() {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'theme-toggle';
-  btn.setAttribute('aria-label', 'Alternar tema claro/escuro');
-  btn.setAttribute('title', 'Alternar tema');
 
   const desenhar = () => {
     // Mostra o icone do que vai virar ao clicar: no escuro, um sol (ir pro claro).
-    btn.innerHTML = document.documentElement.dataset.theme === 'light' ? MOON : SUN;
+    const claro = document.documentElement.dataset.theme === 'light';
+    btn.innerHTML = claro ? MOON : SUN;
+    // Rotulo/titulo refletem o ALVO do clique (pra onde vai), nao o estado atual.
+    const alvo = claro ? 'Mudar para tema escuro' : 'Mudar para tema claro';
+    btn.setAttribute('aria-label', alvo);
+    btn.setAttribute('title', alvo);
+    // aria-pressed = tema claro ativo (true quando o modo claro esta ligado).
+    btn.setAttribute('aria-pressed', String(claro));
   };
 
   btn.addEventListener('click', () => {

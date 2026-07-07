@@ -23,6 +23,11 @@
   /* Cor de destaque so para TEXTO (links, badges): clareada no escuro pra passar no contraste WCAG AA.
      Derivada do --accent em runtime, entao acompanha a marca. */
   --accent-text: color-mix(in srgb, var(--accent) 55%, white);
+  /* Anel de foco (WCAG 2.4.7): precisa de >=3:1 contra o fundo. O accent cru
+     (#6d28d9) da so 2.72:1 no escuro e reprova; o --accent-text clareado passa
+     folgado. Em runtime o dashboard.js sobrescreve com uma cor calibrada pro
+     accent da marca; aqui fica o default seguro. */
+  --focus-ring: var(--accent-text);
   --topbar-bg: rgba(12, 14, 18, 0.72);
   --radius: 12px;
   --radius-sm: 8px;
@@ -49,6 +54,8 @@
   --bad: #c0362c;
   /* No claro o texto de destaque pode ser o proprio accent, levemente escurecido pra garantir AA. */
   --accent-text: color-mix(in srgb, var(--accent) 88%, black);
+  /* Mesmo default seguro de foco no tema claro; runtime recalibra pelo accent. */
+  --focus-ring: var(--accent-text);
   color-scheme: light;
 }
 
@@ -182,13 +189,13 @@ label.field { display: block; margin-bottom: 16px; }
 
 /* Foco visivel acessivel (WCAG 2.4.7): anel global para navegacao por teclado.
    Cobre botoes, choices (div role=button), toggle de tema, links, selects e inputs. */
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: 2px; }
 .btn:focus-visible,
 .choice:focus-visible,
 .theme-toggle:focus-visible,
 a:focus-visible,
-select.input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent); }
+select.input:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: 2px; }
+.input:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: 2px; border-color: var(--focus-ring, var(--accent-text)); }
 label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 6px; }
 
 /* Wizard */

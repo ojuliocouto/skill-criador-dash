@@ -25,7 +25,7 @@ export function render(props = {}, items) {
     const width = maxVal > 0 ? (val / maxVal) * 100 : 0;
     return (
       `<div class="ranking__row">` +
-        `<div class="ranking__key">${esc(it.key)}</div>` +
+        `<div class="ranking__key" title="${esc(it.key)}">${esc(it.key)}</div>` +
         `<div class="ranking__bar-wrap">` +
           `<div class="ranking__bar" style="width:${round(width)}%"></div>` +
         `</div>` +

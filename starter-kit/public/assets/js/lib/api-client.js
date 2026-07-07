@@ -1,7 +1,7 @@
 // Cliente único de API. Todas as chamadas ao backend (Functions) passam por aqui.
 // Puro fetch, sem dependências. ESM.
 
-import { getSource } from '../sources/index.js';
+import { getSource, sourceTypes } from '../sources/index.js';
 
 // ---- Admin token (trava global opcional de mutacao) ----
 // Se o operador setar env.ADMIN_TOKEN, os POST/DELETE de /api/dashboards exigem
@@ -133,21 +133,53 @@ export async function fetchD1(id) {
   return jsonOrThrow(await fetch(`/api/connectors/d1?id=${encodeURIComponent(id)}`, { headers: authHeader(id) }));
 }
 
-// Handlers de fetch por tipo de fonte. Cada fonte nova = 1 entrada aqui + 1
-// entrada no registry (sources/index.js). O 'd1' nao entra aqui: o modo
-// historico usa a funcao dedicada fetchD1(id), fora deste roteamento.
-const FETCHERS = {
+// Handlers de fetch LIVE (no browser) por tipo de fonte. Cada closure aqui usa
+// as Functions de Pages via fetch relativo, entao NAO pode morar no registry
+// puro (sources/index.js) que o Worker tambem importa. O que colamos ao registry
+// e a VALIDACAO: toda chave daqui tem de existir em SOURCES, e todo type do
+// registry que exige fetch live (todos menos 'd1', que usa fetchD1 dedicado) tem
+// de ter uma entrada aqui. Fonte nova sem o fetcher correspondente quebra a
+// checagem abaixo (e o teste de paridade), nao a producao silenciosamente.
+//
+// O 'd1' nao entra aqui: o modo historico usa a funcao dedicada fetchD1(id), fora
+// deste roteamento (o dashboard.js chama fetchD1 direto quando esta em historico).
+const LIVE_FETCHERS = {
   sheets: (source) => fetchSheet(source.url, source.gid || '0'),
   csv: (source) => uploadCsv(source.data || ''),
   meta: (source, id) => fetchMetaById(id),
 };
 
+// Tipos do registry que sao servidos pela funcao dedicada fetchD1(id) e por isso
+// NAO precisam de entrada em LIVE_FETCHERS. Mantido explicito para a checagem de
+// cobertura abaixo nao acusar falso positivo.
+const DEDICATED_FETCH_TYPES = new Set(['d1']);
+
+// Guarda de co-localizacao (roda no import): deriva a partir do registry, em vez
+// de confiar num objeto solto. Falha cedo e alto se api-client e registry
+// divergirem, apontando exatamente o type faltando/sobrando.
+for (const type of Object.keys(LIVE_FETCHERS)) {
+  if (!getSource(type)) {
+    throw new Error(`LIVE_FETCHERS tem '${type}', mas o registry de fontes nao. Ajuste sources/index.js.`);
+  }
+}
+for (const type of sourceTypes()) {
+  if (DEDICATED_FETCH_TYPES.has(type)) continue;
+  if (!LIVE_FETCHERS[type]) {
+    throw new Error(`Fonte '${type}' esta no registry mas sem fetcher live em api-client.js.`);
+  }
+}
+
+// Exposto para o teste de paridade conferir a cobertura sem duplicar a lista.
+export function liveFetcherTypes() {
+  return Object.keys(LIVE_FETCHERS);
+}
+
 // Busca o DataSet de acordo com o source salvo na config.
 // `id` e necessario para o conector Meta (o token e resolvido no servidor por id).
-// O registry (getSource) valida que o tipo existe; o FETCHERS faz a chamada.
+// O registry (getSource) valida que o tipo existe; o LIVE_FETCHERS faz a chamada.
 export async function fetchDataForSource(source, id) {
   if (!source || !source.type) throw new Error('Fonte de dados não configurada.');
-  const fetcher = getSource(source.type) && FETCHERS[source.type];
+  const fetcher = getSource(source.type) && LIVE_FETCHERS[source.type];
   if (!fetcher) throw new Error(`Tipo de fonte desconhecido: ${source.type}`);
   return fetcher(source, id);
 }

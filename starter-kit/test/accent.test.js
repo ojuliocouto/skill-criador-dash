@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { accentForeground } from '../public/assets/js/dashboard.js';
+import { accentForeground, accentText } from '../public/assets/js/dashboard.js';
+
+// Fundos reais dos temas (espelham --bg no main.css).
+const BG_DARK = '#0c0e12';
+const BG_LIGHT = '#f5f6f8';
 
 // accent escuro (roxo padrao): texto branco
 test('accentForeground: accent escuro (#6d28d9) devolve #fff', () => {
@@ -91,4 +95,57 @@ test('accentForeground: escolhe a cor de maior contraste e passa AA (>=4.5)', ()
       `${accent}: contraste do escolhido ${chosen} = ${crChosen.toFixed(2)} < 4.5`
     );
   }
+});
+
+// --- accentText: texto de destaque e anel de foco com contraste garantido ---
+
+// Cobre accent padrao, claros (que o color-mix reprovava) e escuros, nos 2 temas.
+const ACCENTS_TESTE = [
+  '#6d28d9', // padrao (roxo)
+  '#22d3ee', // ciano claro
+  '#f5d90a', // amarelo claro
+  '#0ea5e9', // azul medio
+  '#10b981', // verde medio
+  '#1e3a8a', // azul escuro
+  '#111827', // quase preto
+];
+
+// O texto de destaque (--accent-text) tem que passar 4.5:1 (AA) contra o fundo
+// do tema, no escuro E no claro, pra qualquer accent do wizard.
+for (const accent of ACCENTS_TESTE) {
+  test(`accentText: ${accent} passa 4.5:1 no escuro e no claro`, () => {
+    const dark = accentText(accent, true);
+    const light = accentText(accent, false);
+    const crDark = _contrast(dark, BG_DARK);
+    const crLight = _contrast(light, BG_LIGHT);
+    assert.ok(crDark >= 4.5, `${accent} escuro: ${dark} cr=${crDark.toFixed(2)} < 4.5`);
+    assert.ok(crLight >= 4.5, `${accent} claro: ${light} cr=${crLight.toFixed(2)} < 4.5`);
+  });
+}
+
+// O anel de foco (reusa accentText) precisa de >=3:1 contra o fundo do tema.
+for (const accent of ACCENTS_TESTE) {
+  test(`accentText como focus-ring: ${accent} passa 3:1 nos 2 temas`, () => {
+    const crDark = _contrast(accentText(accent, true), BG_DARK);
+    const crLight = _contrast(accentText(accent, false), BG_LIGHT);
+    assert.ok(crDark >= 3, `${accent} escuro focus cr=${crDark.toFixed(2)} < 3`);
+    assert.ok(crLight >= 3, `${accent} claro focus cr=${crLight.toFixed(2)} < 3`);
+  });
+}
+
+// Hex invalido cai no accent padrao (nunca devolve algo que reprova).
+test('accentText: hex invalido usa o accent padrao e ainda passa AA', () => {
+  for (const bad of ['nao-e-hex', '', null, undefined, '#12']) {
+    const crDark = _contrast(accentText(bad, true), BG_DARK);
+    const crLight = _contrast(accentText(bad, false), BG_LIGHT);
+    assert.ok(crDark >= 4.5, `invalido escuro cr=${crDark.toFixed(2)}`);
+    assert.ok(crLight >= 4.5, `invalido claro cr=${crLight.toFixed(2)}`);
+  }
+});
+
+// O accent padrao cru reprova 3:1 como anel de foco no escuro (era o bug);
+// o accentText derivado tem que consertar isso.
+test('accentText: conserta o foco do accent padrao no escuro (era 2.72:1)', () => {
+  assert.ok(_contrast('#6d28d9', BG_DARK) < 3, 'sanity: accent cru reprovava 3:1');
+  assert.ok(_contrast(accentText('#6d28d9', true), BG_DARK) >= 3, 'accentText passa 3:1');
 });

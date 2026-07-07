@@ -77,6 +77,26 @@ test('buildTrends: metrica sem betterWhen nao gera tendencia', () => {
   assert.deepEqual(buildTrends(metrics, [{ Invest: '20' }], [{ Invest: '10' }], colMap), {});
 });
 
+test('buildTrends: denominador zero (previous soma 0) nao gera tendencia', () => {
+  // Guard p === 0: sem base anterior nao da pra calcular variacao percentual.
+  const metrics = [{ key: 'invest', agg: 'sum', column: 'invest', betterWhen: 'higher' }];
+  const prev = [{ Invest: '0' }];
+  const cur = [{ Invest: '50' }];
+  const t = buildTrends(metrics, cur, prev, colMap);
+  assert.equal(t.invest, undefined);
+  assert.deepEqual(t, {});
+});
+
+test('buildTrends: variacao abaixo do limiar (< 0,05%) e considerada estavel', () => {
+  // delta = (10001 - 10000) / 10000 = 0.0001 < 0.0005 -> nao aparece.
+  const metrics = [{ key: 'invest', agg: 'sum', column: 'invest', betterWhen: 'higher' }];
+  const prev = [{ Invest: '10000' }];
+  const cur = [{ Invest: '10001' }];
+  const t = buildTrends(metrics, cur, prev, colMap);
+  assert.equal(t.invest, undefined);
+  assert.deepEqual(t, {});
+});
+
 test('buildGoal: calcula percentual da meta', () => {
   const g = buildGoal({ goal: { metricKey: 'leads', value: 1000 } }, { leads: 1001 });
   assert.equal(g.metricKey, 'leads');
