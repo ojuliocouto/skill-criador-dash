@@ -154,9 +154,12 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
 ```js
 /**
  * @typedef {Object} Template
- * @property {string} id            'marketing' | 'vendas' | 'suporte'
+ * @property {string} id            chave do domínio; vem do registry (functions/lib/domains.mjs)
  * @property {string} label
  * @property {string} [primaryMetric]  metrica-chave do dominio (usada pela meta opcional no wizard)
+ * @property {string} [dateSlot]    slot semântico do eixo de TEMPO; o dashboard.js lê daqui
+ *                                  (via resolveDateSlot) para calcular a tendência, em vez de
+ *                                  assumir 'data'. Fallback seguro pra 'data' se ausente.
  * @property {SlotDef[]} slots      slots semânticos que o usuário mapeia para colunas
  * @property {MetricDef[]} metrics  métricas do domínio (usam os slots)
  * @property {LayoutItem[]} layout  ordem/tipo de widgets a renderizar
@@ -177,6 +180,11 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
 // autoMap vive em `public/assets/js/lib/automap.js` (nao no template): e generico.
 export function autoMap(slots, columns) {} // -> { [slotKey]: columnName|null }  casa aliases vs columns
 ```
+
+Os domínios válidos têm uma **única fonte da verdade**: `functions/lib/domains.mjs` (lista `DOMAINS` +
+`isDomain`). O registry `templates/index.js` monta as chaves a partir dela, e o servidor
+(`functions/api/dashboards.js`) valida `config.domain` com o mesmo módulo. Adicionar um domínio =
+criar o template + registrar a chave em `domains.mjs`; a validação do POST não precisa ser editada.
 
 Templates prontos: `marketing.js`, `vendas.js`, `suporte.js` (3 domínios).
 - **Marketing** slots: data, canal, investimento, impressoes, cliques, leads, conversoes, receita.
@@ -230,7 +238,7 @@ nao o widget. Adicionar um widget = criar `widgets/<nome>.js` (render puro) + um
 {
   id: 'slug',
   name: 'Meu Dash de Marketing',
-  domain: 'marketing',                                // 'marketing' | 'vendas' | 'suporte'
+  domain: 'marketing',                                // um dos dominios do registry (functions/lib/domains.mjs); hoje marketing, vendas, suporte
   source: { type: 'sheets', url: '...', gid: '0' },   // ou { type:'csv', data:'...' }
                                                       // ou { type:'meta', meta:{ token, account, since, until } }
   colMap: { data:'Data', investimento:'Investimento', ... },

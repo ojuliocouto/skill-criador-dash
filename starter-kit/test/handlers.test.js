@@ -12,6 +12,14 @@ import { onRequest as d1 } from '../functions/api/connectors/d1.js';
 import { onRequest as middleware } from '../functions/_middleware.js';
 import { sha256Hex } from '../public/assets/js/lib/auth.js';
 import { authOk, derivePasswordAuth } from '../functions/lib/auth-config.mjs';
+import { DOMAINS } from '../functions/lib/domains.mjs';
+
+// Modelo FAIL-CLOSED: toda mutacao (POST/DELETE) exige ADMIN_TOKEN no servidor E o
+// header x-admin-token. Os testes de mutacao setam este token no env e mandam o
+// header. A LEITURA (GET) NAO exige token: os testes de GET ficam sem ADMIN_TOKEN
+// de proposito, provando que a leitura publica nao quebrou.
+const ADMIN = 'super-token-admin';
+const adminHeaders = (extra = {}) => ({ 'x-admin-token': ADMIN, ...extra });
 
 // Deriva o bloco auth v2 (salgado) a partir do hash que o cliente enviaria no
 // header. Usado para semear o KV fake no formato ja gravado pelo servidor.
@@ -97,10 +105,13 @@ function ctx(method, { path = 'dashboards', id, body, headers = {}, env = {} } =
 }
 
 // Monta uma config valida de dashboard (com ou sem senha).
+// domain e um dominio canonico (marketing/vendas/suporte): a partir do fix 3,
+// o POST valida config.domain contra a lista de domains.mjs, entao a config
+// base precisa de um dominio real para os testes de gate/seguranca passarem.
 function makeConfig(overrides = {}) {
   return {
     name: 'Meu Dash',
-    domain: 'exemplo.com',
+    domain: 'vendas',
     source: { type: 'sheet', url: 'https://sheet' },
     colMap: { data: 'A', valor: 'B' },
     ...overrides,
@@ -117,13 +128,26 @@ async function readJSON(res) {
 // DASHBOARDS (functions/api/dashboards.js)
 // ---------------------------------------------------------------------------
 
-// 1. POST sem name/domain/source/colMap -> 400.
+// 1. POST sem name/domain/source/colMap -> 400 (com admin token: passa o gate e cai
+//    na validacao de campos). O gate fail-closed roda ANTES, por isso o token e preciso.
 test('dashboards POST sem campos obrigatorios -> 400', async () => {
-  const env = { DASHBOARDS_KV: fakeKV() };
-  const res = await dashboards(ctx('POST', { body: {}, env }));
+  const env = { DASHBOARDS_KV: fakeKV(), ADMIN_TOKEN: ADMIN };
+  const res = await dashboards(ctx('POST', { body: {}, headers: adminHeaders(), env }));
   assert.equal(res.status, 400);
   const j = await readJSON(res);
   assert.match(j.error, /obrigat/i);
+});
+
+// 1b. FAIL-CLOSED: sem ADMIN_TOKEN no servidor, o POST e bloqueado ANTES da validacao
+//     de campos -> 403 adminNotConfigured (nao 400). Nao ha mais mutacao anonima.
+test('dashboards POST sem ADMIN_TOKEN -> 403 adminNotConfigured (fail-closed)', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(ctx('POST', { body: makeConfig(), env: { DASHBOARDS_KV: kv } }));
+  assert.equal(res.status, 403);
+  const j = await readJSON(res);
+  assert.equal(j.adminNotConfigured, true);
+  assert.equal(j.needsAdmin, undefined);
+  assert.equal(kv._map.size, 0, 'nada gravado sem ADMIN_TOKEN');
 });
 
 // 2. POST valido -> 200, gera id (slug) e createdAt; resposta NAO expoe auth.hash.
@@ -131,7 +155,7 @@ test('dashboards POST valido -> 200 gera slug/createdAt, salga a senha e nao vaz
   const kv = fakeKV();
   const hash = await sha256Hex('segredo');
   const res = await dashboards(
-    ctx('POST', { body: makeConfig({ name: 'Café da Manhã', auth: { hash } }), env: { DASHBOARDS_KV: kv } })
+    ctx('POST', { body: makeConfig({ name: 'Café da Manhã', auth: { hash } }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
   );
   assert.equal(res.status, 200);
   const j = await readJSON(res);
@@ -149,6 +173,33 @@ test('dashboards POST valido -> 200 gera slug/createdAt, salga a senha e nao vaz
   // O verifier salgado autentica o header original, mas nao a si mesmo.
   assert.equal(await authOk(stored, hash), true);
   assert.equal(await authOk(stored, stored.auth.verifier), false);
+});
+
+// 2b. HARDENING (fix 3): dominio validado a partir do REGISTRY (domains.mjs),
+//     nao de um enum literal no handler. Dominio fora da lista -> 400.
+test('dashboards POST com dominio invalido -> 400 (validado pela lista de domains.mjs)', async () => {
+  const env = { DASHBOARDS_KV: fakeKV(), ADMIN_TOKEN: ADMIN };
+  const res = await dashboards(ctx('POST', { body: makeConfig({ domain: 'financeiro' }), headers: adminHeaders(), env }));
+  assert.equal(res.status, 400);
+  const j = await readJSON(res);
+  assert.match(j.error, /dom[ií]nio/i, 'erro cita o dominio invalido');
+  // A mensagem lista os dominios validos derivados do registry.
+  for (const d of DOMAINS) assert.ok(j.error.includes(d), `mensagem lista ${d}`);
+});
+
+test('dashboards POST aceita todo dominio do registry (sem enum hardcoded no handler)', async () => {
+  // Percorre a MESMA lista que alimenta os templates: cada um tem de ser aceito
+  // sem editar a validacao do servidor. Se um dominio novo entrar em domains.mjs,
+  // este teste passa a cobri-lo automaticamente.
+  for (const domain of DOMAINS) {
+    const kv = fakeKV();
+    const res = await dashboards(
+      ctx('POST', { body: makeConfig({ name: `Dash ${domain}`, domain }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+    );
+    assert.equal(res.status, 200, `dominio ${domain} deve ser aceito`);
+    const j = await readJSON(res);
+    assert.equal(j.domain, domain);
+  }
 });
 
 // 3. GET ?id de dashboard existente NAO protegido -> 200 com a config.
@@ -196,14 +247,15 @@ test('dashboards DELETE protegido: gate de senha e remocao', async () => {
   const hash = await sha256Hex('del-senha');
   const cfg = makeConfig({ id: 'apagar', auth: await saltedAuth(hash) });
   const kv = fakeKV({ 'dash:apagar': JSON.stringify(cfg) });
+  const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
 
-  const semSenha = await dashboards(ctx('DELETE', { id: 'apagar', env: { DASHBOARDS_KV: kv } }));
+  const semSenha = await dashboards(ctx('DELETE', { id: 'apagar', headers: adminHeaders(), env }));
   assert.equal(semSenha.status, 401);
   assert.equal((await readJSON(semSenha)).needsPassword, true);
   assert.ok(kv._map.has('dash:apagar'), 'nao deve apagar sem senha');
 
   const comSenha = await dashboards(
-    ctx('DELETE', { id: 'apagar', headers: { 'x-dash-auth': hash }, env: { DASHBOARDS_KV: kv } })
+    ctx('DELETE', { id: 'apagar', headers: adminHeaders({ 'x-dash-auth': hash }), env })
   );
   assert.equal(comSenha.status, 200);
   assert.deepEqual(await readJSON(comSenha), { ok: true });
@@ -215,10 +267,11 @@ test('dashboards POST sobrescrever protegido: gate de senha', async () => {
   const hash = await sha256Hex('over-senha');
   const original = makeConfig({ id: 'over', name: 'Original', auth: await saltedAuth(hash) });
   const kv = fakeKV({ 'dash:over': JSON.stringify(original) });
+  const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
 
   // Tenta sobrescrever sem senha (config nova ate sem auth, tentando "tomar" o id).
   const semSenha = await dashboards(
-    ctx('POST', { body: makeConfig({ id: 'over', name: 'Invasor' }), env: { DASHBOARDS_KV: kv } })
+    ctx('POST', { body: makeConfig({ id: 'over', name: 'Invasor' }), headers: adminHeaders(), env })
   );
   assert.equal(semSenha.status, 401);
   assert.equal((await readJSON(semSenha)).needsPassword, true);
@@ -229,8 +282,8 @@ test('dashboards POST sobrescrever protegido: gate de senha', async () => {
   const comSenha = await dashboards(
     ctx('POST', {
       body: makeConfig({ id: 'over', name: 'Novo', auth: { hash } }),
-      headers: { 'x-dash-auth': hash },
-      env: { DASHBOARDS_KV: kv },
+      headers: adminHeaders({ 'x-dash-auth': hash }),
+      env,
     })
   );
   assert.equal(comSenha.status, 200);
@@ -262,8 +315,8 @@ test('dashboards GET listAll -> 200 array sem hash, com flag protected', async (
 test('dashboards listAll: protegido esconde nome/dominio (so id+protected)', async () => {
   const hash = await sha256Hex('x');
   const kv = fakeKV({
-    'dash:aberto': JSON.stringify(makeConfig({ id: 'aberto', name: 'Publico', domain: 'pub.com', createdAt: '2026-01-01T00:00:00.000Z' })),
-    'dash:privado': JSON.stringify(makeConfig({ id: 'privado', name: 'Cliente Secreto', domain: 'cliente-secreto.com', auth: await saltedAuth(hash), createdAt: '2026-02-01T00:00:00.000Z' })),
+    'dash:aberto': JSON.stringify(makeConfig({ id: 'aberto', name: 'Publico', domain: 'marketing', createdAt: '2026-01-01T00:00:00.000Z' })),
+    'dash:privado': JSON.stringify(makeConfig({ id: 'privado', name: 'Cliente Secreto', domain: 'suporte', auth: await saltedAuth(hash), createdAt: '2026-02-01T00:00:00.000Z' })),
   });
   const res = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
   assert.equal(res.status, 200);
@@ -272,7 +325,7 @@ test('dashboards listAll: protegido esconde nome/dominio (so id+protected)', asy
 
   // Aberto: metadados seguem expostos (a landing precisa mostrar).
   assert.equal(byId.aberto.name, 'Publico');
-  assert.equal(byId.aberto.domain, 'pub.com');
+  assert.equal(byId.aberto.domain, 'marketing');
   assert.equal(byId.aberto.protected, false);
 
   // Protegido: SO id + protected. Nome e dominio do cliente NAO vazam sem senha.

@@ -64,12 +64,21 @@ export async function getDashboard(id) {
   if (!res.ok) throw new Error((data && (data.error || data.message)) || `Erro ${res.status}`);
   return data;
 }
-// Le a Response de uma mutacao. Em 401 needsAdmin, lanca um Error com a flag
-// .needsAdmin marcada, para o wizard oferecer o campo de admin token e reenviar.
+// Le a Response de uma mutacao (FAIL-CLOSED). Distingue os dois casos do gate admin:
+//  - 401 needsAdmin: o servidor TEM ADMIN_TOKEN, mas falta o header x-admin-token
+//    correto. Lanca Error com .needsAdmin -> o wizard pede/cola o token e re-tenta.
+//  - 403 adminNotConfigured: o servidor NAO tem ADMIN_TOKEN configurado. Lanca Error
+//    com .adminNotConfigured -> o wizard mostra a instrucao de deploy e NAO pede token
+//    (colar token no cliente nao resolve config do servidor).
 async function mutationOrThrow(res) {
   const text = await res.text();
   let data;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (res.status === 403 && data && data.adminNotConfigured) {
+    const e = new Error(data.error || 'O servidor nao tem ADMIN_TOKEN configurado.');
+    e.adminNotConfigured = true;
+    throw e;
+  }
   if (res.status === 401 && data && data.needsAdmin) {
     const e = new Error(data.error || 'Este ambiente exige um token de administrador.');
     e.needsAdmin = true;

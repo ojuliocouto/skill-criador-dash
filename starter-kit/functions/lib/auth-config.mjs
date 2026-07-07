@@ -27,13 +27,26 @@
 // Numero de iteracoes padrao do PBKDF2 ao definir uma senha nova.
 export const DEFAULT_PBKDF2_ITERATIONS = 100000;
 
-// Comparacao de strings em tempo constante (nao vaza onde diferem via timing).
+// Comparacao de strings em tempo constante (nao vaza onde diferem NEM o tamanho
+// via timing). NAO faz early-return por diferenca de comprimento: um early-return
+// vazaria o tamanho do segredo pelo tempo de resposta. Em vez disso, acumula o XOR
+// sobre o MAIOR comprimento (tratando o mais curto com bytes neutros) e soma a
+// diferenca de length ao acumulador, de modo que o resultado logico continua o
+// mesmo: igual so quando as strings sao identicas.
 export function safeEqual(a, b) {
   const x = String(a == null ? '' : a);
   const y = String(b == null ? '' : b);
-  if (x.length !== y.length) return false;
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  const max = Math.max(x.length, y.length);
+  // A diferenca de comprimento ja entra no acumulador: se os tamanhos diferem,
+  // diff nunca sera 0 (independe do conteudo), sem cortar cedo pelo length.
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < max; i++) {
+    // charCodeAt fora do range devolve NaN; (NaN | 0) === 0 mantem o byte neutro,
+    // mas a diferenca de length ja garante diff != 0 quando os tamanhos diferem.
+    const cx = (x.charCodeAt(i) | 0);
+    const cy = (y.charCodeAt(i) | 0);
+    diff |= cx ^ cy;
+  }
   return diff === 0;
 }
 
@@ -126,11 +139,24 @@ export async function authOk(config, providedHash) {
   return safeEqual(computed, a.verifier);
 }
 
+// Mensagem do 403 fail-closed (ADMIN_TOKEN nao configurado no servidor). Instrui o
+// operador a definir o secret; colar token no cliente NAO resolve, porque o
+// servidor nao tem contra o que comparar. Por isso e uma resposta DISTINTA do 401
+// needsAdmin (que so pede o header quando o servidor JA tem o token).
+const ADMIN_NOT_CONFIGURED_MSG =
+  'ADMIN_TOKEN nao configurado no servidor. Defina o secret com: wrangler pages secret put ADMIN_TOKEN --project-name=<seu-projeto>. Sem ele, criar/gerenciar dashboards fica bloqueado (fail-closed).';
+
 /**
- * Trava global opcional de mutacao. Se env.ADMIN_TOKEN estiver definido, exige o
- * header x-admin-token igual a ele (comparacao em tempo constante). Devolve uma
- * Response 401 quando o token esta definido mas o header falta/nao bate; devolve
- * null (segue o fluxo) quando o token nao esta definido ou o header confere.
+ * Trava global de mutacao, modelo FAIL-CLOSED. Chamada SO nas mutacoes (POST/DELETE
+ * de dashboards e POST de preview do Meta); NUNCA na leitura (GET), que segue publica.
+ *
+ * Semantica:
+ *  - ADMIN_TOKEN setado + header x-admin-token correto -> libera (null).
+ *  - ADMIN_TOKEN setado + header ausente/errado -> 401 { needsAdmin: true } (o cliente
+ *    pede/cola o token e re-tenta; o servidor tem contra o que comparar).
+ *  - ADMIN_TOKEN NAO setado -> 403 { adminNotConfigured: true } (fail-closed): mutacao
+ *    e preview ficam BLOQUEADOS ate o operador definir o secret. NAO usa needsAdmin
+ *    aqui, porque colar token no cliente nao resolve um problema de config do servidor.
  *
  * Vive aqui (modulo neutro de auth) e nao no handler de config para que os
  * conectores (meta-ads, d1) possam usar a trava SEM importar de dashboards.js.
@@ -140,7 +166,14 @@ export async function authOk(config, providedHash) {
  */
 export function checkAdminToken(env, request) {
   const adminToken = env && env.ADMIN_TOKEN;
-  if (!adminToken) return null; // sem token configurado: instancia aberta (comportamento atual).
+  if (!adminToken) {
+    // FAIL-CLOSED: sem ADMIN_TOKEN configurado no servidor, mutacao/preview ficam
+    // bloqueados. Resposta DISTINTA do needsAdmin (nao adianta colar token no cliente).
+    return new Response(
+      JSON.stringify({ adminNotConfigured: true, error: ADMIN_NOT_CONFIGURED_MSG }),
+      { status: 403, headers: { 'content-type': 'application/json' } }
+    );
+  }
   const provided = request.headers.get('x-admin-token') || '';
   if (safeEqual(provided, adminToken)) return null;
   return new Response(

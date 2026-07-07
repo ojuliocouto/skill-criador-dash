@@ -7,6 +7,11 @@ export const template = {
   label: 'Marketing',
   // Metrica sugerida para a meta opcional (meta vs realizado).
   primaryMetric: 'leads',
+  // Slot semantico que representa o eixo de TEMPO deste dominio. O dashboard.js
+  // le daqui para calcular a tendencia (2a metade vs 1a metade do periodo), em
+  // vez de assumir 'data'. Mantem o contrato slot-agnostico: se um dominio novo
+  // chamar o slot de tempo de outra coisa, basta declarar aqui.
+  dateSlot: 'data',
   slots: [
     { key: 'data', label: 'Data', required: true, aliases: ['data', 'dia', 'date'] },
     { key: 'canal', label: 'Canal', required: false, aliases: ['canal', 'origem', 'fonte', 'plataforma', 'campanha'] },

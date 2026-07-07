@@ -26,21 +26,27 @@ function fakeKV(initial = {}) {
 function makeConfig(overrides = {}) {
   return {
     name: 'Dash Hardening',
-    domain: 'exemplo.com',
+    // Dominio canonico: o POST valida config.domain contra domains.mjs (fix 3).
+    domain: 'vendas',
     source: { type: 'sheet', url: 'https://sheet' },
     colMap: { data: 'A', valor: 'B' },
     ...overrides,
   };
 }
 
+// Modelo FAIL-CLOSED: toda mutacao exige ADMIN_TOKEN no servidor + header
+// x-admin-token. Estes testes focam na validacao de accent (nao no gate admin),
+// entao ctxPost ja injeta o token no env e manda o header, para o POST passar o
+// gate e chegar na validacao que esta sendo exercitada.
+const ADMIN = 'super-token-admin';
 function ctxPost(body, env) {
   return {
     request: new Request('https://x/api/dashboards', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-admin-token': ADMIN },
       body: JSON.stringify(body),
     }),
-    env,
+    env: { ADMIN_TOKEN: ADMIN, ...env },
   };
 }
 

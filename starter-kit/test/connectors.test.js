@@ -214,6 +214,7 @@ test('csv POST vazio -> 400', async () => {
 // ---------------------------------------------------------------------------
 
 // 7. POST preview (body {token,account}) com fetch stub de insights -> 200 DataSet.
+//    Modelo FAIL-CLOSED: o preview exige ADMIN_TOKEN no servidor + header x-admin-token.
 test('meta-ads POST preview -> 200 DataSet', async () => {
   const insights = {
     data: [
@@ -234,7 +235,7 @@ test('meta-ads POST preview -> 200 DataSet', async () => {
 
   await comFetchStub(stub, async (contador) => {
     const res = await metaAds(
-      ctx('POST', { path: 'connectors/meta-ads', body: { token: 'TK', account: 'act_123' } })
+      ctx('POST', { path: 'connectors/meta-ads', body: { token: 'TK', account: 'act_123' }, headers: { 'x-admin-token': 'super-token-admin' }, env: { ADMIN_TOKEN: 'super-token-admin' } })
     );
     assert.equal(res.status, 200);
     const ds = await readJSON(res);

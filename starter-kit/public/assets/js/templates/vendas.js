@@ -34,6 +34,8 @@ export const template = {
   label: 'Vendas',
   // Metrica sugerida para a meta opcional (meta vs realizado).
   primaryMetric: 'faturamento',
+  // Slot semantico do eixo de TEMPO (usado pela tendencia no dashboard.js).
+  dateSlot: 'data',
   slots: [
     { key: 'data', label: 'Data', required: true, aliases: ['data', 'dia', 'date'] },
     { key: 'vendedor', label: 'Vendedor', required: false, aliases: ['vendedor', 'vendedora', 'responsavel', 'sdr', 'closer', 'seller'] },

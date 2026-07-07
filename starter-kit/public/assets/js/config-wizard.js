@@ -122,6 +122,22 @@ function pedirAdminToken(feedback, retry) {
   tokenInput.focus();
 }
 
+/**
+ * Caso FAIL-CLOSED: o servidor NAO tem ADMIN_TOKEN configurado. Aqui NAO adianta
+ * pedir pra colar token (o servidor nao tem contra o que comparar): mostra uma
+ * instrucao clara de configuracao/deploy e NAO entra em loop de prompt.
+ * @param {HTMLElement} feedback  container onde a mensagem e renderizada
+ */
+function mostrarAdminNaoConfigurado(feedback) {
+  const box = el('div', { class: 'card' }, [
+    el('h3', { text: 'O servidor ainda nao tem ADMIN_TOKEN configurado' }),
+    el('p', { class: 'hint', text: 'Criar e gerenciar dashboards fica bloqueado ate o operador definir o token no servidor (modelo fail-closed). Colar um token aqui nao resolve, porque o servidor nao tem contra o que comparar.' }),
+    el('p', { class: 'hint', text: 'Rode: wrangler pages secret put ADMIN_TOKEN --project-name=<seu-projeto> e faca o re-deploy. Depois recarregue esta pagina.' }),
+  ]);
+  box.style.marginTop = '16px';
+  feedback.appendChild(box);
+}
+
 // ---------------------------------------------------------------------------
 // Barra de passos.
 // ---------------------------------------------------------------------------
@@ -360,6 +376,12 @@ function renderSource(body) {
         onConnected(ds, { type: 'meta', meta: params });
       } catch (e) {
         feedback.innerHTML = '';
+        if (e && e.adminNotConfigured) {
+          // FAIL-CLOSED: servidor sem ADMIN_TOKEN. Nao pede token (nao adianta),
+          // mostra a instrucao de configuracao/deploy e nao re-tenta em loop.
+          mostrarAdminNaoConfigurado(feedback);
+          return;
+        }
         if (e && e.needsAdmin) {
           pedirAdminToken(feedback, () => tentarConectarMeta(params));
           return;
@@ -583,6 +605,13 @@ function renderFinish(body) {
       window.location.href = `/dashboard.html?id=${encodeURIComponent(id)}`;
     } catch (e) {
       feedback.innerHTML = '';
+      if (e && e.adminNotConfigured) {
+        // FAIL-CLOSED: servidor sem ADMIN_TOKEN. Nao adianta pedir token; mostra a
+        // instrucao de configuracao/deploy e nao entra em loop de prompt.
+        createBtn.disabled = false;
+        mostrarAdminNaoConfigurado(feedback);
+        return;
+      }
       if (e && e.needsAdmin) {
         // Mesmo fluxo compartilhado do card Meta: pede o token e re-tenta o save.
         createBtn.disabled = false;

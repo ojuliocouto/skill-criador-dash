@@ -46,6 +46,20 @@ test('parseNumberBR: somar coluna de percentuais nao encolhe 100x', () => {
   assert.equal(soma, 80);
 });
 
+// ROBUSTEZ (format.js parseNumberBR): o fast-path de number direto pulava o guard
+// de finitude, entao parseNumberBR(Infinity) devolvia Infinity (vazava pro UI).
+// Entrada number nao-finita deve virar NaN (fallback padrao da funcao, como os
+// demais invalidos). Numeros finitos continuam intactos.
+test('parseNumberBR: number nao-finito (Infinity/NaN) vira NaN, finito intacto', () => {
+  assert.ok(Number.isNaN(parseNumberBR(Infinity)), 'Infinity number vira NaN');
+  assert.ok(Number.isNaN(parseNumberBR(-Infinity)), '-Infinity number vira NaN');
+  assert.ok(Number.isNaN(parseNumberBR(NaN)), 'NaN number continua NaN');
+  assert.equal(parseNumberBR(42), 42);       // finito intacto
+  assert.equal(parseNumberBR(0), 0);
+  assert.equal(parseNumberBR(-5.5), -5.5);
+  assert.equal(parseNumberBR(1234.56), 1234.56);
+});
+
 test('parseDateBR: normaliza para ISO YYYY-MM-DD', () => {
   assert.equal(parseDateBR('31/12/2026'), '2026-12-31');
   assert.equal(parseDateBR('01/02/2026'), '2026-02-01');

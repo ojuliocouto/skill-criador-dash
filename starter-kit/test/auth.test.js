@@ -2,7 +2,71 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256Hex } from '../public/assets/js/lib/auth.js';
 import { needsAuth, authOk, stripSecrets } from '../functions/api/dashboards.js';
-import { derivePasswordAuth } from '../functions/lib/auth-config.mjs';
+import { derivePasswordAuth, safeEqual, checkAdminToken } from '../functions/lib/auth-config.mjs';
+
+// ROBUSTEZ (auth-config.mjs safeEqual): a comparacao deve ser tempo-constante e
+// NAO fazer early-return por diferenca de comprimento (o early-return vazava o
+// tamanho do segredo via timing). O resultado logico continua: true so se iguais.
+test('safeEqual: comprimentos diferentes retornam false; iguais retornam true', () => {
+  assert.equal(safeEqual('abc', 'abcdef'), false);   // tamanhos diferentes
+  assert.equal(safeEqual('abcdef', 'abc'), false);   // ordem inversa tambem
+  assert.equal(safeEqual('', 'x'), false);
+  assert.equal(safeEqual('igual', 'igual'), true);   // identicos
+  assert.equal(safeEqual('', ''), true);             // ambos vazios
+  assert.equal(safeEqual('abc', 'abd'), false);      // mesmo tamanho, difere
+});
+
+test('safeEqual: nao faz early-return por diferenca de length (inspeciona a fonte)', () => {
+  // Garante que a implementacao NAO cortou cedo por diferenca de comprimento.
+  // Inspecao do codigo-fonte: o corpo da funcao nao pode conter o padrao
+  // "return false" guardado por comparacao de .length (o vazamento por timing).
+  const src = safeEqual.toString();
+  assert.doesNotMatch(
+    src,
+    /\.length\s*!==[^\n]*return|length[^\n]*return\s+false/,
+    'safeEqual nao pode retornar cedo por diferenca de length',
+  );
+  // E o comportamento continua correto para tamanhos bem diferentes.
+  assert.equal(safeEqual('a', 'abcdefghijklmnop'), false);
+  assert.equal(safeEqual('abcdefghijklmnop', 'a'), false);
+});
+
+// checkAdminToken: modelo FAIL-CLOSED. So e chamado nas MUTACOES (POST/DELETE de
+// dashboards e POST de preview do Meta), nunca na leitura (GET). Devolve null
+// (libera) so quando o servidor TEM ADMIN_TOKEN e o header x-admin-token bate.
+async function statusEBody(res) {
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+}
+function reqComToken(token) {
+  const headers = token == null ? {} : { 'x-admin-token': token };
+  return new Request('https://x/api/dashboards', { method: 'POST', headers });
+}
+
+test('checkAdminToken: sem ADMIN_TOKEN -> 403 adminNotConfigured (fail-closed, nao needsAdmin)', async () => {
+  const res = checkAdminToken({}, reqComToken(null));
+  assert.ok(res, 'sem ADMIN_TOKEN a mutacao deve ser bloqueada (nao liberada)');
+  const { status, body } = await statusEBody(res);
+  assert.equal(status, 403);
+  assert.equal(body.adminNotConfigured, true);
+  assert.equal(body.needsAdmin, undefined, 'nao usa needsAdmin: colar token no cliente nao resolve');
+  assert.match(body.error, /ADMIN_TOKEN/i);
+});
+
+test('checkAdminToken: ADMIN_TOKEN setado + header correto -> libera (null)', () => {
+  assert.equal(checkAdminToken({ ADMIN_TOKEN: 'segredo' }, reqComToken('segredo')), null);
+});
+
+test('checkAdminToken: ADMIN_TOKEN setado + header ausente/errado -> 401 needsAdmin', async () => {
+  const ausente = await statusEBody(checkAdminToken({ ADMIN_TOKEN: 'segredo' }, reqComToken(null)));
+  assert.equal(ausente.status, 401);
+  assert.equal(ausente.body.needsAdmin, true);
+  assert.equal(ausente.body.adminNotConfigured, undefined);
+
+  const errado = await statusEBody(checkAdminToken({ ADMIN_TOKEN: 'segredo' }, reqComToken('outro')));
+  assert.equal(errado.status, 401);
+  assert.equal(errado.body.needsAdmin, true);
+});
 
 test('sha256Hex: vetor conhecido e determinismo', async () => {
   assert.equal(await sha256Hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');

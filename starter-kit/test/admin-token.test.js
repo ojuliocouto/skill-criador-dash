@@ -1,8 +1,9 @@
-// Testes da trava GLOBAL opcional de mutacao (x-admin-token) do /api/dashboards.
-// Regra: se env.ADMIN_TOKEN estiver definido, POST e DELETE exigem o header
-// x-admin-token igual a ele; sem o header correto -> 401 { needsAdmin: true }.
-// O gate roda ANTES da checagem per-dashboard e nao afeta GET. Sem env.ADMIN_TOKEN,
-// o comportamento aberto atual (protecao per-dashboard) continua igual.
+// Testes da trava GLOBAL de mutacao (x-admin-token) do /api/dashboards, modelo
+// FAIL-CLOSED. Regra:
+//  - env.ADMIN_TOKEN setado + header x-admin-token correto -> passa.
+//  - env.ADMIN_TOKEN setado + header ausente/errado -> 401 { needsAdmin: true }.
+//  - env.ADMIN_TOKEN NAO setado -> 403 { adminNotConfigured: true } (mutacao bloqueada).
+// O gate roda ANTES da checagem per-dashboard e NAO afeta GET (leitura publica).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -45,7 +46,8 @@ function ctx(method, { id, body, headers = {}, env = {} } = {}) {
 function makeConfig(overrides = {}) {
   return {
     name: 'Meu Dash',
-    domain: 'exemplo.com',
+    // Dominio canonico: o POST valida config.domain contra domains.mjs (fix 3).
+    domain: 'vendas',
     source: { type: 'sheet', url: 'https://sheet' },
     colMap: { data: 'A', valor: 'B' },
     ...overrides,
@@ -144,18 +146,30 @@ test('admin gate: token admin correto ainda respeita a senha per-dashboard', asy
   assert.equal(JSON.parse(kv._map.get('dash:over')).name, 'Novo');
 });
 
-// 7. Sem env.ADMIN_TOKEN: comportamento aberto atual (POST/DELETE sem header passam).
-test('sem ADMIN_TOKEN: instancia aberta (POST/DELETE sem header admin passam)', async () => {
+// 7. FAIL-CLOSED: sem env.ADMIN_TOKEN, POST -> 403 adminNotConfigured (NAO cria).
+test('sem ADMIN_TOKEN: POST -> 403 adminNotConfigured (fail-closed, nao cria)', async () => {
   const kv = fakeKV();
   const env = { DASHBOARDS_KV: kv }; // sem ADMIN_TOKEN
 
   const post = await dashboards(ctx('POST', { body: makeConfig({ name: 'Aberto' }), env }));
-  assert.equal(post.status, 200);
-  assert.ok(kv._map.has('dash:aberto'));
+  assert.equal(post.status, 403);
+  const j = await readJSON(post);
+  assert.equal(j.adminNotConfigured, true);
+  assert.equal(j.needsAdmin, undefined, 'NAO usa needsAdmin: colar token no cliente nao resolve');
+  assert.match(j.error, /ADMIN_TOKEN/i);
+  assert.equal(kv._map.size, 0, 'nao pode criar nada sem ADMIN_TOKEN no servidor');
+});
 
-  const del = await dashboards(ctx('DELETE', { id: 'aberto', env }));
-  assert.equal(del.status, 200);
-  assert.equal(kv._map.has('dash:aberto'), false);
+// 7b. FAIL-CLOSED: sem env.ADMIN_TOKEN, DELETE -> 403 adminNotConfigured (NAO apaga).
+test('sem ADMIN_TOKEN: DELETE -> 403 adminNotConfigured (fail-closed, nao apaga)', async () => {
+  const cfg = makeConfig({ id: 'existe' });
+  const kv = fakeKV({ 'dash:existe': JSON.stringify(cfg) });
+  const env = { DASHBOARDS_KV: kv }; // sem ADMIN_TOKEN
+
+  const del = await dashboards(ctx('DELETE', { id: 'existe', env }));
+  assert.equal(del.status, 403);
+  assert.equal((await readJSON(del)).adminNotConfigured, true);
+  assert.ok(kv._map.has('dash:existe'), 'nao pode apagar sem ADMIN_TOKEN no servidor');
 });
 
 // 8. O gate admin NAO afeta GET, mesmo com ADMIN_TOKEN setado e sem header admin.

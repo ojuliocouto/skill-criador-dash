@@ -70,6 +70,7 @@ Pergunte qual conta Cloudflare usar. Depois (ver seção "Provisionar a infra"):
 - KV `DASHBOARDS_KV` (sempre) e `DASHBOARD_CACHE` (opcional).
 - Modo histórico: D1 + aplicar `db/schema.sql` + Worker cron (`workers/snapshot/`).
 - Projeto Pages + domínio customizado.
+- `ADMIN_TOKEN` (OBRIGATÓRIO): mutação é fail-closed, sem o token ninguém cria/apaga dashboard.
 
 ### 5. Montar o dashboard
 - Escolha o domínio/template pronto (Marketing, Vendas, Suporte) ou crie um novo (seção "Adicionar domínio").
@@ -89,7 +90,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PEÇAS (biblioteca provada em `starter-kit/`)
 
-Código real e testado (406 testes verdes, TDD). Você compõe a partir daqui.
+Código real e testado (428 testes verdes, TDD). Você compõe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Não sabem de métricas.
@@ -131,20 +132,25 @@ config E OS DADOS (conectores por id) com o header correto. Tentativas erradas t
 `stripSecrets` remove recursivamente qualquer credencial da
 fonte (token/secret/apikey/senha/authorization) das respostas.
 
-Modelo de acesso (avise a pessoa): a API é ABERTA por padrão. Dashboard SEM senha pode ser lido,
-sobrescrito ou apagado por qualquer um que tenha o id (fluxo self-serve). Para dado sensível: ponha
-senha. Para restringir a instância inteira, defina a env `ADMIN_TOKEN` no projeto Pages: com ela setada,
-POST/DELETE exigem o header `x-admin-token`, então só o dono cria/apaga dashboards.
+Modelo de acesso (FAIL-CLOSED, avise a pessoa): a LEITURA de um dashboard publicado é pública (ele existe
+pra ser visto). Mas CRIAR, sobrescrever e APAGAR (POST/DELETE) são fail-closed: exigem o header
+`x-admin-token`. Sem um `ADMIN_TOKEN` configurado no servidor, a API BLOQUEIA toda mutação (responde 403
+`adminNotConfigured`), então ninguém cria ou apaga nada anonimamente. Além disso, dashboard com senha
+protege a config E os dados por id. Ou seja: configurar o `ADMIN_TOKEN` faz parte do setup, não é opcional.
 
-Como definir o `ADMIN_TOKEN` no projeto Pages (dois caminhos, escolha um):
+Passo do setup (o agente FAZ isso, a pessoa não precisa inventar nem decorar token):
 ```
-# via CLI (a partir de starter-kit/, ele pergunta o valor do segredo):
+# 1) gere um token aleatorio forte (o agente roda isto e GUARDA o valor pra passar pra pessoa):
+openssl rand -base64 32
+# 2) defina como secret do Pages (a partir de starter-kit/; cole o valor gerado quando ele pedir):
 wrangler pages secret put ADMIN_TOKEN --project-name=<NOME-DO-PROJETO>
 ```
-Ou pelo painel: Cloudflare Pages > seu projeto > Settings > Variables and Secrets >
-adicionar `ADMIN_TOKEN` como Secret (tipo "Encrypt"/Secret, não como texto plano).
-Efeito: com o `ADMIN_TOKEN` setado, POST/DELETE passam a exigir o header `x-admin-token` com esse
-valor, então só você (o dono, que conhece o token) consegue criar ou apagar dashboards.
+Ou pelo painel: Cloudflare Pages > seu projeto > Settings > Variables and Secrets > adicionar `ADMIN_TOKEN`
+como Secret (tipo Secret/Encrypt, nunca texto plano). Depois de re-deploy, na PRIMEIRA vez que a pessoa
+criar um dashboard no wizard, ele vai pedir o token (fluxo `needsAdmin`): ela cola o valor gerado UMA vez,
+o wizard guarda no navegador (localStorage) e daí pra frente manda o header sozinho. A pessoa gerencia
+zero token no dia a dia: cola uma vez o que o agente gerou. Guarde o token em local seguro (é o que
+autoriza gerenciar os dashboards); se perder, é só gerar outro e repetir o `secret put`.
 
 Detalhe do gate por fonte: a senha protege a config e os conectores POR ID (D1 e Meta GET checam a
 senha antes de devolver dado). Já sheets/csv são lidos com a URL/arquivo que estão na config: quem
@@ -167,7 +173,7 @@ package.json  wrangler.toml
 db/schema.sql                   tabela de snapshots do modo historico (D1)
 examples/                       marketing-exemplo.csv, vendas-exemplo.csv, suporte-exemplo.csv
 functions/
-  _middleware.js                CORS + cache KV (5 min) dos conectores
+  _middleware.js                CORS + cache KV (5 min, só /api/connectors/*) + security headers (CSP etc)
   api/
     dashboards.js               CRUD das configs no KV + gate de senha + strip de segredos
     connectors/
@@ -191,10 +197,10 @@ public/
   assets/js/
     config-wizard.js  dashboard.js  index-page.js
     sources/ index.js (registry de fontes: type, label, canHistory)
-    lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js  color.js
+    lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js  color.js  html.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           406 testes (npm test  ->  node --test test/*.test.js)
+test/                           428 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local (o `npm run dev` já embute a `--compatibility-date` do `package.json`):
@@ -232,19 +238,27 @@ Não há passo de build: o `wrangler.toml` já tem `pages_build_output_dir = "pu
 usam a pasta `public/` direto. Todos os comandos abaixo rodam a partir da pasta `starter-kit/` (é onde
 mora o `wrangler.toml`, o `db/schema.sql` e o `package.json`).
 
-Base (os dois modos):
+Base (os dois modos). Faça os passos NA ORDEM, um de cada vez; o passo 2 é bloqueante (não pule):
+
+Passo 1: crie os namespaces KV.
 ```
 wrangler kv namespace create DASHBOARDS_KV
 # O comando IMPRIME o id do namespace. Dependendo da versao do wrangler (3.x vs 4.x) o formato varia:
 # pode vir como  id = "abc123..."  ou dentro de um bloco [[kv_namespaces]]. Em qualquer caso, copie o valor do id.
 wrangler kv namespace create DASHBOARD_CACHE      # opcional (cache 5 min); imprime outro id
 ```
-Abra `wrangler.toml` e troque os placeholders pelos ids impressos: `<SEU_KV_NAMESPACE_ID>` pelo id do
-DASHBOARDS_KV e `<SEU_KV_CACHE_ID>` pelo id do DASHBOARD_CACHE. Nunca commite id real em repo público.
-Troque também o `name = "meu-dashboard"` do topo do `wrangler.toml` pelo `<NOME-DO-PROJETO>` que você vai
-usar abaixo, pra os dois baterem (o `name` do `wrangler.toml` e o `--project-name` do deploy têm que ser iguais).
-ANTES do deploy, confira que NENHUM placeholder `<...>` sobrou no `wrangler.toml`: se um id de KV ficar como
-placeholder, o deploy compila mesmo assim e a falha só aparece em runtime (API 500 "Binding ... nao configurado").
+
+Passo 2 (BLOQUEANTE, faça ANTES de qualquer deploy): edite o `wrangler.toml`. Troque `<SEU_KV_NAMESPACE_ID>`
+pelo id do DASHBOARDS_KV, `<SEU_KV_CACHE_ID>` pelo id do DASHBOARD_CACHE, e o `name = "meu-dashboard"` do topo
+pelo `<NOME-DO-PROJETO>` (o `name` do toml e o `--project-name` do deploy TÊM que ser iguais). Nunca commite id
+real em repo público. Confirme que NÃO sobrou nenhum placeholder ANTES de seguir:
+```
+grep -n "<SEU_KV\|<NOME-DO-PROJETO\|meu-dashboard" wrangler.toml   # tem que voltar VAZIO. Se achar algo, ainda falta trocar.
+```
+Se você deployar com um placeholder de id ainda no toml, o deploy COMPILA e passa, mas a API responde 500
+"Binding DASHBOARDS_KV nao configurado" em runtime. Por isso o grep acima é obrigatório antes do passo 3.
+
+Passo 3: crie o projeto Pages e faça o deploy.
 ```
 wrangler pages project create <NOME-DO-PROJETO> --production-branch main   # cria o projeto Pages
 wrangler pages deploy public --project-name=<NOME-DO-PROJETO> --branch main
@@ -252,7 +266,16 @@ wrangler pages deploy public --project-name=<NOME-DO-PROJETO> --branch main
 Bindings em produção: com os ids já no `wrangler.toml`, o `wrangler pages deploy` aplica os bindings de KV
 ao deployment. Se por algum motivo a API responder 500 "Binding DASHBOARDS_KV nao configurado", vincule no
 painel: Cloudflare Pages > seu projeto > Settings > Bindings > add KV binding `DASHBOARDS_KV` (e `DASHBOARD_CACHE`).
-Depois: no painel Pages > Custom domains, aponte o domínio da pessoa. Abra `config.html` no domínio e crie o dashboard.
+
+Passo 4 (OBRIGATÓRIO, mutação é fail-closed): defina o `ADMIN_TOKEN` (veja a seção "Modelo de acesso"
+acima: `openssl rand -base64 32` + `wrangler pages secret put ADMIN_TOKEN --project-name=<NOME-DO-PROJETO>`,
+depois re-deploy). Sem ele, criar/apagar dashboard é bloqueado (403), então este passo não é opcional. Guarde
+o token pra colar no wizard na primeira criação.
+Domínio customizado (opcional): é pelo painel, não por CLI. Cloudflare Pages > seu projeto > Custom domains >
+Set up a domain, digite o domínio (tem que estar na MESMA conta Cloudflare, como zona). O painel cria o registro
+DNS (CNAME) automaticamente se a zona é da conta; se o domínio está em outro provedor de DNS, o painel mostra o
+CNAME pra você criar lá. Antes do domínio propagar, valide tudo pela URL nativa `https://<NOME-DO-PROJETO>.pages.dev`.
+Abra `config.html` (no `.pages.dev` ou no domínio) e crie o dashboard.
 
 Modo histórico (adiciona, só se a pessoa escolheu Histórico), sempre a partir de `starter-kit/`:
 ```
@@ -260,6 +283,8 @@ wrangler d1 create dashboard-db
 # imprime database_id = "..."; cole em workers/snapshot/wrangler.toml (DASHBOARD_DB) e no binding D1 do Pages
 wrangler d1 execute dashboard-db --remote --file=db/schema.sql   # cria a tabela snapshots no D1 REMOTO
 ```
+O `--remote` é OBRIGATÓRIO: sem ele o schema vai pro D1 LOCAL (só do seu `wrangler dev`), e o Worker de
+produção fica sem a tabela `snapshots`, quebrando o dashboard histórico mesmo com o cron rodando.
 Em `workers/snapshot/wrangler.toml`, preencha os bindings DASHBOARD_DB (D1) e DASHBOARDS_KV, e o cron.
 ATENÇÃO: o `id` do `DASHBOARDS_KV` tem que ser EXATAMENTE o MESMO nos dois arquivos (raiz e worker) e
 o mesmo namespace do Pages. Se divergir, o cron lista o prefixo `dash:` num KV vazio e não captura nada,

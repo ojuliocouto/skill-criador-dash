@@ -26,13 +26,31 @@ import { groupBy, timeSeries } from '../lib/metrics.js';
 // fallback abaixo.
 const BUCKET_AGGS = new Set(['sum', 'avg', 'count', 'countDistinct']);
 
-// Deriva a agregacao de bucket a partir da MetricDef que casa com o valueSlot.
-// Se a MetricDef trouxer um `agg` valido para bucket, usa-o; senao (metrica
-// ausente, sem agg, ou agg nao aplicavel por bucket) faz fallback seguro pra
-// 'sum', preservando o comportamento historico.
+// Deriva a agregacao de bucket para um `valueSlot` de widget (ranking/timeseries).
+//
+// CONTRATO (explicito, testavel):
+//   `valueSlot` e um SLOT semantico. findMetricDef, porem, casa por `metric.key`.
+//   Slot e metric-key sao namespaces DIFERENTES: por sorte coincidem nos 3
+//   templates atuais (ex: slot 'investimento' == metric.key 'investimento'), mas
+//   numa extensao futura poderiam colidir (slot X e uma metrica X que agrega de
+//   forma diferente), grudando o `agg` da metrica ERRADA e trocando avg por sum
+//   silenciosamente.
+//
+//   Por isso so herdamos o `agg` da MetricDef quando ela e, sem ambiguidade, a
+//   metrica-BASE daquele slot: o `metric.key` casa com o valueSlot E o
+//   `metric.column` referencia o MESMO slot (ou seja, a metrica descreve a
+//   coluna crua daquele slot, nao uma derivada que por acaso tem o mesmo nome).
+//   Fora desse casamento estrito, fallback seguro pra 'sum' (o volume total, que
+//   e o comportamento historico e o unico coerente por bucket para uma coluna
+//   crua). Assim o agg herdado nunca vem de uma metrica que apenas colide de nome.
 function bucketAggFor(template, findMetricDef, valueSlot) {
-  const def = valueSlot != null ? findMetricDef(template, valueSlot) : undefined;
-  const agg = def && def.agg;
+  if (valueSlot == null) return 'sum';
+  const def = findMetricDef(template, valueSlot);
+  // So confia no agg quando a MetricDef e a base do proprio slot (key == slot e
+  // column == slot). Isso torna a resolucao slot->agg inequivoca e a prova de
+  // colisao de namespace, sem exigir um mapa slot->metrica separado por template.
+  const isBaseMetricOfSlot = def && def.key === valueSlot && def.column === valueSlot;
+  const agg = isBaseMetricOfSlot ? def.agg : undefined;
   return BUCKET_AGGS.has(agg) ? agg : 'sum';
 }
 

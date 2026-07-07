@@ -57,9 +57,10 @@ export async function onRequest(context) {
       const rl = await rateLimit(env, `meta-preview:${clientIp(request)}`, { limit: PREVIEW_LIMIT, windowSec: PREVIEW_WINDOW });
       if (!rl.ok) return tooMany(rl.retryAfter);
 
-      // AUTORIZACAO do preview: se ADMIN_TOKEN estiver setado no env, exige o header
-      // x-admin-token (mesma logica das mutacoes de dashboards). O gate admin fica
-      // POR CIMA do rate limit (defesa em camadas).
+      // AUTORIZACAO do preview (FAIL-CLOSED, mesma logica das mutacoes de dashboards):
+      // sem ADMIN_TOKEN no servidor -> 403 adminNotConfigured (preview bloqueado);
+      // com ADMIN_TOKEN e header errado/ausente -> 401 needsAdmin; com header correto
+      // -> passa. O gate admin fica POR CIMA do rate limit (defesa em camadas).
       const adminGate = checkAdminToken(env, request);
       if (adminGate) return adminGate;
 
@@ -97,7 +98,13 @@ export async function onRequest(context) {
       }
       const m = config.source && config.source.meta;
       if (!m || !m.token) return erro('Este dashboard nao tem conector Meta Ads configurado.', 400);
-      return json(await fetchMeta(m));
+      // Mesma protecao do preview: NAO repassa o texto cru da Graph API. Sem isso
+      // o GET vira oraculo de validacao do token/conta GUARDADO no dashboard.
+      try {
+        return json(await fetchMeta(m));
+      } catch {
+        return erro(PREVIEW_ERRO_GENERICO, 400);
+      }
     }
 
     return erro(`Metodo ${method} nao suportado.`, 405);

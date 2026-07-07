@@ -8,6 +8,7 @@
 // dashboards.js (ex: os testes).
 import { needsAuth, authOk, checkAdminToken, derivePasswordAuth } from '../lib/auth-config.mjs';
 import { authRateLimit } from '../lib/rate-limit.mjs';
+import { DOMAINS, isDomain } from '../lib/domains.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -106,15 +107,15 @@ export async function onRequest(context) {
   const providedHash = request.headers.get('x-dash-auth') || '';
 
   try {
-    // Trava GLOBAL opcional de mutacao: se env.ADMIN_TOKEN estiver definido, POST e
-    // DELETE exigem o header x-admin-token igual a ele. Assim o operador fecha a
-    // instancia inteira sem quebrar o fluxo self-serve de quem nao setar o token.
-    // Roda ANTES da checagem per-dashboard e so vale para POST/DELETE (GET nao muda).
+    // Trava GLOBAL de mutacao, modelo FAIL-CLOSED: POST e DELETE exigem que o
+    // servidor tenha ADMIN_TOKEN definido E o header x-admin-token bata com ele.
+    // Roda ANTES da checagem per-dashboard e so vale para POST/DELETE (GET nao muda,
+    // a leitura de dashboard publicado continua PUBLICA).
     //
-    // AVISO DE SEGURANCA (ver README): SEM env.ADMIN_TOKEN a instancia fica ABERTA.
-    // Qualquer anonimo pode criar, SOBRESCREVER ou APAGAR qualquer dashboard que NAO
-    // tenha senha per-dashboard (os protegidos ainda exigem x-dash-auth). Em producao
-    // multiusuario, defina ADMIN_TOKEN para exigir o header x-admin-token nas mutacoes.
+    // SEM env.ADMIN_TOKEN a mutacao fica BLOQUEADA (403 adminNotConfigured): nao ha
+    // mais criacao/sobrescrita/delecao anonima. Para liberar as mutacoes, o operador
+    // define o secret (wrangler pages secret put ADMIN_TOKEN) e passa a mandar o
+    // header x-admin-token. Com o token setado mas sem header -> 401 needsAdmin.
     if (method === 'POST' || method === 'DELETE') {
       const adminGate = checkAdminToken(env, request);
       if (adminGate) return adminGate;
@@ -212,6 +213,15 @@ async function create(kv, request, providedHash, env) {
   if (!config.colMap || typeof config.colMap !== 'object') faltando.push('colMap');
   if (faltando.length) {
     return erro(`Campos obrigatórios ausentes: ${faltando.join(', ')}.`, 400);
+  }
+
+  // Valida o dominio contra a lista canonica (functions/lib/domains.mjs), a MESMA
+  // fonte que alimenta o registry de templates do front-end. Derivar daqui (em vez
+  // de um enum literal no handler) faz com que adicionar um dominio novo NAO exija
+  // editar esta validacao: basta registrar a chave em domains.mjs + criar o
+  // template. Dominios fora da lista continuam rejeitados (contrato preservado).
+  if (!isDomain(config.domain)) {
+    return erro(`Domínio inválido: "${config.domain}". Use um de: ${DOMAINS.join(', ')}.`, 400);
   }
 
   // Valida a cor de destaque no servidor: se vier e nao for hex (#rgb/#rrggbb),

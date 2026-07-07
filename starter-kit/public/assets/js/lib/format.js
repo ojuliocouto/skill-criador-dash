@@ -6,7 +6,10 @@
  * Remove símbolos de moeda e espaços. Retorna NaN se não for numérico.
  */
 export function parseNumberBR(v) {
-  if (typeof v === 'number') return v;
+  // Fast-path de number: mas guarda a finitude. Antes, um number nao-finito
+  // (Infinity/-Infinity/NaN) escapava direto e vazava pro UI. Entrada nao-finita
+  // vira NaN (o mesmo fallback dos demais invalidos), que metrics.js ja filtra.
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
   if (v == null) return NaN;
   let s = String(v).trim();
   if (!s) return NaN;

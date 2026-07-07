@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (406 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (428 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -87,7 +87,7 @@ For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 406 unit tests: node --test 'test/*.test.js'
+npm test                      # 428 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
@@ -118,15 +118,16 @@ For the MVP (Google Sheets or CSV) there is no secret or token to configure.
    wrangler pages deploy public --project-name=<YOUR-PROJECT-NAME> --branch main
    ```
 4. If the API responds 500 "Binding DASHBOARDS_KV nao configurado", attach the bindings in the panel: Cloudflare Pages > your project > Settings > Bindings > add the KV binding `DASHBOARDS_KV` (and `DASHBOARD_CACHE`).
-5. Optionally attach a custom domain in the Cloudflare Pages dashboard.
-6. Open `config.html` on the published domain and create the first dashboard.
-7. Historical mode: also create a D1 database (`wrangler d1 create ...`), apply `db/schema.sql` with `--remote`, deploy the Worker in `workers/snapshot/`, and bind D1 (`DASHBOARD_DB`) to the Pages project. See SKILL.md for the exact commands.
+5. Required (mutations are fail-closed): set an admin token so you can create/manage dashboards. Generate one and store it as a secret: `openssl rand -base64 32` then `wrangler pages secret put ADMIN_TOKEN --project-name=<YOUR-PROJECT-NAME>` (paste the generated value). Without it, every create/delete is rejected with 403.
+6. Optionally attach a custom domain in the Cloudflare Pages dashboard.
+7. Open `config.html` on the published domain and create the first dashboard. The wizard asks for the admin token once (paste the value from step 5); it is stored in the browser and sent automatically after that.
+8. Historical mode: also create a D1 database (`wrangler d1 create ...`), apply `db/schema.sql` with `--remote`, deploy the Worker in `workers/snapshot/`, and bind D1 (`DASHBOARD_DB`) to the Pages project. See SKILL.md for the exact commands.
 
-### Access model (important)
+### Access model (fail-closed)
 
-The dashboards API is open by default: anyone who can reach the site can create dashboards, and any dashboard WITHOUT a password can be read, overwritten, or deleted by anyone with its id. This fits the self-serve, single-owner deploy model. For anything sensitive:
-- Set a password on the dashboard (it also gates the data, not just the config).
-- To lock the whole instance, set an `ADMIN_TOKEN` env var on the Pages project: with it set, POST/DELETE require the `x-admin-token` header, so only you can create or delete dashboards.
+Reading a published dashboard is public (it exists to be viewed). Mutations are not: creating, overwriting, and deleting (POST/DELETE) are fail-closed and require the `x-admin-token` header. If no `ADMIN_TOKEN` is configured on the server, the API rejects every mutation with `403 adminNotConfigured`, so nobody can create or delete anything anonymously. Setting `ADMIN_TOKEN` is part of setup, not optional:
+- Generate a strong random token (`openssl rand -base64 32`) and set it as a Pages secret: `wrangler pages secret put ADMIN_TOKEN --project-name=<YOUR-PROJECT>`. On first use the wizard asks for it once (the `needsAdmin` flow), stores it in the browser, and sends `x-admin-token` from then on.
+- Additionally set a per-dashboard password for anything whose DATA should not be read by link (it gates the config and the data, not just writes).
 
 ## Project structure
 
@@ -180,6 +181,7 @@ starter-kit/
           auth.js               # client-side SHA-256 of the optional password (salted PBKDF2 verifier lives server-side)
           theme.js              # light/dark toggle (injected into the topbar)
           color.js              # WCAG contrast helpers + aplicarAccent (shared by dashboard, theme, wizard)
+          html.js               # single esc() (HTML escaping), shared by dashboard, index-page and widgets
         templates/
           index.js
           marketing.js
@@ -198,7 +200,7 @@ starter-kit/
 
 ## Testing
 
-There are 406 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 428 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit
@@ -210,7 +212,8 @@ The full browser flow (Marketing and Sales, including the brand accent color swa
 ## Security
 
 - No token is required for the default source: a link-shared public Google Sheet or a CSV upload is enough.
-- Optional password per dashboard: the server stores a salted PBKDF2-SHA256 verifier per dashboard (never the plain password, never a directly replayable hash), and the config API strips the whole `auth` block (salt, verifier, iterations) before responding. A KV fixed-window rate limiter throttles wrong-password attempts (by IP + dashboard id) and the Meta Ads preview POST (by IP), so the gate and the preview relay cannot be hammered. The `x-dash-auth` header (a SHA-256 of the password) is still a bearer-style credential protected by TLS in transit: this is a shared view password, not user accounts. For anything sensitive, also set an `ADMIN_TOKEN`.
+- Optional password per dashboard: the server stores a salted PBKDF2-SHA256 verifier per dashboard (never the plain password, never a directly replayable hash), and the config API strips the whole `auth` block (salt, verifier, iterations) before responding. A KV fixed-window rate limiter throttles wrong-password attempts (by IP + dashboard id) and the Meta Ads preview POST (by IP), so the gate and the preview relay cannot be hammered. The `x-dash-auth` header (a SHA-256 of the password) is still a bearer-style credential protected by TLS in transit: this is a shared view password, not user accounts.
+- Mutations are fail-closed: with no `ADMIN_TOKEN` set, POST/DELETE (and the Meta preview POST) are rejected, so there is no anonymous create/overwrite/delete. Setting `ADMIN_TOKEN` is a required setup step, not a hardening extra.
 - Meta Ads access token is stored in the dashboard config and never returned to the browser: the connector Function reads it server-side by dashboard id. The config API strips the token from every response.
 - A link-shared Google Sheet is readable by anyone with the link, and a published dashboard has no login unless you set a password. Use data you are comfortable sharing by link, and set a password for anything sensitive.
 - Nothing sensitive lives in the code. No tokens, Account IDs, or KV ids are committed. Use `<...>` placeholders in any public repo.

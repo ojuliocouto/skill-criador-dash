@@ -239,3 +239,73 @@ test('timeseries: fallback sum quando MetricDef nao tem agg', () => {
   // avg(10,30)=20 nao aparece; sum=40 vira o tick central.
   assert.ok(/chart__ytick[^>]*>40</.test(html), 'timeseries fallback sum soma 10+30=40');
 });
+
+// ---------- HARDENING fix 1: contrato explicito do bucketAggFor ----------
+// Slot e metric-key sao namespaces diferentes. So herdamos o agg quando a
+// MetricDef e, sem ambiguidade, a metrica-BASE do proprio slot (key == slot E
+// column == slot). Uma metrica que apenas COLIDE de nome com o slot (mas agrega
+// outra coluna) NAO pode emprestar seu agg: cairia no bug silencioso avg<->sum.
+
+test('ranking: NAO herda agg de metrica que so colide de nome (column != slot)', () => {
+  // Metrica 'nota' existe, agg avg, mas descreve OUTRA coluna ('outra'), nao o
+  // slot 'nota'. O contrato manda ignorar esse agg e cair no fallback sum.
+  const template = {
+    metrics: [{ key: 'nota', label: 'Nota', agg: 'avg', column: 'outra', format: 'number' }],
+  };
+  const item = { widget: 'ranking', props: { dimensionSlot: 'canal', valueSlot: 'nota' } };
+  const html = registry.ranking.toHtml(item, { template, dataset, colMap, findMetricDef, card });
+  assert.ok(html.includes('40'), 'colisao de namespace cai no fallback sum (10+30=40)');
+  assert.ok(!html.includes('>20<'), 'nao pegou avg da metrica que so colide de nome');
+});
+
+test('ranking: herda agg quando a MetricDef e a base do slot (key==slot E column==slot)', () => {
+  // Casamento estrito: key 'nota' e column 'nota' == o slot. Ai sim herda o avg.
+  const template = {
+    metrics: [{ key: 'nota', label: 'Nota', agg: 'avg', column: 'nota', format: 'number' }],
+  };
+  const item = { widget: 'ranking', props: { dimensionSlot: 'canal', valueSlot: 'nota' } };
+  const html = registry.ranking.toHtml(item, { template, dataset, colMap, findMetricDef, card });
+  assert.ok(html.includes('20'), 'metrica-base do slot empresta o avg (20)');
+  assert.ok(!html.includes('40'), 'nao caiu no sum');
+});
+
+test('timeseries: colisao de namespace tambem cai no fallback sum', () => {
+  const template = {
+    metrics: [{ key: 'nota', label: 'Nota', agg: 'avg', column: 'outra', format: 'number' }],
+  };
+  const item = { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'nota' } };
+  const html = registry.timeseries.toHtml(item, { template, dataset, colMap, findMetricDef, card });
+  assert.ok(/chart__ytick[^>]*>40</.test(html), 'fallback sum (tick 40), nao o avg da metrica homonima');
+});
+
+// Trava o comportamento dos 3 dominios reais: o valueSlot dos widgets
+// ranking/timeseries agrega por 'sum' em todos (investimento/valor/atendimentos
+// sao colunas de VOLUME). Garante que o fix 1 nao mudou nada observavel neles.
+test('dominios reais: ranking/timeseries seguem agregando por sum', async () => {
+  const mods = await Promise.all([
+    import('../public/assets/js/templates/marketing.js'),
+    import('../public/assets/js/templates/vendas.js'),
+    import('../public/assets/js/templates/suporte.js'),
+  ]);
+  // Dataset: 2 linhas mesmo canal/data, valores 10 e 30 -> sum 40, avg 20.
+  const rowsVol = [
+    { C: '10', D: '01/01/2026', G: 'X' },
+    { C: '30', D: '01/01/2026', G: 'X' },
+  ];
+  const ds = { rows: rowsVol, columns: ['C', 'D', 'G'] };
+  for (const { template } of mods) {
+    for (const item of template.layout) {
+      if (item.widget !== 'ranking' && item.widget !== 'timeseries') continue;
+      const cm = {};
+      cm[item.props.valueSlot] = 'C';
+      if (item.props.dateSlot) cm[item.props.dateSlot] = 'D';
+      if (item.props.dimensionSlot) cm[item.props.dimensionSlot] = 'G';
+      const html = registry[item.widget].toHtml(item, { template, dataset: ds, colMap: cm, findMetricDef, card });
+      if (item.widget === 'ranking') {
+        assert.ok(html.includes('40'), `${template.id}/${item.props.valueSlot}: ranking soma (sum=40)`);
+      } else {
+        assert.ok(/chart__ytick[^>]*>40</.test(html), `${template.id}/${item.props.valueSlot}: timeseries soma (sum=40)`);
+      }
+    }
+  }
+});

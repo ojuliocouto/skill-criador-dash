@@ -74,6 +74,21 @@ test('ratio retorna 0 quando denominador é zero', () => {
   assert.equal(computeMetric(def, rows, colMap, computed), 0);
 });
 
+// ROBUSTEZ (metrics.js ratio): o resultado precisa degradar para 0 quando nao for
+// finito (Infinity/-Infinity/NaN), espelhando o guard do caso 'derived'. Sem isso,
+// um numerador/denominador nao-finito (ou 0/0) vazava Infinity/NaN pro UI.
+test('ratio degrada para 0 quando o resultado nao e finito', () => {
+  const def = { key: 'x', agg: 'ratio', ratioOf: ['num', 'den'] };
+  // den 0 (ja coberto) mais bases nao-finitas:
+  assert.equal(computeMetric(def, rows, colMap, { num: 10, den: 0 }), 0);      // divisao por zero
+  assert.equal(computeMetric(def, rows, colMap, { num: Infinity, den: 2 }), 0); // numerador Infinity
+  assert.equal(computeMetric(def, rows, colMap, { num: 2, den: Infinity }), 0); // denominador Infinity
+  assert.equal(computeMetric(def, rows, colMap, { num: NaN, den: 2 }), 0);      // numerador NaN
+  assert.equal(computeMetric(def, rows, colMap, { num: -Infinity, den: 3 }), 0);
+  // caso normal continua valendo
+  assert.equal(computeMetric(def, rows, colMap, { num: 35, den: 3500 }), 35 / 3500);
+});
+
 test('derived chama def.compute', () => {
   const receita = computeMetric({ key: 'receita', agg: 'sum', column: 'receita' }, rows, colMap);
   const investimento = computeMetric({ key: 'investimento', agg: 'sum', column: 'investimento' }, rows, colMap);

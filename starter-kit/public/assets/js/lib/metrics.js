@@ -102,7 +102,11 @@ export function computeMetric(def, rows, colMap, computed = {}) {
       const [numKey, denKey] = def.ratioOf || [];
       const num = Number(computed[numKey]) || 0;
       const den = Number(computed[denKey]) || 0;
-      return den === 0 ? 0 : num / den;
+      const out = den === 0 ? 0 : num / den;
+      // Guard de finitude (espelha o caso 'derived'): se o resultado nao for
+      // finito (Infinity/-Infinity/NaN, ex numerador/denominador nao-finito),
+      // degrada pra 0 em vez de vazar Infinity/NaN pro UI.
+      return Number.isFinite(out) ? out : 0;
     }
     case 'derived': {
       if (typeof def.compute !== 'function') return 0;

@@ -8,6 +8,8 @@ export const template = {
   label: 'Suporte',
   // Metrica sugerida para a meta opcional (meta vs realizado).
   primaryMetric: 'atendimentos',
+  // Slot semantico do eixo de TEMPO (usado pela tendencia no dashboard.js).
+  dateSlot: 'data',
   slots: [
     { key: 'data', label: 'Data', required: true, aliases: ['data', 'dia', 'date'] },
     { key: 'canal', label: 'Canal', required: false, aliases: ['canal', 'origem', 'fila', 'setor', 'time'] },

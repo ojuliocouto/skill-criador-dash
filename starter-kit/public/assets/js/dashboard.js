@@ -97,6 +97,18 @@ export function buildTrends(metrics, curRows, prevRows, colMap) {
 }
 
 /**
+ * Resolve o slot semantico do eixo de TEMPO a partir do contrato do template.
+ * LE de template.dateSlot (declarado por cada dominio), em vez de assumir 'data'.
+ * Fallback seguro pra 'data' quando o template nao declara (ex: template custom
+ * antigo), preservando o comportamento historico.
+ * @param {object|null|undefined} template
+ * @returns {string}
+ */
+export function resolveDateSlot(template) {
+  return (template && template.dateSlot) || 'data';
+}
+
+/**
  * Monta o progresso da meta (meta vs realizado) para a metrica configurada.
  * config.goal = { metricKey, value }. Retorna { metricKey, pct, text } ou null.
  */
@@ -334,8 +346,11 @@ async function init() {
   // 5. Metricas + tendencia (2a metade vs 1a metade do periodo) + render
   const colMap = config.colMap || {};
   const computed = computeAll(template.metrics, dataset.rows, colMap);
-  const tsItem = (template.layout || []).find((l) => l.widget === 'timeseries');
-  const dateSlot = (tsItem && tsItem.props && tsItem.props.dateSlot) || 'data';
+  // Eixo de tempo da tendencia: LE do contrato do template (resolveDateSlot ->
+  // template.dateSlot), em vez de assumir 'data' ou fisgar do widget timeseries.
+  // Mantem o dashboard slot-agnostico: um dominio que nomeie o slot de tempo de
+  // outra forma so precisa declarar dateSlot no proprio template.
+  const dateSlot = resolveDateSlot(template);
   const { current, previous } = splitByPeriod(dataset.rows, colMap, dateSlot);
   const trends = buildTrends(template.metrics, current, previous, colMap);
   const goal = buildGoal(config, computed);
