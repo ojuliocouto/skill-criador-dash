@@ -3,6 +3,11 @@
 // - Cache opcional em DASHBOARD_CACHE (KV) só para GET de /api/connectors/*.
 // - Nunca cacheia /api/dashboards (dados mutáveis).
 // - Sempre devolve Cache-Control: no-store ao browser.
+// - Enriquece o <head> da PAGINA do dashboard com titulo/descricao/OpenGraph do
+//   dashboard (preview de link): o crawler nao roda JS, entao vem do servidor.
+
+import { buildMeta, metaTagsHtml } from './lib/og.mjs';
+import { needsAuth } from './lib/auth-config.mjs';
 
 // So expomos GET para cross-origin (leitura). POST/DELETE ficam de fora do CORS:
 // mutacao e same-origin (as proprias paginas), entao o browser bloqueia mutacao
@@ -71,6 +76,41 @@ export function shouldCache(status, contentType, body) {
   return status === 200 && String(contentType || '').includes('application/json') && isCacheableBody(body);
 }
 
+// Injeta titulo + descricao + tags OpenGraph/Twitter + theme-color + favicon
+// tingido no HTML da pagina do dashboard, lendo a config do KV pelo id da URL.
+// So age no HTML de /dashboard(.html) com ?id=; qualquer outra coisa passa direto.
+// Dashboard protegido nao vaza nome/dominio (buildMeta cai no generico). HTMLRewriter
+// e streaming (nativo do Pages), nao carrega o HTML todo na memoria.
+async function maybeInjectDashboardMeta(request, env, response) {
+  try {
+    if (request.method.toUpperCase() !== 'GET') return response;
+    const ct = response.headers.get('content-type') || '';
+    if (!ct.includes('text/html')) return response; // pula redirect 308 e assets nao-HTML
+    const url = new URL(request.url);
+    if (url.pathname !== '/dashboard' && url.pathname !== '/dashboard.html') return response;
+    const id = url.searchParams.get('id');
+    if (!id) return response;
+    const kv = env && env.DASHBOARDS_KV;
+    if (!kv) return response;
+
+    let config = null;
+    let isProtected = false;
+    const raw = await kv.get('dash:' + id);
+    if (raw) {
+      try { config = JSON.parse(raw); isProtected = needsAuth(config); } catch { config = null; }
+    }
+    const meta = buildMeta(config, { id, origin: url.origin, isProtected });
+    const tags = metaTagsHtml(meta);
+    return new HTMLRewriter()
+      .on('title', { element(el) { el.setInnerContent(meta.title); } })
+      .on('link[rel="icon"]', { element(el) { el.setAttribute('href', meta.faviconHref); } })
+      .on('head', { element(el) { el.append(tags, { html: true }); } })
+      .transform(response);
+  } catch {
+    return response; // qualquer falha: serve o HTML original, sem enriquecer
+  }
+}
+
 export async function onRequest(context) {
   const { request, env, next } = context;
   const method = request.method.toUpperCase();
@@ -90,7 +130,8 @@ export async function onRequest(context) {
 
   if (!cacheavel) {
     const response = await next();
-    return withHeaders(response);
+    const enriched = await maybeInjectDashboardMeta(request, env, response);
+    return withHeaders(enriched);
   }
 
   // A chave inclui o header de senha: assim um pedido SEM a senha (ou com senha

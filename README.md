@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (510 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (520 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -39,6 +39,7 @@ The person chooses per dashboard:
 - Built-in client-side filters: a filter bar (period from/to plus one selector per categorical dimension) recomputes every KPI, trend, funnel, series, ranking and table in the browser on change, without reloading or re-hitting the source.
 - Dashboard groups (tabs): combine several dashboards of the same business under a single link with tabs (`kind:'group'` config). Each tab lazy-loads its child dashboard with its own filters; the active tab is reflected in the URL. Create one from the landing page ('New group' wizard) or via the API.
 - Configs stored in Cloudflare KV; optional 5-minute data cache.
+- Per-dashboard link previews (OpenGraph): sharing a dashboard link shows a card with the dashboard name, a per-domain description, a brand-colored 1200x630 image, `theme-color`, and a tinted favicon. Injected server-side (a Pages Function rewrites the page `<head>` from the KV config, since link crawlers do not run JS); the image is a self-hosted SVG at `/og?id=`. Password-protected dashboards do not leak their name (generic card, `noindex`). Note: the SVG image renders on most platforms; WhatsApp/Facebook may show only the title and description.
 
 ## Architecture (3 layers)
 
@@ -91,7 +92,7 @@ For the MVP data source (Google Sheets or CSV) you need no token, no OAuth, and 
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 510 unit tests: node --test 'test/*.test.js'
+npm test                      # 520 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
@@ -206,7 +207,7 @@ starter-kit/
 
 ## Testing
 
-There are 510 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 520 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit

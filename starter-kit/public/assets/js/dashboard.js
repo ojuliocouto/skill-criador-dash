@@ -445,6 +445,9 @@ function applyAccent(config) {
 // Reusado pelo dashboard normal (container = #app) e por cada aba de um grupo
 // (container = #tabpanel, com showHeader:false). Devolve true no sucesso.
 async function loadDashboardInto(container, config, id, opts = {}) {
+  // Titulo da aba do navegador reflete o dashboard (ou a aba ativa de um grupo).
+  // O preview de LINK ja vem do servidor (middleware); isto e so a aba aberta.
+  if (config && config.name) document.title = config.name;
   const template = getTemplate(config.domain);
   if (!template) {
     showError(container, `Dominio desconhecido: ${config.domain}.`, {

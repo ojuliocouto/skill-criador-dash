@@ -220,6 +220,18 @@ Estética (anti-"cara de IA", nível ferramenta premium tipo Linear/Vercel, NÃO
   em `--font-mono`. Antes de mexer no visual, rode a auditoria adversarial anti-IA (subagent crítico) e
   confira nos DOIS temas, como manda a doutrina do dono.
 
+Preview de link (OpenGraph) por dashboard: quando alguém compartilha o link (WhatsApp/Slack/etc.), o
+card mostra o NOME do dashboard, uma descrição por domínio e uma imagem branded na cor da marca. Como o
+crawler não roda JS, o `_middleware.js` injeta no SERVIDOR (via HTMLRewriter, streaming) no `<head>` de
+`/dashboard(.html)?id=`: `<title>`, `description`, `og:*`/`twitter:*`, `theme-color` (accent) e a favicon
+tingida com a cor, lendo a config do KV pelo id. A imagem OG (1200x630) é um SVG branded servido pela rota
+`/og?id=` (`functions/og.js`). Lógica pura em `functions/lib/og.mjs` (`buildMeta`/`metaTagsHtml`/`ogImageSvg`/
+`faviconDataUri`, testada em `test/og.test.js`); o `dashboard.js` também seta o `document.title` da aba.
+Dashboard protegido por senha NÃO vaza nome/domínio (cai no texto/imagem genérico, `noindex`). CAVEAT: og:image
+é SVG (dependency-free, casa com o resto da skill) e renderiza na maioria das plataformas; WhatsApp/Facebook às
+vezes não mostram imagem SVG (o título e a descrição aparecem sempre). Se precisar da IMAGEM no WhatsApp, aí
+sim precisaria de um gerador raster (PNG via workers-og/WASM), que quebra o "dependency-free" e seria opt-in.
+
 Árvore de arquivos (`starter-kit/`, sem node_modules):
 ```
 ARCHITECTURE.md                 contratos das 3 camadas (fonte da verdade)
@@ -227,7 +239,8 @@ package.json  wrangler.toml
 db/schema.sql                   tabela de snapshots do modo historico (D1)
 examples/                       marketing-exemplo.csv, vendas-exemplo.csv, suporte-exemplo.csv
 functions/
-  _middleware.js                CORS + cache KV (5 min, só /api/connectors/*) + security headers (CSP etc)
+  _middleware.js                CORS + cache KV + security headers (CSP) + injeta OpenGraph no HTML do dashboard
+  og.js                         rota /og?id= : imagem de preview (SVG branded na cor da marca)
   api/
     dashboards.js               CRUD das configs no KV + gate de senha + strip de segredos
     connectors/
@@ -244,6 +257,7 @@ functions/
     auth-config.mjs             needsAuth/authOk (PBKDF2 salgado)/safeEqual/checkAdminToken (neutro)
     rate-limit.mjs              rate limiter em KV (gate de senha + preview Meta)
     domains.mjs                 lista DOMAINS do servidor (valida o POST); paridade com a do browser
+    og.mjs                      metadados de preview de link (buildMeta/metaTagsHtml/ogImageSvg, puro)
 workers/
   snapshot/ src/index.js        Worker com cron que grava snapshots no D1 (SNAPSHOT_FETCHERS)
 public/
