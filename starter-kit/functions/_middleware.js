@@ -16,9 +16,23 @@ const CORS = {
 
 const CACHE_TTL = 300; // segundos
 
+// Headers de seguranca (defesa em profundidade) aplicados a TODAS as respostas.
+// - X-Content-Type-Options: impede o browser de "adivinhar" (sniff) o tipo do conteudo.
+// - X-Frame-Options: nega enquadrar as paginas em iframe (anti-clickjacking).
+// - Content-Security-Policy: politica PRAGMATICA que NAO quebra o app.
+//   'unsafe-inline' em script-src e style-src e NECESSARIO porque as paginas usam
+//   um <script> inline (anti-flash de tema no head) e os widgets usam atributos
+//   style="..." inline. Isso e uma camada extra, nao a unica protecao.
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Content-Security-Policy':
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+};
+
 function withHeaders(response, extra = {}) {
   const headers = new Headers(response.headers);
-  for (const [k, v] of Object.entries({ ...CORS, 'Cache-Control': 'no-store', ...extra })) {
+  for (const [k, v] of Object.entries({ ...CORS, ...SECURITY_HEADERS, 'Cache-Control': 'no-store', ...extra })) {
     headers.set(k, v);
   }
   return new Response(response.body, {

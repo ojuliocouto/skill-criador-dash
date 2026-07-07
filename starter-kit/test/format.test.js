@@ -6,6 +6,7 @@ import {
 
 test('parseNumberBR: formato brasileiro', () => {
   assert.equal(parseNumberBR('1.234,56'), 1234.56);
+  assert.equal(parseNumberBR('1.500'), 1500);       // milhar de 3 digitos sem decimal
   assert.equal(parseNumberBR('1.234'), 1234);       // milhar BR sem decimal
   assert.equal(parseNumberBR('0,5'), 0.5);
   assert.equal(parseNumberBR('R$ 1.234,50'), 1234.5);

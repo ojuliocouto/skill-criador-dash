@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (194 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (221 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -87,7 +87,7 @@ For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 194 unit tests: node --test 'test/*.test.js'
+npm test                      # 221 unit tests: node --test 'test/*.test.js'
 wrangler pages dev public     # local dev server with Functions + KV
 ```
 
@@ -189,32 +189,12 @@ starter-kit/
           funnel.js
           table.js
           ranking.js
-  test/                       # 20 test files, all green (node --test test/*.test.js)
-    csv.test.js
-    format.test.js
-    metrics.test.js
-    templates.test.js
-    widgets.test.js
-    render.test.js
-    wizard.test.js
-    dashboards.test.js
-    middleware.test.js
-    auth.test.js
-    meta.test.js
-    snapshots.test.js
-    trends.test.js
-    vendas-metrics.test.js
-    suporte-metrics.test.js
-    automap.test.js
-    handlers.test.js          # dashboards API handlers + password/data gates
-    admin-token.test.js       # optional global ADMIN_TOKEN gate on POST/DELETE
-    worker-cron.test.js       # the historical-mode scheduled() handler
-    worker-parity.test.js     # guards the snapshot worker against parser drift
+  test/                       # unit + handler + security + parity tests (node --test)
 ```
 
 ## Testing
 
-There are 194 unit tests, all green, written before the code (TDD). They cover the pure logic: CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, the wizard flow, and the dashboards CRUD.
+There are 221 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit

@@ -14,6 +14,7 @@ import {
   sheetUrlToCsv as workerSheetUrlToCsv,
   buildInsightsUrl as workerBuildInsightsUrl,
   mapInsightsToDataSet as workerMapInsightsToDataSet,
+  insertSnapshotSQL as workerInsertSnapshotSQL,
 } from '../workers/snapshot/src/index.js';
 import { parseCSV as libParseCSV } from '../functions/lib/csv.mjs';
 import { sheetUrlToCsv as libSheetUrlToCsv } from '../functions/lib/sheets-url.mjs';
@@ -21,6 +22,7 @@ import {
   buildInsightsUrl as libBuildInsightsUrl,
   mapInsightsToDataSet as libMapInsightsToDataSet,
 } from '../functions/lib/meta.mjs';
+import { insertSnapshotSQL as libInsertSnapshotSQL } from '../functions/lib/snapshots.mjs';
 import { sheetUrlToCsv as connectorSheetUrlToCsv } from '../functions/api/connectors/sheets.js';
 
 test('paridade: worker usa a MESMA função parseCSV do lib (identidade)', () => {
@@ -103,5 +105,33 @@ test('paridade: mapInsightsToDataSet produz o mesmo DataSet no worker e no lib',
       workerMapInsightsToDataSet(apiJson),
       libMapInsightsToDataSet(apiJson),
     );
+  }
+});
+
+test('paridade: worker usa a MESMA função insertSnapshotSQL do lib (identidade)', () => {
+  // O Worker NÃO monta o INSERT do snapshot inline: ele importa e reexporta a
+  // função pura de functions/lib/snapshots.mjs. Se alguém recolocar SQL inline
+  // no Worker, esta identidade quebra.
+  assert.strictEqual(workerInsertSnapshotSQL, libInsertSnapshotSQL);
+});
+
+test('paridade: insertSnapshotSQL gera o mesmo sql/params no worker e no lib', () => {
+  const capturedAt = '2026-07-06T10:00:00.000Z';
+  const casos = [
+    ['dash-a', { columns: ['nome', 'valor'], rows: [['Ana', 30]], meta: { source: 'sheets' } }],
+    ['dash-b', { columns: [], rows: [], meta: { source: 'meta', rowCount: 0 } }],
+    [42, { columns: ['x'], rows: [[1], [2], [3]] }],
+  ];
+  for (const [dashboardId, dataset] of casos) {
+    const doWorker = workerInsertSnapshotSQL(dashboardId, capturedAt, dataset);
+    const doLib = libInsertSnapshotSQL(dashboardId, capturedAt, dataset);
+    assert.deepStrictEqual(doWorker, doLib);
+    // E confere o contrato posicional do INSERT (dashboard_id, captured_at, dataset_json).
+    assert.match(doWorker.sql, /INSERT INTO snapshots \(dashboard_id, captured_at, dataset_json\) VALUES \(\?, \?, \?\)/);
+    assert.deepStrictEqual(doWorker.params, [
+      String(dashboardId),
+      capturedAt,
+      JSON.stringify(dataset),
+    ]);
   }
 });

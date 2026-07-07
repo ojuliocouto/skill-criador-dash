@@ -91,6 +91,15 @@ Conectores de 2a onda (fora do MVP, deixar como stub documentado): `crm.js`, `ho
 Os conectores por id (`d1.js`, `meta-ads.js` GET) checam a senha do dashboard antes de devolver
 dados, importando `needsAuth`/`authOk` de `functions/lib/auth-config.mjs` (modulo neutro, nao de `dashboards.js`).
 
+PONTOS DE PLUGAGEM (um conector de fonte VIVA nao e so o arquivo do handler). Pra ser usado ponta a
+ponta, um novo `source.type` precisa ser ligado em:
+1. `functions/api/connectors/<nome>.js` (o handler que devolve o DataSet).
+2. `public/assets/js/lib/api-client.js`: um branch em `fetchDataForSource(source, id)`.
+3. `public/assets/js/config-wizard.js`: um card no passo Fonte (e, se aplicavel, em `podeHistorico`).
+4. `workers/snapshot/src/index.js`: um branch em `fetchDataSet` (se a fonte deve entrar no modo historico).
+5. `public/assets/js/dashboard.js`: ja roteia por `storage` (ao vivo x d1); rotulo amigavel em `sourceLabel`.
+Sheets/CSV/Meta ja estao ligados nos 5. Um handler solto, sem esses pontos, nunca e chamado.
+
 ---
 
 ## Contrato 3: Camada de métricas (pura, browser + node)

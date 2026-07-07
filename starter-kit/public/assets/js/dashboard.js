@@ -17,9 +17,11 @@ const DEFAULT_ACCENT = '#6d28d9';
 
 /**
  * Decide a cor do texto que fica SOBRE o accent (fundo de botao, chip ativo).
- * Calcula a luminancia relativa (WCAG) do accent e devolve texto escuro em
- * accent claro (amarelo, ciano, lima) ou texto branco em accent escuro.
- * Hex invalido cai no fallback seguro '#fff' (o accent padrao e escuro).
+ * Em vez de um limiar de luminancia (que reprova WCAG em accents de tom medio),
+ * calcula a razao de contraste REAL do accent contra texto escuro (#111) e
+ * contra texto branco (#fff) e devolve a cor de MAIOR contraste. Empate ou
+ * dominio do escuro devolve '#111'. Hex invalido cai no fallback '#fff'
+ * (o accent padrao e escuro).
  *
  * @param {string} hex cor do accent (#rgb ou #rrggbb)
  * @returns {'#111'|'#fff'}
@@ -39,9 +41,20 @@ export function accentForeground(hex) {
     const s = c / 255;
     return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
   };
-  const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  // Limiar 0.5: acima disso o accent e claro, entao texto escuro contrasta melhor.
-  return luminance > 0.5 ? '#111' : '#fff';
+  const lum = (rr, gg, bb) => 0.2126 * lin(rr) + 0.7152 * lin(gg) + 0.0722 * lin(bb);
+  // Razao de contraste WCAG: (L_claro + 0.05) / (L_escuro + 0.05).
+  const contrast = (l1, l2) => {
+    const hi = Math.max(l1, l2);
+    const lo = Math.min(l1, l2);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const lumAccent = lum(r, g, b);
+  const lumBlack = lum(0x11, 0x11, 0x11); // texto escuro #111
+  const lumWhite = lum(0xff, 0xff, 0xff); // texto branco #fff
+  const crBlack = contrast(lumAccent, lumBlack);
+  const crWhite = contrast(lumAccent, lumWhite);
+  // Escolhe a cor com MAIOR razao de contraste (empate favorece o escuro).
+  return crBlack >= crWhite ? '#111' : '#fff';
 }
 
 /**

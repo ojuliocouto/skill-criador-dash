@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PECAS (biblioteca provada em `starter-kit/`)
 
-Codigo real e testado (194 testes verdes, TDD). Voce compoe a partir daqui.
+Codigo real e testado (221 testes verdes, TDD). Voce compoe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Nao sabem de metricas.
@@ -177,7 +177,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           194 testes (npm test  ->  node --test test/*.test.js)
+test/                           221 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local:
@@ -237,11 +237,17 @@ wrangler d1 create dashboard-db
 # imprime database_id = "..."; cole em workers/snapshot/wrangler.toml (DASHBOARD_DB) e no binding D1 do Pages
 wrangler d1 execute dashboard-db --remote --file db/schema.sql   # cria a tabela snapshots no D1 REMOTO
 ```
-Em `workers/snapshot/wrangler.toml`, preencha os bindings DASHBOARD_DB (D1) e DASHBOARDS_KV (o mesmo do Pages), e o cron.
+Em `workers/snapshot/wrangler.toml`, preencha os bindings DASHBOARD_DB (D1) e DASHBOARDS_KV, e o cron.
+ATENCAO: o `id` do `DASHBOARDS_KV` tem que ser EXATAMENTE o MESMO nos dois arquivos (raiz e worker) e
+o mesmo namespace do Pages. Se divergir, o cron lista o prefixo `dash:` num KV vazio e nao captura nada,
+sem erro visivel.
 ```
 cd workers/snapshot && wrangler deploy                 # sobe o Worker com cron trigger (captura de hora em hora)
 ```
-No projeto Pages > Settings > Bindings, adicione o binding D1 `DASHBOARD_DB` apontando pro mesmo banco (pro `d1.js` ler).
+PASSO QUE NAO PODE FALTAR (senao o dashboard historico cai no 500 do d1.js mesmo com o cron gravando):
+vincule o binding D1 no PAGES. Duas formas: (a) descomente o bloco `[[d1_databases]]` do `wrangler.toml`
+da raiz e cole o `database_id`, e re-deploy o Pages; ou (b) no painel Pages > seu projeto > Settings >
+Bindings > add D1 binding `DASHBOARD_DB` apontando pro mesmo banco.
 A primeira captura acontece no proximo disparo do cron (de hora em hora), entao o dashboard mostra
 "Ainda nao ha dados capturados" ate la (nao esta quebrado). Para ver dado NA HORA, force uma captura:
 ```

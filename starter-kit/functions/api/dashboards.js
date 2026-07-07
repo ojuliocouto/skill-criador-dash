@@ -63,6 +63,10 @@ function erro(mensagem, status) {
 const PREFIX = 'dash:';
 const kvKey = (id) => `${PREFIX}${id}`;
 
+// Cor hex valida: #rgb ou #rrggbb. Validar no servidor evita injetar valor
+// arbitrario numa CSS custom property (--accent) via config.accent.
+const HEX_COLOR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
+
 /**
  * Trava global opcional de mutacao. Se env.ADMIN_TOKEN estiver definido, exige o
  * header x-admin-token igual a ele (comparacao em tempo constante). Devolve uma
@@ -186,6 +190,13 @@ async function create(kv, request, providedHash) {
   if (!config.colMap || typeof config.colMap !== 'object') faltando.push('colMap');
   if (faltando.length) {
     return erro(`Campos obrigatórios ausentes: ${faltando.join(', ')}.`, 400);
+  }
+
+  // Valida a cor de destaque no servidor: se vier e nao for hex (#rgb/#rrggbb),
+  // rejeita com 400. Sem isso, um valor arbitrario iria parar numa CSS custom
+  // property (ex: '); background:url(x)') e viraria vetor de injecao.
+  if (config.accent != null && !HEX_COLOR.test(String(config.accent))) {
+    return erro('Cor de destaque (accent) inválida. Use um hexadecimal como #7c3aed ou #abc.', 400);
   }
 
   if (!config.id) config.id = slugify(config.name);

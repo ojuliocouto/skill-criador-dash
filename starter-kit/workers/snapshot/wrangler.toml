@@ -24,4 +24,4 @@ database_id = "<SEU_D1_ID>"
 # KV com as configs dos dashboards (mesmo namespace do Pages, chaves dash:<id>).
 [[kv_namespaces]]
 binding = "DASHBOARDS_KV"
-id = "<SEU_KV_ID>"
+id = "<SEU_KV_NAMESPACE_ID>"

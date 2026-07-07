@@ -13,13 +13,12 @@
 import { parseCSV } from '../../../functions/lib/csv.mjs';
 import { sheetUrlToCsv } from '../../../functions/lib/sheets-url.mjs';
 import { buildInsightsUrl, mapInsightsToDataSet } from '../../../functions/lib/meta.mjs';
+import { insertSnapshotSQL } from '../../../functions/lib/snapshots.mjs';
 
 // Reexporta a lógica pura compartilhada para que o teste de paridade
 // (test/worker-parity.test.js) possa importar daqui e conferir que é a MESMA
 // função usada pelos conectores de Pages, sem cópia inline no Worker.
-export { parseCSV, sheetUrlToCsv, buildInsightsUrl, mapInsightsToDataSet };
-
-const TABLE = 'snapshots';
+export { parseCSV, sheetUrlToCsv, buildInsightsUrl, mapInsightsToDataSet, insertSnapshotSQL };
 
 export default {
   /**
@@ -58,8 +57,9 @@ export default {
         const dataset = await fetchDataSet(type, source);
         if (!dataset) continue;
 
-        const sql = `INSERT INTO ${TABLE} (dashboard_id, captured_at, dataset_json) VALUES (?, ?, ?)`;
-        const params = [String(config.id), capturedAt, JSON.stringify(dataset)];
+        // Monta o INSERT pela MESMA função pura que os handlers de Pages usam
+        // (functions/lib/snapshots.mjs). Zero SQL inline aqui: sem drift.
+        const { sql, params } = insertSnapshotSQL(config.id, capturedAt, dataset);
         await env.DASHBOARD_DB.prepare(sql).bind(...params).run();
 
         console.log(`snapshot: gravado ${config.id} (${dataset.rows.length} linhas).`);
