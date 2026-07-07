@@ -90,7 +90,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PEÇAS (biblioteca provada em `starter-kit/`)
 
-Código real e testado (448 testes verdes, TDD). Você compõe a partir daqui.
+Código real e testado (450 testes verdes, TDD). Você compõe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Não sabem de métricas.
@@ -201,7 +201,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js  color.js  html.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           448 testes (npm test  ->  node --test test/*.test.js)
+test/                           450 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local (o `npm run dev` já embute a `--compatibility-date` do `package.json`):

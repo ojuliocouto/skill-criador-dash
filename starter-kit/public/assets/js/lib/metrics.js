@@ -166,6 +166,11 @@ export function groupBy(rows, colMap, dimensionSlot, valueSlot, agg = 'sum') {
       if (valueSlot == null || isNonEmpty(cellRaw(row, valueSlot, colMap, safeRows))) {
         buckets.get(key).push(1);
       }
+    } else if (agg === 'countDistinct') {
+      // countDistinct conta valores DISTINTOS por string (igual ao computeMetric),
+      // nao pela via numerica. Antes, coluna de texto virava NaN e o bucket zerava.
+      const raw = cellRaw(row, valueSlot, colMap, safeRows);
+      if (isNonEmpty(raw)) buckets.get(key).push(String(raw).trim());
     } else {
       const n = parseNumberBR(cellRaw(row, valueSlot, colMap, safeRows));
       if (Number.isFinite(n)) buckets.get(key).push(n);
@@ -198,6 +203,10 @@ export function timeSeries(rows, colMap, dateSlot, valueSlot, agg = 'sum') {
       if (valueSlot == null || isNonEmpty(cellRaw(row, valueSlot, colMap, safeRows))) {
         buckets.get(iso).push(1);
       }
+    } else if (agg === 'countDistinct') {
+      // countDistinct por string (ver groupBy): coluna de texto contava 0 antes.
+      const raw = cellRaw(row, valueSlot, colMap, safeRows);
+      if (isNonEmpty(raw)) buckets.get(iso).push(String(raw).trim());
     } else {
       const n = parseNumberBR(cellRaw(row, valueSlot, colMap, safeRows));
       if (Number.isFinite(n)) buckets.get(iso).push(n);

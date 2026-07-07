@@ -42,11 +42,14 @@ export function parseNumberBR(v) {
     // digitos, e milhar -> remove as virgulas ('1,234' -> 1234, '1,000,000' -> 1000000).
     // Caso contrario e decimal BR -> troca virgula por ponto ('1,23' -> 1.23, '1,5' -> 1.5).
     const grupos = s.split(',');
-    const primeiroTemDigitos = /^\d{1,3}$/.test(grupos[0]);
+    // o primeiro grupo pode ter sinal (ex '-1,000' -> ['-1','000']); os demais
+    // sao grupos de milhar de 3 digitos. Sem aceitar o sinal aqui, um milhar US
+    // negativo caia no ramo decimal e encolhia ~1000x (ou virava NaN).
+    const primeiroTemDigitos = /^[+-]?\d{1,3}$/.test(grupos[0]);
     const restoGrupoDe3 = grupos.slice(1).every((p) => /^\d{3}$/.test(p));
     const looksThousand = grupos.length > 1 && primeiroTemDigitos && restoGrupoDe3;
     if (looksThousand) s = grupos.join('');
-    else s = s.replace(',', '.');
+    else s = s.replace(/,/g, '.');
   } else if (hasDot) {
     // So ponto, ambiguo (ex '100.000' pode ser 100 mil ou 100.0).
     // HEURISTICA (limitacao conhecida e AMBIGUA): se cada grupo apos o 1o ponto
