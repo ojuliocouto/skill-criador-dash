@@ -387,6 +387,80 @@ test('dashboards GET protegido: brute force da senha estoura em 429', async () =
   assert.equal(ok.status, 200, 'uso legitimo nao pode tomar 429');
 });
 
+// 8d. IDENTIDADE VISUAL (logo): logo https valido -> 200 e PERSISTE (entra na
+//     config gravada e volta no GET, pois nao e segredo).
+test('dashboards POST com logo https valido -> 200 e persiste', async () => {
+  const kv = fakeKV();
+  const logo = 'https://cdn.exemplo.com/marca/logo.png';
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ id: 'com-logo', logo }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+  );
+  assert.equal(res.status, 200);
+  const j = await readJSON(res);
+  assert.equal(j.logo, logo, 'logo volta na resposta (nao e segredo)');
+  // Persistido no KV.
+  const stored = JSON.parse(kv._map.get('dash:com-logo'));
+  assert.equal(stored.logo, logo, 'logo gravado no KV');
+  // E sobrevive ao GET (stripSecrets nao remove).
+  const got = await dashboards(ctx('GET', { id: 'com-logo', env: { DASHBOARDS_KV: kv } }));
+  assert.equal((await readJSON(got)).logo, logo);
+});
+
+// 8e. logo data:image valido -> 200.
+test('dashboards POST com logo data:image valido -> 200', async () => {
+  const kv = fakeKV();
+  const logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ logo }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+  );
+  assert.equal(res.status, 200);
+  assert.equal((await readJSON(res)).logo, logo);
+});
+
+// 8f. logo javascript: -> 400 (vetor de XSS, rejeitado).
+test('dashboards POST com logo javascript: -> 400', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ logo: 'javascript:alert(1)' }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+  );
+  assert.equal(res.status, 400);
+  assert.match((await readJSON(res)).error, /logo/i);
+  assert.equal(kv._map.size, 0, 'nao persiste logo inseguro');
+});
+
+// 8g. logo http:// -> 400 (exigimos https, http e rejeitado).
+test('dashboards POST com logo http:// -> 400', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ logo: 'http://x/logo.png' }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+  );
+  assert.equal(res.status, 400);
+  assert.match((await readJSON(res)).error, /logo/i);
+  assert.equal(kv._map.size, 0);
+});
+
+// 8h. accent2 (cor secundaria) hex valido -> 200 e persiste.
+test('dashboards POST com accent2 hex valido -> 200 e persiste', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ id: 'sec2', accent2: '#3cd3a4' }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+  );
+  assert.equal(res.status, 200);
+  assert.equal((await readJSON(res)).accent2, '#3cd3a4');
+  assert.equal(JSON.parse(kv._map.get('dash:sec2')).accent2, '#3cd3a4');
+});
+
+// 8i. accent2 invalido -> 400.
+test('dashboards POST com accent2 invalido -> 400', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ accent2: "'); background:url(x)" }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+  );
+  assert.equal(res.status, 400);
+  assert.match((await readJSON(res)).error, /accent2|secund/i);
+  assert.equal(kv._map.size, 0);
+});
+
 // ---------------------------------------------------------------------------
 // CONECTOR D1 (functions/api/connectors/d1.js)
 // ---------------------------------------------------------------------------

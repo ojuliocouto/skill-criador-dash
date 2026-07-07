@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (450 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (476 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -87,7 +87,7 @@ For the MVP data source (Google Sheets or CSV) you need no token, no OAuth, and 
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 450 unit tests: node --test 'test/*.test.js'
+npm test                      # 476 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
@@ -202,7 +202,7 @@ starter-kit/
 
 ## Testing
 
-There are 450 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 476 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit

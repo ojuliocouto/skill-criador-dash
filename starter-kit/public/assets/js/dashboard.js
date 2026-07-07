@@ -15,6 +15,7 @@ import { getWidget } from './widgets/index.js';
 import { getSource } from './sources/index.js';
 import { DEFAULT_ACCENT, aplicarAccent } from './lib/color.js';
 import { esc } from './lib/html.js';
+import { brandInnerHtml } from './lib/brand.js';
 
 /**
  * Agrupa itens de layout: kpis consecutivos viram um unico bloco 'kpis';
@@ -260,10 +261,12 @@ function renderDashboard(app, ctx) {
     `<p class="hint" style="margin-top:28px">${esc(metaBits)}</p>`;
 }
 
-// Preenche a topbar com nome + botoes de navegacao.
+// Preenche a topbar com a marca (logo seguro ou .dot + nome) + botoes de navegacao.
 function renderTopbar(config, id) {
-  const brand = document.querySelector('.topbar .brand .name');
-  if (brand) brand.textContent = config.name || 'Dashboard';
+  const brand = document.querySelector('.topbar .brand');
+  // brandInnerHtml valida o src do logo no cliente (https/data:image) e escapa
+  // nome e src; com logo seguro troca o .dot por <img class="brand-logo">.
+  if (brand) brand.innerHTML = brandInnerHtml(config.name || 'Dashboard', config.logo);
   const actions = document.querySelector('.topbar .actions');
   if (actions) {
     const cfgHref = `/config.html?id=${encodeURIComponent(id)}`;
@@ -310,7 +313,9 @@ async function init() {
   const accent = config.accent || DEFAULT_ACCENT;
   const root = document.documentElement;
   const isDark = root.dataset.theme !== 'light';
-  aplicarAccent(root, accent, isDark);
+  // accent2 opcional tinge o fundo suave (area do grafico, soft dos badges).
+  // Ausente/invalido = comportamento de hoje (tudo derivado da primaria).
+  aplicarAccent(root, accent, isDark, config.accent2);
   renderTopbar(config, id);
 
   // 3. Template

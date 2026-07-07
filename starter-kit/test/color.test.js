@@ -358,3 +358,67 @@ test('badgeText: preserva o tom da marca quando o accent ja passa o contraste', 
   assert.notEqual(fg, '#000000');
   assert.notEqual(fg, '#ffffff');
 });
+
+// --- Cor secundaria opcional (accent2): tinge o FUNDO SUAVE ---
+//
+// Contrato: aplicarAccent(el, accent, isDark, accent2). accent2 ausente/undefined
+// = comportamento de hoje (nada muda visualmente: --accent-2 = accent e
+// --accent-2-soft = mesmo soft derivado do accent). accent2 presente = --accent-2
+// vira a secundaria crua e --accent-2-soft vira o soft dela (fundo do grafico).
+
+test('aplicarAccent: SEM accent2 nao muda o visual (--accent-2 = accent)', () => {
+  const el = fakeEl();
+  aplicarAccent(el, '#6d28d9', true);
+  // Sem secundaria, --accent-2 acompanha a primaria e o soft e o mesmo da primaria.
+  assert.equal(el._vars['--accent-2'], '#6d28d9', '--accent-2 deve cair no accent');
+  assert.equal(
+    el._vars['--accent-2-soft'],
+    el._vars['--accent-soft'] || badgeSoftBg('#6d28d9', true),
+    '--accent-2-soft sem secundaria deve espelhar o soft da primaria',
+  );
+  assert.ok(!el.dataset.accent2, 'sem accent2, nao grava dataset.accent2');
+});
+
+test('aplicarAccent: COM accent2 grava --accent-2 e --accent-2-soft da secundaria', () => {
+  const el = fakeEl();
+  aplicarAccent(el, '#6d28d9', true, '#3cd3a4');
+  assert.equal(el._vars['--accent-2'], '#3cd3a4', '--accent-2 = cor secundaria crua');
+  assert.ok(el._vars['--accent-2-soft'], 'faltou --accent-2-soft');
+  // O soft da secundaria tem que ser DIFERENTE do soft da primaria (senao a
+  // secundaria nao apareceria).
+  assert.notEqual(
+    el._vars['--accent-2-soft'],
+    badgeSoftBg('#6d28d9', true),
+    '--accent-2-soft deve derivar da secundaria, nao da primaria',
+  );
+  assert.equal(el.dataset.accent2, '#3cd3a4', 'grava dataset.accent2 pra persistir no toggle');
+});
+
+test('aplicarAccent: accent2 invalido cai no comportamento SEM secundaria', () => {
+  const el = fakeEl();
+  aplicarAccent(el, '#6d28d9', false, 'nao-e-hex');
+  assert.equal(el._vars['--accent-2'], '#6d28d9', 'accent2 invalido -> --accent-2 = accent');
+  assert.ok(!el.dataset.accent2, 'accent2 invalido nao grava dataset.accent2');
+});
+
+test('aplicarAccent: le accent2 do dataset quando o parametro vem undefined (toggle)', () => {
+  // Simula o theme.js: primeiro aplica COM secundaria (grava dataset.accent2),
+  // depois o toggle chama com 3 args (accent2 undefined). A secundaria tem que
+  // sobreviver ao toggle, lida do dataset.
+  const el = fakeEl();
+  aplicarAccent(el, '#6d28d9', true, '#3cd3a4'); // grava dataset.accent2
+  aplicarAccent(el, '#6d28d9', false);           // toggle, sem passar accent2
+  assert.equal(el._vars['--accent-2'], '#3cd3a4', 'accent2 deve persistir do dataset no toggle');
+  assert.equal(el.dataset.accent2, '#3cd3a4');
+});
+
+// O --accent-2-soft precisa ser um fundo suave visivel (nao chapado): nao pode
+// ser a cor crua nem transparente total. Aqui so garantimos que e um hex valido
+// e diferente da cor crua (foi de fato suavizado).
+test('aplicarAccent: --accent-2-soft e suave (hex valido, != cor crua)', () => {
+  const el = fakeEl();
+  aplicarAccent(el, '#6d28d9', true, '#3cd3a4');
+  const soft = el._vars['--accent-2-soft'];
+  assert.ok(/^#[0-9a-f]{6}$/i.test(soft), `--accent-2-soft deveria ser hex de 6 digitos: ${soft}`);
+  assert.notEqual(soft, '#3cd3a4', 'o soft nao pode ser a cor crua');
+});

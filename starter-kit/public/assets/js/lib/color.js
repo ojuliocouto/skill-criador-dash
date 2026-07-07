@@ -312,11 +312,24 @@ export function accentFill(hex, isDark, target = 3) {
  *                 recalibrado pra >=4.5:1 (nao vira branco/preto chapado)
  * Tambem grava o accent em el.dataset.accent pra o theme.js reachar no toggle.
  *
+ * Cor secundaria OPCIONAL (accent2): tinge o FUNDO SUAVE (a area do grafico de
+ * linha e a trilha/soft dos badges). Grava:
+ *   --accent-2       cor secundaria crua (ou o proprio accent quando ausente)
+ *   --accent-2-soft  versao suave da secundaria pra fundo (ou o soft da primaria
+ *                    quando ausente, pra nada mudar visualmente)
+ * accent2 e so fundo/decorativo: nao precisa de contraste de texto, mas o soft e
+ * calibrado (accent 13% sobre a superficie do card) pra aparecer sem chapar. Se
+ * accent2 vier undefined, le de el.dataset.accent2 (persiste no toggle de tema,
+ * ja que o theme.js chama esta funcao com so 3 args). Hex invalido = sem
+ * secundaria (cai no comportamento de hoje). Grava el.dataset.accent2 quando
+ * valida, pra o theme.js reachar no toggle.
+ *
  * @param {HTMLElement} el elemento alvo (ex: document.documentElement)
  * @param {string} hex cor do accent
  * @param {boolean} isDark true = tema escuro
+ * @param {string} [accent2] cor secundaria opcional (fundo suave)
  */
-export function aplicarAccent(el, hex, isDark) {
+export function aplicarAccent(el, hex, isDark, accent2) {
   if (!el || !el.style) return;
   const accent = parseHex(hex) ? hex : DEFAULT_ACCENT;
   const txt = accentText(accent, isDark);
@@ -344,4 +357,19 @@ export function aplicarAccent(el, hex, isDark) {
   el.style.setProperty('--badge-fg', badgeText(accent, isDark));
   // Guarda o accent escolhido pra o theme.js recalcular no toggle de tema.
   if (el.dataset) el.dataset.accent = accent;
+
+  // --- Cor secundaria opcional (fundo suave): --accent-2 / --accent-2-soft ---
+  // accent2 undefined = le do dataset (persiste no toggle, que chama com 3 args).
+  // Hex invalido ou ausente = sem secundaria: --accent-2 acompanha a primaria e o
+  // soft espelha o soft da primaria, pra NADA mudar visualmente. Presente = crua
+  // + soft calibrado (accent 13% sobre o card, visivel sem chapar).
+  const raw2 = accent2 === undefined && el.dataset ? el.dataset.accent2 : accent2;
+  const has2 = !!parseHex(raw2);
+  const accentSecond = has2 ? raw2 : accent;
+  el.style.setProperty('--accent-2', accentSecond);
+  el.style.setProperty('--accent-2-soft', badgeSoftBg(accentSecond, isDark));
+  if (el.dataset) {
+    if (has2) el.dataset.accent2 = accentSecond;
+    else delete el.dataset.accent2;
+  }
 }

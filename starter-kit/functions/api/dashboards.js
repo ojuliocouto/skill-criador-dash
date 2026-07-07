@@ -81,6 +81,34 @@ const kvKey = (id) => `${PREFIX}${id}`;
 // arbitrario numa CSS custom property (--accent) via config.accent.
 const HEX_COLOR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
 
+// Limite de tamanho pro logo em data: URI. Um data:image grande viraria dezenas
+// de KB dentro da config e estouraria o valor de KV (limite de 25 MB por chave,
+// mas nao faz sentido guardar imagem inline: 200 KB ja e folgado pra um logo).
+const LOGO_MAX_LEN = 200 * 1024; // 200 KB
+
+/**
+ * Valida o src do logo da marca. Aceita apenas fontes de imagem SEGURAS para
+ * cair num <img src="..."> no browser sem virar vetor de XSS:
+ *   - "" (vazio)  -> sem logo, valido
+ *   - URL https:// -> valido (http:// e rejeitado: mixed content e sem TLS)
+ *   - data:image/ -> valido (imagem inline; qualquer outro data: e rejeitado)
+ * Qualquer outra coisa (javascript:, vbscript:, http://, texto solto) e rejeitada.
+ * @param {*} logo
+ * @returns {boolean}
+ */
+function isLogoSeguro(logo) {
+  if (logo === '' || logo == null) return true; // vazio = sem logo
+  if (typeof logo !== 'string') return false;
+  const v = logo.trim();
+  if (v === '') return true;
+  if (v.length > LOGO_MAX_LEN) return false;
+  // data:image/... (so imagem; nao aceita data:text/html nem outros tipos)
+  if (/^data:image\/[a-z0-9.+-]+[;,]/i.test(v)) return true;
+  // URL https:// (http:// NAO conta: exigimos TLS pra imagem de marca externa)
+  if (/^https:\/\/[^\s]+$/i.test(v)) return true;
+  return false;
+}
+
 // A trava global de mutacao (checkAdminToken) mora em auth-config.mjs (modulo
 // neutro), para que os conectores possam usa-la sem importar deste handler.
 // Reexportada aqui para nao quebrar quem ja importava de dashboards.js.
@@ -229,6 +257,21 @@ async function create(kv, request, providedHash, env) {
   // property (ex: '); background:url(x)') e viraria vetor de injecao.
   if (config.accent != null && !HEX_COLOR.test(String(config.accent))) {
     return erro('Cor de destaque (accent) inválida. Use um hexadecimal como #7c3aed ou #abc.', 400);
+  }
+
+  // Cor SECUNDARIA (accent2): opcional. Ausente/vazia e valido; se presente, vale
+  // a MESMA regra do accent (hex #rgb/#rrggbb). Mesma motivacao: o valor cai numa
+  // CSS custom property no front, entao um valor arbitrario seria vetor de injecao.
+  if (config.accent2 != null && String(config.accent2) !== '' && !HEX_COLOR.test(String(config.accent2))) {
+    return erro('Cor secundária (accent2) inválida. Use um hexadecimal como #7c3aed ou #abc.', 400);
+  }
+
+  // LOGO da marca: opcional. Vazio ("") = sem logo. Se preenchido, so aceita src de
+  // imagem SEGURO (URL https ou data:image). Sem essa trava, um valor como
+  // "javascript:alert(1)" cairia num <img src>/onerror e viraria XSS, ou um data:
+  // gigante estouraria o KV. Validar no servidor e a barreira que nao depende do front.
+  if (config.logo != null && !isLogoSeguro(config.logo)) {
+    return erro('Logo inválido: use uma URL https ou um data:image.', 400);
   }
 
   // SEGURANCA: nunca usar o id CRU do cliente como chave KV. Um id arbitrario

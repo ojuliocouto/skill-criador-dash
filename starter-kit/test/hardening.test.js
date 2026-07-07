@@ -82,6 +82,31 @@ test('middleware: toda resposta inclui os 3 headers de seguranca', async () => {
   assert.equal(res.headers.get('Cache-Control'), 'no-store');
 });
 
+// CSP: img-src permite https: e data: (logo de marca), MAS script-src segue
+// endurecido (com hash, sem 'unsafe-inline'). Afrouxar imagem nao pode afrouxar script.
+test('middleware CSP: img-src libera https:/data: (logo) sem afrouxar script-src', async () => {
+  const next = async () =>
+    new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+  const res = await middleware({
+    request: new Request('https://x/api/dashboards', { method: 'GET' }),
+    env: {},
+    next,
+  });
+  const csp = res.headers.get('Content-Security-Policy') || '';
+  // img-src permite self, https: e data: (para o logo da marca).
+  const imgSrc = (csp.match(/img-src[^;]*/) || [''])[0];
+  assert.match(imgSrc, /'self'/, "img-src mantem 'self'");
+  assert.match(imgSrc, /\bhttps:/, 'img-src permite https: (logo externo)');
+  assert.match(imgSrc, /\bdata:/, 'img-src permite data: (logo inline)');
+  // script-src NAO pode ter sido afrouxado: segue com hash e SEM 'unsafe-inline'.
+  const scriptSrc = (csp.match(/script-src[^;]*/) || [''])[0];
+  assert.match(scriptSrc, /'sha256-[A-Za-z0-9+/=]+'/, 'script-src mantem o hash');
+  assert.doesNotMatch(scriptSrc, /unsafe-inline/, "script-src nao pode ter 'unsafe-inline'");
+  assert.doesNotMatch(scriptSrc, /\bhttps:/, 'script-src nao ganhou https: por engano');
+  // img-src nao pode ter escapado pra 'unsafe-inline' (nao faz sentido em img, mas garante).
+  assert.match(csp, /default-src 'self'/);
+});
+
 // ---------------------------------------------------------------------------
 // Validacao de config.accent no create()
 // ---------------------------------------------------------------------------

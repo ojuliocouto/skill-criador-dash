@@ -24,6 +24,21 @@ test('CSS: contem tokens de acessibilidade e tema', () => {
   assert.ok(css.includes('tabular-nums'), 'precisa de tabular-nums para numeros');
 });
 
+// Identidade visual: classe do logo e cor secundaria no fundo suave.
+test('CSS: tem .brand-logo com limites de tamanho', () => {
+  assert.ok(/\.brand-logo\s*\{/.test(css), 'precisa da classe .brand-logo');
+  assert.ok(css.includes('max-height: 28px'), '.brand-logo precisa limitar a altura');
+  assert.ok(css.includes('object-fit: contain'), '.brand-logo precisa de object-fit: contain');
+});
+
+test('CSS: area do grafico usa a cor secundaria (--accent-2-soft) com fallback', () => {
+  assert.ok(css.includes('--accent-2-soft'), 'precisa do token --accent-2-soft');
+  assert.ok(
+    /\.chart__area\s*\{[^}]*var\(--accent-2-soft, var\(--accent-soft\)\)/.test(css),
+    '.chart__area precisa tingir com var(--accent-2-soft, var(--accent-soft))',
+  );
+});
+
 const htmlFiles = ['index.html', 'dashboard.html', 'config.html'];
 
 for (const file of htmlFiles) {

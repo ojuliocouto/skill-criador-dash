@@ -33,11 +33,16 @@ const ANTI_FLASH_SCRIPT_HASH = "'sha256-s81Hgk0mA2pQZt3tfYry+Pma8+DQ6+PEFZO+zskz
 //   script-src usa HASH (sem 'unsafe-inline'): so o inline anti-flash exato roda.
 //   style-src MANTEM 'unsafe-inline': os widgets usam atributos style="..." inline
 //   (dezenas de estilos gerados em runtime), que nao dao para cobrir por hash.
+//   img-src permite https: e data: por causa do LOGO da marca: o operador escolhe
+//   uma identidade visual (seletor de logo) apontando uma URL https externa OU
+//   colando um data:image inline. Sem https:/data: em img-src, esse logo seria
+//   bloqueado pelo CSP. Isso NAO afrouxa script-src (segue com hash, sem inline):
+//   imagem e uma superficie muito menos perigosa que script.
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Content-Security-Policy':
-    `default-src 'self'; script-src 'self' ${ANTI_FLASH_SCRIPT_HASH}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'`,
+    `default-src 'self'; script-src 'self' ${ANTI_FLASH_SCRIPT_HASH}; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'`,
 };
 
 function withHeaders(response, extra = {}) {

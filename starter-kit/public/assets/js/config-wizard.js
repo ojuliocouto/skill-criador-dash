@@ -7,6 +7,7 @@ import { autoMap } from './lib/automap.js';
 import { getSource } from './sources/index.js';
 import { sha256Hex } from './lib/auth.js';
 import { aplicarAccent } from './lib/color.js';
+import { safeLogoSrc } from './lib/brand.js';
 
 // Le o tema atual do documento (o theme.js grava dataset.theme). Serve pra
 // calibrar o accent do preview com o contraste certo do tema em uso.
@@ -47,8 +48,15 @@ const state = {
   colMap: {}, // { slotKey: columnName|null }
   name: '',
   accent: '#6d28d9',
+  logo: '', // URL do logo (opcional). Vazio = usa o .dot de hoje.
+  accent2: '', // cor secundaria hex (opcional). Vazio = derivada da primaria.
   connecting: false, // trava o botão Conectar durante a chamada
 };
+
+// Cor secundaria default do input color quando o usuario liga o toggle. So um
+// valor de partida do seletor; enquanto o checkbox "usar padrao" estiver marcado,
+// state.accent2 fica vazio e nada muda visualmente.
+const ACCENT2_DEFAULT = '#3cd3a4';
 
 const STEPS = [
   { n: 1, label: 'Domínio' },
@@ -488,6 +496,76 @@ function renderFinish(body) {
   const primaryDef = (tpl.metrics || []).find((m) => m.key === primaryKey);
   const primaryLabel = primaryDef ? primaryDef.label : 'meta';
 
+  // Reaplica todo o accent (primaria + secundaria) pro preview do wizard refletir
+  // o estado atual, calibrado pro tema. Centraliza pra os handlers reusarem.
+  const reaplicarAccent = () => {
+    aplicarAccent(
+      document.documentElement,
+      state.accent || '#6d28d9',
+      temaEscuroAtual(),
+      state.accent2 || undefined,
+    );
+  };
+
+  // --- Preview ao vivo do logo (ao lado do campo de URL) ---
+  const logoImg = el('img', { class: 'brand-logo', alt: 'Preview do logo' });
+  logoImg.style.display = 'none';
+  const logoPreview = el('div', {
+    class: 'logo-preview',
+    style: 'display:flex;align-items:center;gap:10px;margin-top:6px;min-height:28px',
+  }, [logoImg]);
+  const logoHint = el('span', { class: 'hint' });
+  logoPreview.appendChild(logoHint);
+  const atualizarLogoPreview = (raw) => {
+    const safe = safeLogoSrc(raw);
+    if (safe) {
+      logoImg.src = safe;
+      logoImg.style.display = 'block';
+      logoHint.textContent = '';
+    } else {
+      logoImg.style.display = 'none';
+      logoImg.removeAttribute('src');
+      logoHint.textContent = raw && raw.trim()
+        ? 'Use uma URL https:// de imagem (o link atual nao sera aplicado).'
+        : 'Sem logo: mostramos o ponto de marca padrao.';
+    }
+  };
+
+  const logoInput = el('input', {
+    class: 'input', id: 'dashLogo', type: 'text',
+    placeholder: 'https://.../logo.png', value: state.logo || '',
+    oninput: (ev) => { state.logo = ev.target.value.trim(); atualizarLogoPreview(ev.target.value); },
+  });
+
+  // --- Cor secundaria (opcional) com checkbox "usar padrao" ---
+  const usarPadrao = !state.accent2; // sem secundaria = usa o padrao (derivado da primaria)
+  const accent2Input = el('input', {
+    class: 'input', id: 'dashAccent2', type: 'color',
+    value: state.accent2 || ACCENT2_DEFAULT,
+  });
+  accent2Input.style.maxWidth = '80px';
+  accent2Input.disabled = usarPadrao;
+  const usarPadraoChk = el('input', { id: 'dashAccent2Default', type: 'checkbox' });
+  usarPadraoChk.checked = usarPadrao;
+  // Ao marcar "usar padrao": some a secundaria (state.accent2 = ''), desabilita o
+  // seletor e reaplica (fundo volta a derivar da primaria). Ao desmarcar: liga a
+  // secundaria com o valor atual do seletor.
+  usarPadraoChk.addEventListener('change', () => {
+    if (usarPadraoChk.checked) {
+      state.accent2 = '';
+      accent2Input.disabled = true;
+    } else {
+      accent2Input.disabled = false;
+      state.accent2 = accent2Input.value || ACCENT2_DEFAULT;
+    }
+    reaplicarAccent();
+  });
+  accent2Input.addEventListener('input', () => {
+    if (usarPadraoChk.checked) return; // ignorado enquanto no padrao
+    state.accent2 = accent2Input.value;
+    reaplicarAccent();
+  });
+
   const fields = [
     el('label', { class: 'field' }, [
       el('span', { class: 'lbl', text: 'Nome do dashboard' }),
@@ -498,12 +576,31 @@ function renderFinish(body) {
       el('input', {
         class: 'input', id: 'dashAccent', type: 'color', value: state.accent || '#6d28d9',
         // Ao escolher a cor, calibra --accent/--accent-fg/--accent-text/--focus-ring
-        // pro tema atual (contraste WCAG) e grava em dataset.accent pra o theme.js
-        // achar no toggle. Assim o preview do wizard reflete o contraste correto.
-        oninput: (ev) => aplicarAccent(document.documentElement, ev.target.value, temaEscuroAtual()),
+        // (+ a secundaria atual) pro tema atual (contraste WCAG) e grava em
+        // dataset.accent pra o theme.js achar no toggle. Assim o preview do wizard
+        // reflete o contraste correto.
+        oninput: (ev) => { state.accent = ev.target.value; reaplicarAccent(); },
       }),
     ]),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Logo (URL) (opcional)' }),
+      logoInput,
+      logoPreview,
+    ]),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Cor secundaria (opcional)' }),
+      el('div', { style: 'display:flex;align-items:center;gap:10px' }, [
+        accent2Input,
+        el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim)' }, [
+          usarPadraoChk,
+          el('span', { text: 'Usar padrao (derivar da cor de destaque)' }),
+        ]),
+      ]),
+      el('span', { class: 'hint', text: 'Tinge o fundo suave do dashboard (area do grafico e trilha dos badges).' }),
+    ]),
   ];
+  // Sincroniza o preview do logo com o estado inicial ao montar o passo.
+  atualizarLogoPreview(state.logo || '');
   if (primaryKey) {
     fields.push(el('label', { class: 'field' }, [
       el('span', { class: 'lbl', text: `Meta de ${primaryLabel} (opcional)` }),
@@ -534,8 +631,9 @@ function renderFinish(body) {
   const card = el('div', { class: 'card' }, fields);
   body.appendChild(card);
 
-  // Aplica o accent atual ao entrar no passo, pra o preview ja sair calibrado.
-  aplicarAccent(document.documentElement, state.accent || '#6d28d9', temaEscuroAtual());
+  // Aplica o accent atual (primaria + secundaria) ao entrar no passo, pra o
+  // preview ja sair calibrado.
+  reaplicarAccent();
 
   const feedback = el('div', { id: 'finishFeedback' });
   body.appendChild(feedback);
@@ -552,10 +650,16 @@ function renderFinish(body) {
   async function onCreate() {
     const name = card.querySelector('#dashName').value.trim();
     const accent = card.querySelector('#dashAccent').value || '#6d28d9';
+    const logo = card.querySelector('#dashLogo').value.trim();
+    // Secundaria so entra se o checkbox "usar padrao" estiver DESMARCADO.
+    const useDefault2 = card.querySelector('#dashAccent2Default').checked;
+    const accent2 = useDefault2 ? '' : (card.querySelector('#dashAccent2').value || '');
     state.name = name;
     state.accent = accent;
+    state.logo = logo;
+    state.accent2 = accent2;
     // Garante que as variaveis CSS refletem o accent final antes de salvar.
-    aplicarAccent(document.documentElement, accent, temaEscuroAtual());
+    reaplicarAccent();
     feedback.innerHTML = '';
 
     if (!name) { feedback.appendChild(errorBox('Dê um nome ao dashboard.')); return; }
@@ -567,6 +671,12 @@ function renderFinish(body) {
       colMap: state.colMap,
       accent,
     };
+
+    // Logo (opcional): so envia se o operador preencheu. O backend valida o src;
+    // o cliente tambem valida na hora de renderizar (brand.js).
+    if (logo) config.logo = logo;
+    // Cor secundaria (opcional): so envia quando NAO esta no modo padrao.
+    if (accent2) config.accent2 = accent2;
 
     // Meta opcional (meta vs realizado) na metrica principal do dominio.
     const goalInput = card.querySelector('#dashGoal');

@@ -1,6 +1,7 @@
 // Landing/lista de dashboards. Busca as configs no KV via api-client e renderiza.
 import { listDashboards, deleteDashboard } from './lib/api-client.js';
 import { esc } from './lib/html.js';
+import { safeLogoSrc } from './lib/brand.js';
 
 const lista = document.getElementById('lista');
 
@@ -37,13 +38,19 @@ function itemHTML(dash) {
   const dominio = esc(dash.domain || '');
   const data = fmtData(dash.createdAt);
   const metaData = data ? `<span class="meta">Criado em ${data}</span>` : '';
+  // Logo do dashboard ao lado do nome, quando o src for seguro (https/data:image).
+  const logo = safeLogoSrc(dash.logo);
+  const logoImg = logo ? `<img class="brand-logo" alt="${nome}" src="${esc(logo)}" />` : '';
   return `
     <div class="list-item" data-id="${id}" style="padding:14px 0;border-bottom:1px solid var(--border);">
-      <div>
-        <div style="font-weight:600;margin-bottom:4px;">${nome}</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          ${dominio ? `<span class="badge">${dominio}</span>` : ''}
-          ${metaData}
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${logoImg}
+        <div>
+          <div class="js-name" style="font-weight:600;margin-bottom:4px;">${nome}</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${dominio ? `<span class="badge">${dominio}</span>` : ''}
+            ${metaData}
+          </div>
         </div>
       </div>
       <div class="row-actions" style="margin-top:0;">
@@ -63,7 +70,7 @@ function renderLista(dashboards) {
 
 async function excluir(id, btn) {
   const item = lista.querySelector(`.list-item[data-id="${CSS.escape(id)}"]`);
-  const nome = item ? item.querySelector('div > div')?.textContent : id;
+  const nome = item ? item.querySelector('.js-name')?.textContent : id;
   if (!confirm(`Excluir o dashboard "${nome || id}"? Esta ação não pode ser desfeita.`)) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Excluindo...'; }
   try {
