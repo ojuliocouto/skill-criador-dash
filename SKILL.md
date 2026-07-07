@@ -90,7 +90,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PEÇAS (biblioteca provada em `starter-kit/`)
 
-Código real e testado (428 testes verdes, TDD). Você compõe a partir daqui.
+Código real e testado (448 testes verdes, TDD). Você compõe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Não sabem de métricas.
@@ -189,18 +189,19 @@ functions/
     snapshots.mjs               SQL do modo historico + rowToDataSet (puro)
     auth-config.mjs             needsAuth/authOk (PBKDF2 salgado)/safeEqual/checkAdminToken (neutro)
     rate-limit.mjs              rate limiter em KV (gate de senha + preview Meta)
+    domains.mjs                 lista DOMAINS do servidor (valida o POST); paridade com a do browser
 workers/
   snapshot/ src/index.js        Worker com cron que grava snapshots no D1 (SNAPSHOT_FETCHERS)
 public/
   index.html  config.html (wizard)  dashboard.html
   assets/css/main.css
   assets/js/
-    config-wizard.js  dashboard.js  index-page.js
+    config-wizard.js  dashboard.js  index-page.js  domains.mjs (lista DOMAINS do browser: fonte da verdade dos dominios)
     sources/ index.js (registry de fontes: type, label, canHistory)
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js  color.js  html.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           428 testes (npm test  ->  node --test test/*.test.js)
+test/                           448 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local (o `npm run dev` já embute a `--compatibility-date` do `package.json`):
@@ -256,7 +257,7 @@ real em repo público. Confirme que NÃO sobrou nenhum placeholder ANTES de segu
 grep -n "<SEU_KV\|<NOME-DO-PROJETO\|meu-dashboard" wrangler.toml   # tem que voltar VAZIO. Se achar algo, ainda falta trocar.
 ```
 Se você deployar com um placeholder de id ainda no toml, o deploy COMPILA e passa, mas a API responde 500
-"Binding DASHBOARDS_KV nao configurado" em runtime. Por isso o grep acima é obrigatório antes do passo 3.
+"Binding DASHBOARDS_KV não configurado" em runtime. Por isso o grep acima é obrigatório antes do passo 3.
 
 Passo 3: crie o projeto Pages e faça o deploy.
 ```
@@ -264,7 +265,7 @@ wrangler pages project create <NOME-DO-PROJETO> --production-branch main   # cri
 wrangler pages deploy public --project-name=<NOME-DO-PROJETO> --branch main
 ```
 Bindings em produção: com os ids já no `wrangler.toml`, o `wrangler pages deploy` aplica os bindings de KV
-ao deployment. Se por algum motivo a API responder 500 "Binding DASHBOARDS_KV nao configurado", vincule no
+ao deployment. Se por algum motivo a API responder 500 "Binding DASHBOARDS_KV não configurado", vincule no
 painel: Cloudflare Pages > seu projeto > Settings > Bindings > add KV binding `DASHBOARDS_KV` (e `DASHBOARD_CACHE`).
 
 Passo 4 (OBRIGATÓRIO, mutação é fail-closed): defina o `ADMIN_TOKEN` (veja a seção "Modelo de acesso"
@@ -316,12 +317,19 @@ Deploy do Pages: sem CLOUDFLARE_API_TOKEN forçado, usa o OAuth do `wrangler log
 Marketing, Vendas e Suporte já vêm prontos. Para um novo (ex: Financeiro), siga o Contrato 5 do
 `ARCHITECTURE.md` e use `vendas.js`/`suporte.js` como molde. TDD: teste antes.
 1. `public/assets/js/templates/<dominio>.js` exportando `template` com `id`, `label`, `primaryMetric`,
-   `slots` (com `aliases` lowercase sem acento pro auto-mapeamento), `metrics` (base antes das derivadas;
-   marque `betterWhen` nas que têm direção) e `layout` (kpi/timeseries/funnel/table/ranking).
+   `dateSlot` (qual slot é o eixo de tempo, ex `'data'`), `slots` (com `aliases` lowercase sem acento pro
+   auto-mapeamento), `metrics` (base antes das derivadas; marque `betterWhen` nas que têm direção) e `layout`
+   (kpi/timeseries/funnel/table/ranking).
    Ex Financeiro: slots data, categoria, entrada, saida; métricas receita (sum entrada), despesa (sum saida),
    saldo (derived entrada-saida), margem (ratio saldo/entrada).
-2. Registre em `templates/index.js`.
-3. Escreva o teste em `test/templates.test.js` (autoMap + estrutura). Não mexe em widgets nem conectores.
+2. Registre a CHAVE do domínio (ex `'financeiro'`) no array `DOMAINS`, em DOIS lugares que um teste de
+   paridade mantém iguais: `public/assets/js/domains.mjs` (fonte do browser) E `functions/lib/domains.mjs`
+   (fonte do servidor, que valida o POST). Esta é a fonte da verdade: `templates/index.js` monta o registry
+   a partir de `DOMAINS`, então sem a chave aqui o template NUNCA é registrado (`getTemplate` volta undefined)
+   e o servidor rejeita o POST com 400 "Domínio inválido". Editar só o `byId` de `templates/index.js` não basta.
+3. Adicione o `import` do template novo no `byId` de `templates/index.js` (é só o mapa de template por id;
+   o registro efetivo é a chave em `DOMAINS` do passo 2).
+4. Escreva o teste em `test/templates.test.js` (autoMap + estrutura). Não mexe em widgets nem conectores.
 
 ## ADICIONAR UM NOVO CONECTOR
 

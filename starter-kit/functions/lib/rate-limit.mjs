@@ -1,17 +1,24 @@
-// Rate limiter de JANELA FIXA usando o KV de cache (env.DASHBOARD_CACHE).
-// ESM, puro o suficiente para testar com um stub de KV.
+// Rate limiter de JANELA FIXA usando KV. ESM, puro o suficiente para testar com
+// um stub de KV.
 //
-// PARA QUE SERVE (dois graves de seguranca):
+// PARA QUE SERVE (graves de seguranca):
 //  1. Preview do Meta Ads (POST /api/connectors/meta-ads): sem limite, o endpoint
 //     e um relay/SSRF anonimo que valida tokens em lote contra a Graph API, do IP
 //     do dono. Rate limit por IP fecha o relay ilimitado.
 //  2. Gate de senha (x-dash-auth): sem contador, da pra fazer brute force online
 //     da senha variando o header. Rate limit por IP+id barra a forca bruta sem
 //     punir o uso legitimo (so conta as TENTATIVAS ERRADAS).
+//  3. Conector Sheets (GET /api/connectors/sheets): relay de fetch anonimo. Rate
+//     limit por IP evita virar proxy de fetch ilimitado.
 //
-// EXIGE O KV DE CACHE: o rate limit real usa env.DASHBOARD_CACHE como contador.
-// Se esse binding NAO existir (deploy sem cache), rateLimit devolve { ok: true }
-// para NAO quebrar o deploy: nesse caso nao ha rate limit (documentado no README).
+// STORE DO CONTADOR (NAO PODE FALHAR ABERTO): o rate limit usa
+// `env.DASHBOARD_CACHE || env.DASHBOARDS_KV` como store. DASHBOARD_CACHE e um
+// binding OPCIONAL (nem todo deploy vincula o KV de cache); DASHBOARDS_KV e
+// OBRIGATORIO (sem ele a API ja responde 500). Antes, o rate limit usava SO o
+// DASHBOARD_CACHE e, quando ele nao estava vinculado (o caminho de deploy mais
+// comum), TODO o rate limit desligava em silencio -> brute force ilimitado. Com o
+// fallback, o rate limit conta no DASHBOARDS_KV quando nao ha cache dedicado, e so
+// libera sem contar no caso degenerado em que NENHUM dos dois existe.
 //
 // MODELO (janela fixa): a chave e `rl:<key>:<janela>`, onde
 //   janela = floor(agoraEmSegundos / windowSec).
@@ -52,7 +59,9 @@ export async function authRateLimit(env, request, id) {
 
 /**
  * Aplica rate limit de janela fixa em KV.
- * @param {Object} env  ambiente das Functions (usa env.DASHBOARD_CACHE, o KV de cache)
+ * @param {Object} env  ambiente das Functions. Store = env.DASHBOARD_CACHE (KV de
+ *   cache, opcional) OU, em fallback, env.DASHBOARDS_KV (obrigatorio). Ver topo do
+ *   arquivo: usar so o cache fazia o rate limit falhar ABERTO no deploy comum.
  * @param {string} key  identificador do balde (ex: 'meta-preview:1.2.3.4' ou 'auth:1.2.3.4:dashId')
  * @param {{ limit: number, windowSec: number, nowSec?: () => number }} opts
  *   limit      = maximo de chamadas por janela
@@ -61,8 +70,11 @@ export async function authRateLimit(env, request, id) {
  * @returns {Promise<{ ok: boolean, remaining?: number, retryAfter?: number }>}
  */
 export async function rateLimit(env, key, opts = {}) {
-  const kv = env && env.DASHBOARD_CACHE;
-  // Sem KV de cache: nao ha onde contar. Nao quebrar o deploy -> libera.
+  // Store do contador: prefere o KV de cache dedicado; se ele nao estiver
+  // vinculado (binding opcional), cai no DASHBOARDS_KV (obrigatorio). Assim o rate
+  // limit NAO desliga em silencio quando so o cache falta. So libera sem contar no
+  // caso degenerado em que NENHUM dos dois KVs existe (a API ja daria 500 antes).
+  const kv = (env && env.DASHBOARD_CACHE) || (env && env.DASHBOARDS_KV);
   if (!kv) return { ok: true };
 
   const limit = Number(opts.limit) || 0;

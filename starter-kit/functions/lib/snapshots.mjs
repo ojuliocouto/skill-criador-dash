@@ -11,6 +11,18 @@
 
 const TABLE = 'snapshots';
 
+// Limite default seguro para listagem de histórico (usado quando o limit
+// informado não é um inteiro positivo válido, evitando gerar `LIMIT NaN`).
+const DEFAULT_LIST_LIMIT = 100;
+
+// Validação compartilhada do dashboardId. Mesma regra do insert, reusada por
+// latest/list para não haver assimetria (antes só o insert validava).
+function assertDashboardId(dashboardId) {
+  if (!dashboardId || !String(dashboardId).trim()) {
+    throw new Error('Informe o dashboardId para gravar o snapshot.');
+  }
+}
+
 /**
  * Monta o INSERT parametrizado de um snapshot no D1.
  * Não executa nada: só devolve o SQL e os params, na ordem posicional dos '?'.
@@ -21,9 +33,7 @@ const TABLE = 'snapshots';
  * @throws {Error} se dashboardId ou dataset faltarem
  */
 export function insertSnapshotSQL(dashboardId, capturedAt, dataset) {
-  if (!dashboardId || !String(dashboardId).trim()) {
-    throw new Error('Informe o dashboardId para gravar o snapshot.');
-  }
+  assertDashboardId(dashboardId);
   if (dataset == null || typeof dataset !== 'object') {
     throw new Error('Informe o dataset (dados capturados) para gravar o snapshot.');
   }
@@ -38,8 +48,10 @@ export function insertSnapshotSQL(dashboardId, capturedAt, dataset) {
  * Ordena por captured_at desc e pega só o primeiro.
  * @param {string} dashboardId
  * @returns {{ sql: string, params: Array }}
+ * @throws {Error} se dashboardId faltar ou for vazio (mesma validação do insert)
  */
 export function latestSnapshotSQL(dashboardId) {
+  assertDashboardId(dashboardId);
   const sql =
     `SELECT id, dashboard_id, captured_at, dataset_json FROM ${TABLE} ` +
     `WHERE dashboard_id = ? ORDER BY captured_at DESC LIMIT 1`;
@@ -50,14 +62,23 @@ export function latestSnapshotSQL(dashboardId) {
  * Monta o SELECT do histórico de capturas de um dashboard (mais recentes primeiro).
  * Devolve só metadados (id e captured_at), sem o payload, para listagem leve.
  * @param {string} dashboardId
- * @param {number} [limit=100]
+ * @param {number} [limit=100]  inteiro positivo; valor inválido cai no default 100
  * @returns {{ sql: string, params: Array }}
+ * @throws {Error} se dashboardId faltar ou for vazio (mesma validação do insert)
  */
-export function listSnapshotsSQL(dashboardId, limit = 100) {
+export function listSnapshotsSQL(dashboardId, limit = DEFAULT_LIST_LIMIT) {
+  assertDashboardId(dashboardId);
+  // Sanitiza o limit: só aceita inteiro POSITIVO. Number('abc')/undefined viram
+  // NaN e gerariam `LIMIT NaN` (SQL inválido no D1); 0, negativos e não-inteiros
+  // (1.5, Infinity) também não fazem sentido como LIMIT. Em qualquer desses casos
+  // cai no default seguro, garantindo que params[1] é sempre inteiro positivo.
+  const n = Number(limit);
+  const safeLimit =
+    Number.isInteger(n) && n > 0 ? n : DEFAULT_LIST_LIMIT;
   const sql =
     `SELECT id, captured_at FROM ${TABLE} ` +
     `WHERE dashboard_id = ? ORDER BY captured_at DESC LIMIT ?`;
-  return { sql, params: [String(dashboardId), Number(limit)] };
+  return { sql, params: [String(dashboardId), safeLimit] };
 }
 
 /**

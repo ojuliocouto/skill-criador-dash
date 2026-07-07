@@ -4,8 +4,23 @@
 // e é reexportada aqui para compatibilidade com quem já importava daqui.
 import { parseCSV } from '../../lib/csv.mjs';
 import { sheetUrlToCsv } from '../../lib/sheets-url.mjs';
+import { rateLimit, clientIp } from '../../lib/rate-limit.mjs';
 
 export { sheetUrlToCsv };
+
+// Limite do conector Sheets: por IP, para nao virar relay de fetch anonimo
+// ilimitado (o handler busca uma URL do lado do servidor). Mesma politica de IP
+// do preview Meta. Usa o store do rate-limit (DASHBOARD_CACHE || DASHBOARDS_KV).
+const SHEETS_LIMIT = 20;
+const SHEETS_WINDOW = 60;
+
+// 429 amigavel em PT-BR. Nao revela contadores nem limites.
+function tooMany(retryAfter, headers) {
+  return new Response(
+    JSON.stringify({ error: 'Muitas requisições em pouco tempo. Aguarde um instante e tente de novo.', rateLimited: true }),
+    { status: 429, headers: { ...headers, 'Retry-After': String(retryAfter || 60) } }
+  );
+}
 
 /**
  * Handler Cloudflare Pages Function.
@@ -14,8 +29,16 @@ export { sheetUrlToCsv };
  * @param {{ request: Request }} context
  */
 export async function onRequest(context) {
+  const { request, env } = context;
   const headers = { 'content-type': 'application/json' };
-  const { searchParams } = new URL(context.request.url);
+
+  // RATE LIMIT por IP ANTES de tocar a rede: fecha o relay de fetch anonimo
+  // (o endpoint deixa de ser proxy ilimitado). Store = DASHBOARD_CACHE ||
+  // DASHBOARDS_KV; sem nenhum dos dois, rateLimit libera (deploy degenerado).
+  const rl = await rateLimit(env, `sheets:${clientIp(request)}`, { limit: SHEETS_LIMIT, windowSec: SHEETS_WINDOW });
+  if (!rl.ok) return tooMany(rl.retryAfter, headers);
+
+  const { searchParams } = new URL(request.url);
   const url = searchParams.get('url');
   const gid = searchParams.get('gid') || '0';
 

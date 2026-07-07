@@ -3,7 +3,7 @@
 import { template as marketing } from './marketing.js';
 import { template as vendas } from './vendas.js';
 import { template as suporte } from './suporte.js';
-import { DOMAINS } from '../../../../functions/lib/domains.mjs';
+import { DOMAINS } from '../domains.mjs';
 
 const byId = { marketing, vendas, suporte };
 
@@ -20,9 +20,9 @@ export const templates = Object.fromEntries(
   }),
 );
 
-// Reexporta a lista canonica para quem precisa so das chaves (ex: wizard),
-// mantendo domains.mjs como unico ponto de definicao.
-export { DOMAINS } from '../../../../functions/lib/domains.mjs';
+// Reexporta a lista canonica do browser para quem precisa so das chaves (ex:
+// wizard), mantendo public/assets/js/domains.mjs como fonte do browser.
+export { DOMAINS } from '../domains.mjs';
 
 /**
  * Retorna o template pelo id, ou undefined se nao existir.

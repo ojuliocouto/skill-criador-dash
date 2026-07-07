@@ -87,8 +87,10 @@ export function parseDateBR(v) {
   if (!s) return null;
   // ja ISO (aceita hifen ou barra como separador: AAAA-MM-DD ou AAAA/MM/DD).
   // Mes e dia aceitam 1-2 digitos (ex '2026-2-1', '2026/1/1'), coerente com o ramo BR.
-  // Nao ancora o fim: tolera sufixo de hora (ex '2026-12-31T10:00'), como antes.
-  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  // O fim so aceita: data pura, OU data seguida de um separador de hora RECONHECIDO
+  // ('T' ou espaco, ex '2026-12-31T10:00', '2026-12-31 10:00'). Sufixo colado
+  // nao reconhecido ('2026-01-01lixo', '2026-01-0110') e rejeitado -> cai pra null.
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T ].*)?$/);
   if (m) {
     const y = +m[1]; const mo = +m[2]; const d = +m[3];
     if (!isValidYMD(y, mo, d)) return null;

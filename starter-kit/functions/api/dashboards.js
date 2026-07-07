@@ -231,7 +231,12 @@ async function create(kv, request, providedHash, env) {
     return erro('Cor de destaque (accent) inválida. Use um hexadecimal como #7c3aed ou #abc.', 400);
   }
 
-  if (!config.id) config.id = slugify(config.name);
+  // SEGURANCA: nunca usar o id CRU do cliente como chave KV. Um id arbitrario
+  // (com espacos, barras, '..', caracteres de controle) viraria uma chave KV
+  // perigosa/ambigua. Passa SEMPRE pelo mesmo slugify do contrato: se o cliente
+  // mandou um id, e sanitizado; se nao mandou, deriva do name. Assim a chave
+  // gravada e sempre um slug seguro.
+  config.id = slugify(config.id || config.name);
   if (!config.createdAt) config.createdAt = new Date().toISOString();
 
   // Nao deixa SOBRESCREVER um dashboard protegido sem a senha dele (senao qualquer

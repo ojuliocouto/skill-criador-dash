@@ -171,6 +171,50 @@ test('sheets GET com fetch !ok -> 502', async () => {
   });
 });
 
+// MINOR seguranca: o conector Sheets e relay de fetch anonimo. Aplica rate limit
+// por IP (limit 20, window 60s). Sem CF-Connecting-IP o balde e 'unknown'.
+test('sheets GET: estoura rate limit por IP -> 429 amigavel PT-BR (nao vira proxy ilimitado)', async () => {
+  const url = 'https://docs.google.com/spreadsheets/d/ABC123/edit';
+  const env = { DASHBOARDS_KV: fakeCache() }; // sem cache dedicado; usa o obrigatorio
+  const stub = () => fakeResponse({ ok: true, status: 200, text: 'data,valor\n2026-01-01,10\n' });
+
+  await comFetchStub(stub, async () => {
+    let ultima;
+    // Limite e 20; a 21a chamada dentro da janela deve estourar.
+    for (let i = 0; i < 21; i += 1) {
+      ultima = await sheets(
+        ctx('GET', {
+          path: 'connectors/sheets',
+          query: `url=${encodeURIComponent(url)}`,
+          headers: { 'CF-Connecting-IP': '7.7.7.7' },
+          env,
+        })
+      );
+    }
+    assert.equal(ultima.status, 429, 'a 21a requisicao do mesmo IP estoura');
+    assert.ok(ultima.headers.get('Retry-After'), 'devolve Retry-After');
+    const j = await readJSON(ultima);
+    assert.match(j.error, /aguarde/i);
+    assert.equal(j.rateLimited, true);
+  });
+});
+
+test('sheets GET: IPs diferentes tem baldes independentes (nao pune terceiro)', async () => {
+  const url = 'https://docs.google.com/spreadsheets/d/ABC123/edit';
+  const env = { DASHBOARDS_KV: fakeCache() };
+  const stub = () => fakeResponse({ ok: true, status: 200, text: 'data,valor\n2026-01-01,10\n' });
+
+  await comFetchStub(stub, async () => {
+    // Esgota o IP A.
+    for (let i = 0; i < 21; i += 1) {
+      await sheets(ctx('GET', { path: 'connectors/sheets', query: `url=${encodeURIComponent(url)}`, headers: { 'CF-Connecting-IP': '1.1.1.1' }, env }));
+    }
+    // IP B na mesma janela ainda passa.
+    const resB = await sheets(ctx('GET', { path: 'connectors/sheets', query: `url=${encodeURIComponent(url)}`, headers: { 'CF-Connecting-IP': '2.2.2.2' }, env }));
+    assert.equal(resB.status, 200, 'IP diferente nao herda o estouro do vizinho');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // CSV (functions/api/connectors/csv.js)
 // ---------------------------------------------------------------------------

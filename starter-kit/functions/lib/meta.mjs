@@ -18,10 +18,17 @@ const COLUMNS = [
 ];
 
 // Tipos de ação da Graph API que contam como conversão de compra.
-const PURCHASE_ACTION_TYPES = [
+//
+// ATENÇÃO (correção de dobra de conversão): na Graph API do Meta, `omni_purchase`
+// é um AGREGADO unificado que JÁ inclui as compras de pixel/site
+// (`offsite_conversion.fb_pixel_purchase` e `purchase`). Se somarmos o agregado
+// junto com os componentes, contamos a mesma compra em dobro, inflando ROAS/CPA.
+// Por isso escolhemos UMA fonte de conversão: se houver `omni_purchase`, usamos só
+// o(s) omni; caso contrário, somamos os tipos específicos abaixo.
+const OMNI_ACTION_TYPE = 'omni_purchase';
+const SPECIFIC_PURCHASE_ACTION_TYPES = [
   'purchase',
   'offsite_conversion.fb_pixel_purchase',
-  'omni_purchase',
 ];
 
 /**
@@ -87,16 +94,26 @@ export function mapInsightsToDataSet(apiJson) {
     const leadAction = actions.find((a) => a && a.action_type === 'lead');
     const leads = leadAction ? String(leadAction.value) : '0';
 
-    // Conversões: soma dos values dos tipos de compra conhecidos.
+    // Conversões: escolhe UMA fonte, nunca soma agregado + componentes.
+    // Se houver omni_purchase (agregado unificado), usa só os omni entre si
+    // (itens/janelas distintos do mesmo agregado). Caso contrário, soma os
+    // tipos específicos ('purchase' e 'offsite_conversion.fb_pixel_purchase').
+    // Ver nota em OMNI_ACTION_TYPE sobre a dobra de conversão.
+    const omniActions = actions.filter(
+      (a) => a && a.action_type === OMNI_ACTION_TYPE
+    );
+    const sourceActions =
+      omniActions.length > 0
+        ? omniActions
+        : actions.filter(
+            (a) => a && SPECIFIC_PURCHASE_ACTION_TYPES.includes(a.action_type)
+          );
+
     let conversoesSum = 0;
-    let temConversao = false;
-    for (const a of actions) {
-      if (a && PURCHASE_ACTION_TYPES.includes(a.action_type)) {
-        conversoesSum += Number(a.value) || 0;
-        temConversao = true;
-      }
+    for (const a of sourceActions) {
+      conversoesSum += Number(a.value) || 0;
     }
-    const conversoes = temConversao ? String(conversoesSum) : '0';
+    const conversoes = sourceActions.length > 0 ? String(conversoesSum) : '0';
 
     return {
       Data: item.date_start != null ? String(item.date_start) : '',

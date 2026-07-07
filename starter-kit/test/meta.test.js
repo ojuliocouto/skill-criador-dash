@@ -150,26 +150,90 @@ test('mapInsightsToDataSet: valores em string crua conforme Contrato 1', () => {
   }
 });
 
-test('mapInsightsToDataSet: soma múltiplos tipos de conversão de compra', () => {
+test('mapInsightsToDataSet: omni_purchase é agregado, NÃO soma com pixel/purchase (bug de dobra)', () => {
+  // Caso real: a Graph API traz omni_purchase (agregado unificado) JUNTO com
+  // offsite_conversion.fb_pixel_purchase. omni_purchase JÁ inclui as compras
+  // de pixel/site. Somar os dois conta a mesma compra em dobro.
   const ds = mapInsightsToDataSet({
     data: [
       {
-        campaign_name: 'Y',
+        campaign_name: 'Dobra',
         spend: '1',
         impressions: '1',
         clicks: '1',
         date_start: '2026-03-01',
         actions: [
+          { action_type: 'omni_purchase', value: '10' },
+          { action_type: 'offsite_conversion.fb_pixel_purchase', value: '10' },
+        ],
+      },
+    ],
+  });
+  // Havendo omni_purchase, usa SÓ o agregado: 10 (não 20).
+  assert.equal(ds.rows[0].Conversões, '10');
+});
+
+test('mapInsightsToDataSet: sem omni_purchase soma purchase + pixel', () => {
+  const ds = mapInsightsToDataSet({
+    data: [
+      {
+        campaign_name: 'SemOmni',
+        spend: '1',
+        impressions: '1',
+        clicks: '1',
+        date_start: '2026-03-02',
+        actions: [
           { action_type: 'purchase', value: '2' },
           { action_type: 'offsite_conversion.fb_pixel_purchase', value: '3' },
-          { action_type: 'omni_purchase', value: '4' },
           { action_type: 'link_click', value: '99' },
         ],
       },
     ],
   });
-  // 2 + 3 + 4 = 9 (link_click ignorado)
-  assert.equal(ds.rows[0].Conversões, '9');
+  // Sem agregado omni: soma os específicos 2 + 3 = 5 (link_click ignorado).
+  assert.equal(ds.rows[0].Conversões, '5');
+});
+
+test('mapInsightsToDataSet: só omni_purchase usa o agregado', () => {
+  const ds = mapInsightsToDataSet({
+    data: [
+      {
+        campaign_name: 'SoOmni',
+        spend: '1',
+        impressions: '1',
+        clicks: '1',
+        date_start: '2026-03-03',
+        actions: [
+          { action_type: 'omni_purchase', value: '7' },
+          { action_type: 'link_click', value: '99' },
+        ],
+      },
+    ],
+  });
+  assert.equal(ds.rows[0].Conversões, '7');
+});
+
+test('mapInsightsToDataSet: múltiplos omni_purchase somam entre si (itens distintos do agregado)', () => {
+  // Vários omni_purchase são itens/janelas separados do mesmo agregado unificado;
+  // somar os omni ENTRE SI é correto. O que não pode é somar omni COM pixel/purchase.
+  const ds = mapInsightsToDataSet({
+    data: [
+      {
+        campaign_name: 'MultiOmni',
+        spend: '1',
+        impressions: '1',
+        clicks: '1',
+        date_start: '2026-03-04',
+        actions: [
+          { action_type: 'omni_purchase', value: '4' },
+          { action_type: 'omni_purchase', value: '6' },
+          { action_type: 'offsite_conversion.fb_pixel_purchase', value: '10' },
+        ],
+      },
+    ],
+  });
+  // Soma só os omni: 4 + 6 = 10. O pixel é ignorado por já estar no agregado.
+  assert.equal(ds.rows[0].Conversões, '10');
 });
 
 test('mapInsightsToDataSet: resposta de erro da Graph API lança Error', () => {

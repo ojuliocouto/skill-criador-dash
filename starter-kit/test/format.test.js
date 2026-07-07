@@ -175,6 +175,31 @@ test('parseDateBR: aceita ISO com mes/dia de 1 digito', () => {
   assert.equal(parseDateBR('2026-12-31'), '2026-12-31'); // 2 digitos continua
 });
 
+// MINOR 3 (format.js:91-96): o ramo ISO nao ancorava o fim e aceitava sufixo
+// colado invalido apos a data ('2026-01-01lixo' passava como 2026-01-01). Agora
+// so aceita: data pura, ou data seguida de um separador de hora reconhecido
+// (espaco ou 'T'). Sufixo nao reconhecido (colado ou nao) vira null.
+test('parseDateBR: sufixo colado invalido apos ISO vira null', () => {
+  assert.equal(parseDateBR('2026-01-01lixo'), null);
+  assert.equal(parseDateBR('2026-01-01abc'), null);
+  assert.equal(parseDateBR('2026/01/01xpto'), null);
+  assert.equal(parseDateBR('2026-1-1lixo'), null);
+  assert.equal(parseDateBR('2026-01-0110'), null); // digito colado sem separador de hora
+});
+
+test('parseDateBR: ISO com hora reconhecida (T ou espaco) continua valido', () => {
+  assert.equal(parseDateBR('2026-12-31T10:00'), '2026-12-31');
+  assert.equal(parseDateBR('2026-12-31T10:00:00.000Z'), '2026-12-31');
+  assert.equal(parseDateBR('2026-12-31 10:00'), '2026-12-31');
+  assert.equal(parseDateBR('2026/12/31T23:59:59'), '2026-12-31');
+});
+
+test('parseDateBR: ISO puro (sem sufixo) continua valido', () => {
+  assert.equal(parseDateBR('2026-01-01'), '2026-01-01');
+  assert.equal(parseDateBR('2026/01/01'), '2026-01-01');
+  assert.equal(parseDateBR('2026-2-1'), '2026-02-01');
+});
+
 // CORRETUDE 1: parseNumberBR usava Number() cru, que aceita hexadecimal
 // ('0x1A'), notacao cientifica ('1e3') e formas degeneradas ('5.', '.5').
 // Esses casos devem virar NaN (texto, nao numero decimal plausivel), sem

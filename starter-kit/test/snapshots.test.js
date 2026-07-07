@@ -91,3 +91,46 @@ test('rowToDataSet: dbRow null lança Error "nenhum snapshot encontrado"', () =>
 test('rowToDataSet: dbRow undefined lança Error de snapshot ausente', () => {
   assert.throws(() => rowToDataSet(undefined), /nenhum snapshot encontrado/i);
 });
+
+// MINOR 1 (snapshots.mjs:56-61): listSnapshotsSQL aceitava limit nao-numerico e
+// gerava `LIMIT NaN` (SQL invalido). Number('abc') -> NaN, Number(undefined) -> NaN.
+// Regra: limit precisa ser inteiro POSITIVO; senao cai no default seguro (100).
+// Nunca deve vazar NaN pro params (que viraria LIMIT NaN no D1).
+test('listSnapshotsSQL: limit nao-inteiro/invalido cai no default 100 (nunca NaN)', () => {
+  for (const bad of [undefined, 'abc', -5, 0, null, NaN, 1.5, Infinity, {}, '']) {
+    const { params } = listSnapshotsSQL('meu-dash', bad);
+    assert.ok(Number.isInteger(params[1]), `limit deve ser inteiro para entrada ${String(bad)}`);
+    assert.ok(params[1] > 0, `limit deve ser positivo para entrada ${String(bad)}`);
+    assert.equal(params[1], 100, `limit invalido deve cair no default 100 para ${String(bad)}`);
+  }
+});
+
+test('listSnapshotsSQL: limit inteiro positivo valido e preservado', () => {
+  assert.equal(listSnapshotsSQL('meu-dash', 50).params[1], 50);
+  assert.equal(listSnapshotsSQL('meu-dash', 1).params[1], 1);
+  assert.equal(listSnapshotsSQL('meu-dash', 1000).params[1], 1000);
+  // numero em string que representa inteiro positivo tambem vale
+  assert.equal(listSnapshotsSQL('meu-dash', '25').params[1], 25);
+});
+
+// MINOR 2 (snapshots.mjs:42-47): latestSnapshotSQL/listSnapshotsSQL nao validavam
+// dashboardId vazio (assimetria com o insert, que valida). Devem lancar a MESMA
+// validacao PT-BR do insert quando o dashboardId falta ou e vazio/espacos.
+test('latestSnapshotSQL: sem dashboardId lança Error em PT-BR (igual ao insert)', () => {
+  assert.throws(() => latestSnapshotSQL(''), /dashboard/i);
+  assert.throws(() => latestSnapshotSQL('   '), /dashboard/i);
+  assert.throws(() => latestSnapshotSQL(null), /dashboard/i);
+  assert.throws(() => latestSnapshotSQL(undefined), /dashboard/i);
+});
+
+test('listSnapshotsSQL: sem dashboardId lança Error em PT-BR (igual ao insert)', () => {
+  assert.throws(() => listSnapshotsSQL(''), /dashboard/i);
+  assert.throws(() => listSnapshotsSQL('   ', 10), /dashboard/i);
+  assert.throws(() => listSnapshotsSQL(null), /dashboard/i);
+  assert.throws(() => listSnapshotsSQL(undefined), /dashboard/i);
+});
+
+test('latestSnapshotSQL: dashboardId valido continua funcionando', () => {
+  const { params } = latestSnapshotSQL('meu-dash');
+  assert.deepEqual(params, ['meu-dash']);
+});

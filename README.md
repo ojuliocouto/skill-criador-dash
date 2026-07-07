@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (428 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (448 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -87,7 +87,7 @@ For the MVP data source (Google Sheets or CSV) you need no token, no OAuth, and 
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 428 unit tests: node --test 'test/*.test.js'
+npm test                      # 448 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
@@ -117,7 +117,7 @@ The data source needs no secret for the MVP (a link-shared Google Sheet or a CSV
    wrangler pages project create <YOUR-PROJECT-NAME> --production-branch main
    wrangler pages deploy public --project-name=<YOUR-PROJECT-NAME> --branch main
    ```
-4. If the API responds 500 "Binding DASHBOARDS_KV nao configurado", attach the bindings in the panel: Cloudflare Pages > your project > Settings > Bindings > add the KV binding `DASHBOARDS_KV` (and `DASHBOARD_CACHE`).
+4. If the API responds 500 "Binding DASHBOARDS_KV não configurado", attach the bindings in the panel: Cloudflare Pages > your project > Settings > Bindings > add the KV binding `DASHBOARDS_KV` (and `DASHBOARD_CACHE`).
 5. Required (mutations are fail-closed): set an admin token so you can create/manage dashboards. Generate one and store it as a secret: `openssl rand -base64 32` then `wrangler pages secret put ADMIN_TOKEN --project-name=<YOUR-PROJECT-NAME>` (paste the generated value). Without it, every create/delete is rejected with 403.
 6. Optionally attach a custom domain in the Cloudflare Pages dashboard.
 7. Open `config.html` on the published domain and create the first dashboard. The wizard asks for the admin token once (paste the value from step 5); it is stored in the browser and sent automatically after that.
@@ -159,6 +159,7 @@ starter-kit/
       snapshots.mjs             # historical-mode SQL + rowToDataSet (pure)
       auth-config.mjs           # needsAuth/authOk (salted PBKDF2)/safeEqual/checkAdminToken (neutral)
       rate-limit.mjs            # KV fixed-window limiter (password gate + Meta preview throttle)
+      domains.mjs               # server DOMAINS list (validates POST); kept in parity with the browser copy
   workers/
     snapshot/                   # Worker with a cron trigger that writes D1 snapshots
   public/
@@ -171,6 +172,7 @@ starter-kit/
         config-wizard.js
         dashboard.js
         index-page.js
+        domains.mjs           # browser DOMAINS list (source of truth for domains; parity-tested with the server copy)
         sources/
           index.js              # source registry (type, label, canHistory): source of truth
         lib/
@@ -200,7 +202,7 @@ starter-kit/
 
 ## Testing
 
-There are 428 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 448 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit

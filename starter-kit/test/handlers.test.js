@@ -202,6 +202,37 @@ test('dashboards POST aceita todo dominio do registry (sem enum hardcoded no han
   }
 });
 
+// 2c. MINOR seguranca: config.id CRU do cliente e sanitizado pelo MESMO slugify
+//     do contrato antes de virar chave KV. Nao se aceita id arbitrario.
+test('dashboards POST: id cru do cliente vira slug seguro antes de virar chave KV', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(
+    ctx('POST', {
+      body: makeConfig({ name: 'Qualquer', id: '../../Evil ID!! /etc/passwd' }),
+      headers: adminHeaders(),
+      env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN },
+    })
+  );
+  assert.equal(res.status, 200);
+  const j = await readJSON(res);
+  // O id devolvido e um slug: so [a-z0-9-], sem barras, espacos ou '..'.
+  assert.match(j.id, /^[a-z0-9-]+$/, 'id sanitizado (sem caractere perigoso)');
+  assert.ok(!j.id.includes('/'), 'sem barra');
+  assert.ok(!j.id.includes('..'), 'sem travessia de caminho');
+  // A chave gravada no KV usa o slug, nao o id cru.
+  assert.ok(kv._map.has(`dash:${j.id}`), 'chave KV usa o slug seguro');
+  assert.ok(!kv._map.has('dash:../../Evil ID!! /etc/passwd'), 'jamais grava o id cru');
+});
+
+test('dashboards POST: id ja limpo e preservado (slug estavel)', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ name: 'X', id: 'meu-dash-2026' }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+  );
+  assert.equal(res.status, 200);
+  assert.equal((await readJSON(res)).id, 'meu-dash-2026', 'id valido nao e alterado');
+});
+
 // 3. GET ?id de dashboard existente NAO protegido -> 200 com a config.
 test('dashboards GET ?id nao protegido -> 200 com a config', async () => {
   const cfg = makeConfig({ id: 'aberto', createdAt: '2026-01-01T00:00:00.000Z' });

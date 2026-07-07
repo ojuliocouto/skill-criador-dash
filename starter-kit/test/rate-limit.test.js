@@ -40,9 +40,37 @@ function at(t) {
   return t;
 }
 
-test('rateLimit: sem KV (env.DASHBOARD_CACHE ausente) -> { ok: true } e nao quebra', async () => {
+test('rateLimit: sem NENHUM KV (nem cache nem DASHBOARDS_KV) -> { ok: true } e nao quebra', async () => {
   const r = await rateLimit({}, 'ip:1.2.3.4', { limit: 5, windowSec: 60 });
   assert.equal(r.ok, true);
+});
+
+// GRAVE (fail-open): DASHBOARD_CACHE e binding OPCIONAL. Quando ele nao esta
+// vinculado (deploy comum), o rate limit NAO pode desligar: cai no DASHBOARDS_KV
+// (sempre presente) e AINDA barra o brute force no limite.
+test('rateLimit: SEM DASHBOARD_CACHE mas COM DASHBOARDS_KV -> ainda conta e barra (nao fail-open)', async () => {
+  const clock = { t: 4000 };
+  const env = { DASHBOARDS_KV: fakeKV(clock) }; // repare: SEM DASHBOARD_CACHE
+  const opts = { limit: 2, windowSec: 60, nowSec: () => clock.t };
+
+  const r1 = await rateLimit(env, 'ip:a', opts);
+  assert.equal(r1.ok, true);
+  const r2 = await rateLimit(env, 'ip:a', opts);
+  assert.equal(r2.ok, true);
+  // 3a chamada estoura: o fallback contou de verdade no DASHBOARDS_KV.
+  const r3 = await rateLimit(env, 'ip:a', opts);
+  assert.equal(r3.ok, false, 'sem cache, o rate limit ainda barra usando DASHBOARDS_KV');
+  assert.ok(r3.retryAfter > 0);
+});
+
+test('rateLimit: prefere DASHBOARD_CACHE quando os dois bindings existem', async () => {
+  const clock = { t: 5000 };
+  const cache = fakeKV(clock);
+  const kvObrig = fakeKV(clock);
+  const env = { DASHBOARD_CACHE: cache, DASHBOARDS_KV: kvObrig };
+  await rateLimit(env, 'ip:x', { limit: 5, windowSec: 60, nowSec: () => clock.t });
+  assert.equal(cache._map.size, 1, 'contou no cache dedicado');
+  assert.equal(kvObrig._map.size, 0, 'nao tocou no DASHBOARDS_KV quando ha cache');
 });
 
 test('rateLimit: conta as chamadas na janela e estoura ao passar do limite', async () => {
