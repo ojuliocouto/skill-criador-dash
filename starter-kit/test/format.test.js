@@ -103,3 +103,41 @@ test('parseDateBR: aceita ISO com barra AAAA/MM/DD', () => {
 test('parseDateBR: ISO com barra invalido vira null (mesmo retorno de hoje)', () => {
   assert.equal(parseDateBR('2026/13/40'), null);
 });
+
+// GRAVE 1: coluna US so-com-virgula (milhar sem ponto decimal).
+// '1,234' era tratado como decimal BR (1.234) e a soma da coluna encolhia ~1000x.
+// Regra: se a virgula separa grupos de EXATAMENTE 3 digitos, e milhar (remove virgula).
+test('parseNumberBR: US so-com-virgula de milhar (grupos de 3 digitos)', () => {
+  assert.equal(parseNumberBR('1,234'), 1234);
+  assert.equal(parseNumberBR('12,345'), 12345);
+  assert.equal(parseNumberBR('1,000,000'), 1000000);
+});
+
+test('parseNumberBR: so-com-virgula decimal BR quando nao e grupo de 3', () => {
+  assert.equal(parseNumberBR('1,23'), 1.23); // 2 casas = decimal
+  assert.equal(parseNumberBR('1,5'), 1.5);   // 1 casa = decimal
+});
+
+test('parseNumberBR: soma de coluna US so-virgula bate o total inteiro', () => {
+  const coluna = ['1,234', '5,678'];
+  const soma = coluna.reduce((acc, v) => acc + parseNumberBR(v), 0);
+  assert.equal(soma, 6912); // 1234 + 5678, sem encolher
+});
+
+// MINOR: fmtInteger(-0.4) arredonda pra -0; deve normalizar pra '0'.
+test('fmtInteger: normaliza zero negativo para 0', () => {
+  assert.equal(fmtInteger(-0.4), '0');
+  assert.equal(fmtInteger(-0), '0');
+  // Math.round arredonda o meio para +infinito: -0.5 -> -0 (normalizado para '0').
+  assert.equal(fmtInteger(-0.5), '0');
+  assert.equal(fmtInteger(-0.6), '-1'); // magnitude > 0.5 arredonda normal
+  assert.equal(fmtInteger(-1234.5), '-1.234'); // negativo grande formata com sinal
+});
+
+// MINOR: parseDateBR deve aceitar ISO com mes/dia de 1 digito (hifen e barra),
+// coerente com o ramo BR que ja aceita D/M/AAAA.
+test('parseDateBR: aceita ISO com mes/dia de 1 digito', () => {
+  assert.equal(parseDateBR('2026-2-1'), '2026-02-01');
+  assert.equal(parseDateBR('2026/1/1'), '2026-01-01');
+  assert.equal(parseDateBR('2026-12-31'), '2026-12-31'); // 2 digitos continua
+});

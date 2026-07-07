@@ -71,3 +71,19 @@ test('autoMap: alias casa como token completo dentro do header (casos legitimos)
   assert.equal(autoMap([{ key: 'data', aliases: ['data'] }], ['Data da venda']).data, 'Data da venda');
   assert.equal(autoMap([{ key: 'valor', aliases: ['total'] }], ['Valor total']).valor, 'Valor total');
 });
+
+// GRAVE 2: alias nao pode casar como PREFIXO de uma palavra maior (token unico).
+// 'data' x 'Database', 'custo' x 'Customizado', 'lead' x 'Leadership', 'dia' x 'Diaria'
+// eram falsos positivos porque o ultimo token do alias casava por startsWith.
+test('autoMap: alias NAO casa como prefixo de palavra maior (falsos positivos)', () => {
+  assert.deepEqual(autoMap([{ key: 'data', aliases: ['data'] }], ['Database']), { data: null });
+  assert.deepEqual(autoMap([{ key: 'custo', aliases: ['custo'] }], ['Customizado']), { custo: null });
+  assert.deepEqual(autoMap([{ key: 'lead', aliases: ['lead'] }], ['Leadership']), { lead: null });
+  assert.deepEqual(autoMap([{ key: 'dia', aliases: ['dia'] }], ['Diaria']), { dia: null });
+});
+
+// Prefixo com sufixo curtissimo (<=2 chars) ainda casa: plural/flexao legitimo.
+test('autoMap: alias casa prefixo com sufixo curto (plural/flexao)', () => {
+  assert.equal(autoMap([{ key: 'venda', aliases: ['venda'] }], ['Vendas']).venda, 'Vendas');
+  assert.equal(autoMap([{ key: 'custo', aliases: ['custo'] }], ['Custos']).custo, 'Custos');
+});

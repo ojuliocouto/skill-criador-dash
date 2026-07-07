@@ -14,6 +14,12 @@ import { onRequest as csv } from '../functions/api/connectors/csv.js';
 import { onRequest as metaAds } from '../functions/api/connectors/meta-ads.js';
 import { onRequest as d1 } from '../functions/api/connectors/d1.js';
 import { sha256Hex } from '../public/assets/js/lib/auth.js';
+import { derivePasswordAuth } from '../functions/lib/auth-config.mjs';
+
+// Deriva o bloco auth v2 (salgado) a partir do hash do cliente, como o servidor grava.
+async function saltedAuth(clientHash) {
+  return derivePasswordAuth(clientHash);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers de infra fake
@@ -246,7 +252,7 @@ test('meta-ads GET protegido sem senha -> 401 e NAO chama a Graph API', async ()
   const hash = await sha256Hex('meta-senha');
   const config = {
     name: 'Dash Meta',
-    auth: { hash },
+    auth: await saltedAuth(hash), // formato v2 salgado (unico aceito)
     source: { meta: { token: 'SEGREDO', account: 'act_999' } },
   };
   const kv = fakeKV({ 'dash:meta1': JSON.stringify(config) });
@@ -269,7 +275,7 @@ test('meta-ads GET protegido com senha correta -> 200 DataSet e chama a Graph AP
   const hash = await sha256Hex('meta-senha');
   const config = {
     name: 'Dash Meta',
-    auth: { hash },
+    auth: await saltedAuth(hash), // formato v2 salgado (unico aceito)
     source: { meta: { token: 'SEGREDO', account: 'act_999' } },
   };
   const kv = fakeKV({ 'dash:meta1': JSON.stringify(config) });

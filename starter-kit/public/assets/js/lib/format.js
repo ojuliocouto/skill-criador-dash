@@ -27,8 +27,16 @@ export function parseNumberBR(v) {
       s = s.replace(/\./g, '').replace(',', '.');
     }
   } else if (hasComma) {
-    // so virgula -> decimal BR
-    s = s.replace(',', '.');
+    // So virgula, ambiguo (ex '1,234' pode ser 1234 milhar US ou 1.234 decimal BR).
+    // Simetrico ao ramo so-com-ponto: se a virgula separa grupos de EXATAMENTE 3
+    // digitos, e milhar -> remove as virgulas ('1,234' -> 1234, '1,000,000' -> 1000000).
+    // Caso contrario e decimal BR -> troca virgula por ponto ('1,23' -> 1.23, '1,5' -> 1.5).
+    const grupos = s.split(',');
+    const primeiroTemDigitos = /^\d{1,3}$/.test(grupos[0]);
+    const restoGrupoDe3 = grupos.slice(1).every((p) => /^\d{3}$/.test(p));
+    const looksThousand = grupos.length > 1 && primeiroTemDigitos && restoGrupoDe3;
+    if (looksThousand) s = grupos.join('');
+    else s = s.replace(',', '.');
   } else if (hasDot) {
     // So ponto, ambiguo (ex '100.000' pode ser 100 mil ou 100.0). Regra adotada:
     // se cada grupo apos o 1o ponto tem exatamente 3 digitos, e milhar -> remove os pontos
@@ -52,11 +60,14 @@ export function parseDateBR(v) {
   if (v == null) return null;
   const s = String(v).trim();
   if (!s) return null;
-  // ja ISO (aceita hifen ou barra como separador: AAAA-MM-DD ou AAAA/MM/DD)
-  let m = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  // ja ISO (aceita hifen ou barra como separador: AAAA-MM-DD ou AAAA/MM/DD).
+  // Mes e dia aceitam 1-2 digitos (ex '2026-2-1', '2026/1/1'), coerente com o ramo BR.
+  // Nao ancora o fim: tolera sufixo de hora (ex '2026-12-31T10:00'), como antes.
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (m) {
-    const iso = `${m[1]}-${m[2]}-${m[3]}`;
-    return isValidYMD(+m[1], +m[2], +m[3]) ? iso : null;
+    const y = +m[1]; const mo = +m[2]; const d = +m[3];
+    if (!isValidYMD(y, mo, d)) return null;
+    return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
   // DD/MM/AAAA ou D/M/AAAA (aceita - ou . como separador)
   m = s.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/);
@@ -96,6 +107,8 @@ export function fmtPercent(n) {
 }
 
 export function fmtInteger(n) {
-  const v = Number.isFinite(n) ? Math.round(n) : 0;
+  let v = Number.isFinite(n) ? Math.round(n) : 0;
+  // Normaliza zero negativo (Math.round(-0.4) === -0) para evitar a saida '-0'.
+  if (v === 0) v = 0;
   return nf(0, 0).format(v);
 }

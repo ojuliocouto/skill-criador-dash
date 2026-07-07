@@ -14,9 +14,15 @@
 //  - Ao AUTENTICAR, o servidor recomputa PBKDF2(headerRecebido, salt, iterations)
 //    e compara com o verifier guardado em tempo constante.
 //
-// COMPATIBILIDADE: configs antigas no formato `auth = { hash }` (hash cru aceito
-// direto no header) continuam funcionando via fallback, para nao derrubar
-// dashboards ja gravados. Recomenda-se regravar a senha para migrar ao formato v2.
+// FORMATO UNICO (sem legado): so o formato v2 salgado e aceito. Como isto e um
+// template/skill (cada pessoa faz deploy do zero, NAO existe dashboard legado
+// gravado em producao), NAO ha fallback para o formato antigo `{ hash }` (SHA-256
+// cru), que era uma credencial reenviavel em texto no KV. Um config antigo com
+// `{ hash }` e tratado como invalido (nega acesso) em vez de aceitar o hash cru.
+//
+// LIMITACAO CONHECIDA (ver README): o header x-dash-auth carrega sha256(senha) e
+// NAO ha rate limit no servidor (modelo de senha compartilhada). Implementar rate
+// limit exigiria storage (KV/D1) por IP/dashboard e esta fora do escopo aqui.
 
 // Numero de iteracoes padrao do PBKDF2 ao definir uma senha nova.
 export const DEFAULT_PBKDF2_ITERATIONS = 100000;
@@ -87,11 +93,11 @@ export async function derivePasswordAuth(clientHash, iterations = DEFAULT_PBKDF2
   return { salt, verifier, iterations, algo: 'PBKDF2-SHA256' };
 }
 
-/** Indica se o dashboard exige senha para ser aberto (formato v2 salgado ou legado). */
+/** Indica se o dashboard exige senha para ser aberto (formato v2 salgado). */
 export function needsAuth(config) {
   const a = config && config.auth;
   if (!a) return false;
-  return !!(a.verifier || a.hash);
+  return !!a.verifier;
 }
 
 /**
@@ -106,18 +112,39 @@ export async function authOk(config, providedHash) {
   if (!needsAuth(config)) return true;
   if (typeof providedHash !== 'string' || !providedHash) return false;
   const a = config.auth;
-  // Formato v2 (salgado + PBKDF2): recomputa e compara com o verifier em tempo constante.
-  if (a.verifier) {
-    if (!a.salt) return false;
-    const iterations = Number(a.iterations) || DEFAULT_PBKDF2_ITERATIONS;
-    let computed;
-    try {
-      computed = await derivePbkdf2Base64(providedHash, a.salt, iterations);
-    } catch {
-      return false;
-    }
-    return safeEqual(computed, a.verifier);
+  // So o formato v2 (salgado + PBKDF2) e aceito: recomputa e compara com o verifier
+  // em tempo constante. Nao ha fallback para o formato legado `{ hash }` (SHA-256
+  // cru reenviavel): um config antigo sem verifier ja e negado por needsAuth acima.
+  if (!a.salt) return false;
+  const iterations = Number(a.iterations) || DEFAULT_PBKDF2_ITERATIONS;
+  let computed;
+  try {
+    computed = await derivePbkdf2Base64(providedHash, a.salt, iterations);
+  } catch {
+    return false;
   }
-  // Formato legado (hash cru aceito direto): fallback de compatibilidade.
-  return safeEqual(providedHash, a.hash);
+  return safeEqual(computed, a.verifier);
+}
+
+/**
+ * Trava global opcional de mutacao. Se env.ADMIN_TOKEN estiver definido, exige o
+ * header x-admin-token igual a ele (comparacao em tempo constante). Devolve uma
+ * Response 401 quando o token esta definido mas o header falta/nao bate; devolve
+ * null (segue o fluxo) quando o token nao esta definido ou o header confere.
+ *
+ * Vive aqui (modulo neutro de auth) e nao no handler de config para que os
+ * conectores (meta-ads, d1) possam usar a trava SEM importar de dashboards.js.
+ * @param {Object} env
+ * @param {Request} request
+ * @returns {Response|null}
+ */
+export function checkAdminToken(env, request) {
+  const adminToken = env && env.ADMIN_TOKEN;
+  if (!adminToken) return null; // sem token configurado: instancia aberta (comportamento atual).
+  const provided = request.headers.get('x-admin-token') || '';
+  if (safeEqual(provided, adminToken)) return null;
+  return new Response(
+    JSON.stringify({ error: 'Token de administrador necessário ou incorreto.', needsAdmin: true }),
+    { status: 401, headers: { 'content-type': 'application/json' } }
+  );
 }

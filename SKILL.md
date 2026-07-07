@@ -1,14 +1,14 @@
 ---
 name: criador-dash
 description: >
-  Construtor guiado de dashboards de marketing, vendas e suporte. NAO entrega um app pronto:
-  o agente conduz a pessoa, passo a passo, para construir e publicar o proprio dashboard na
-  infra dela (conta Cloudflare, KV, Pages, dominio e, no modo historico, D1 + Worker cron).
-  O agente MONTA a partir de uma biblioteca de pecas ja testadas (conectores, widgets,
-  templates, motor de metricas) em `starter-kit/`, personalizando para a operacao da pessoa,
-  e escreve conectores sob medida quando a fonte e especifica. Dois modos de dados: ao vivo
-  (le a fonte na hora, KV so guarda config) ou historico (cron tira snapshots no D1). Use
-  quando alguem quiser criar, personalizar e publicar um dashboard proprio no Cloudflare.
+  Construtor guiado de dashboards de marketing, vendas e suporte. NÃO entrega um app pronto:
+  o agente conduz a pessoa, passo a passo, para construir e publicar o próprio dashboard na
+  infra dela (conta Cloudflare, KV, Pages, domínio e, no modo histórico, D1 + Worker cron).
+  O agente monta a partir de uma biblioteca de peças já testadas (conectores, widgets,
+  templates, motor de métricas) em `starter-kit/`, personalizando para a operação da pessoa,
+  e escreve conectores sob medida quando a fonte é específica. Dois modos de dados: ao vivo
+  (lê a fonte na hora, KV só guarda config) ou histórico (cron tira snapshots no D1). Use
+  quando alguém quiser criar, personalizar e publicar um dashboard próprio no Cloudflare.
 version: 3.0.0
 author: Julio Couto
 category: marketing-analytics
@@ -73,7 +73,7 @@ Pergunte qual conta Cloudflare usar. Depois (ver seção "Provisionar a infra"):
 
 ### 5. Montar o dashboard
 - Escolha o domínio/template pronto (Marketing, Vendas, Suporte) ou crie um novo (seção "Adicionar domínio").
-- Conecte a fonte: planilha (gviz CSV), upload CSV, Meta Ads (token), ou um conector sob medida.
+- Conecte a fonte: planilha (gviz CSV), upload CSV, Meta Ads (token; o card só aparece no domínio Marketing), ou um conector sob medida.
 - Mapeie colunas (auto-mapeamento por cabeçalho pré-preenche), defina branding (cor), meta opcional e senha opcional.
 - No modo ao vivo, a fonte fica na config; no modo histórico, a fonte alimenta o cron e o dashboard lê o D1.
 
@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PEÇAS (biblioteca provada em `starter-kit/`)
 
-Código real e testado (274 testes verdes, TDD). Você compõe a partir daqui.
+Código real e testado (337 testes verdes, TDD). Você compõe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Não sabem de métricas.
@@ -184,10 +184,11 @@ public/
   assets/css/main.css
   assets/js/
     config-wizard.js  dashboard.js  index-page.js
-    lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js
+    sources/ index.js (registry de fontes: type, label, canHistory)
+    lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js  color.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           274 testes (npm test  ->  node --test test/*.test.js)
+test/                           337 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local (o `npm run dev` já embute a `--compatibility-date` do `package.json`):
@@ -233,6 +234,8 @@ wrangler kv namespace create DASHBOARD_CACHE      # opcional (cache 5 min); impr
 ```
 Abra `wrangler.toml` e troque os placeholders pelos ids impressos: `<SEU_KV_NAMESPACE_ID>` pelo id do
 DASHBOARDS_KV e `<SEU_KV_CACHE_ID>` pelo id do DASHBOARD_CACHE. Nunca commite id real em repo público.
+Troque também o `name = "meu-dashboard"` do topo do `wrangler.toml` pelo `<NOME-DO-PROJETO>` que você vai
+usar abaixo, pra os dois baterem (o `name` do `wrangler.toml` e o `--project-name` do deploy têm que ser iguais).
 ```
 wrangler pages project create <NOME-DO-PROJETO> --production-branch main   # cria o projeto Pages
 wrangler pages deploy public --project-name=<NOME-DO-PROJETO> --branch main
@@ -301,7 +304,7 @@ Siga os Contratos 1 e 2 do `ARCHITECTURE.md`. Todo conector devolve exatamente u
 IMPORTANTE (conector de fonte VIVA não é só 1 arquivo): pra ele ser usado de ponta a ponta, plugue em 4 lugares. Comece SEMPRE pelo registro, que é a fonte de verdade:
 1. `public/assets/js/sources/index.js`: registre a fonte `{ type, label, canHistory }`. Sem isso, `getSource(type)` volta `undefined` e `fetchDataForSource` lança "Tipo de fonte desconhecido". E o `label`/`podeHistorico` do wizard saem daqui.
 2. `public/assets/js/lib/api-client.js`: adicione o fetcher live em `LIVE_FETCHERS` (chave = `type`). Há uma guarda no import: se um `type` do registry (menos `d1`) ficar sem fetcher, o módulo lança no load apontando qual faltou. Não há como esquecer em silêncio.
-3. `public/assets/js/config-wizard.js`: um card/opção no passo 2 (Fonte) pra pessoa conectar (como o Meta).
+3. `public/assets/js/config-wizard.js`: um card/opção no passo 2 (Fonte) pra pessoa conectar. Atenção: o card do Meta é filtrado por domínio (só aparece em Marketing); se a sua fonte serve qualquer domínio, não replique esse gate.
 4. Modo histórico (só se `canHistory:true`): adicione o fetcher em `SNAPSHOT_FETCHERS` de `workers/snapshot/src/index.js`. Outra guarda no import exige que as chaves batam EXATAMENTE com `historyTypes()` do registry.
 As guardas de import e o `test/sources.test.js` (paridade) quebram na hora se um passo faltar, nunca em produção. Sheets/CSV/Meta já estão plugados. Um conector SÓ com o arquivo do handler nunca é chamado.
 

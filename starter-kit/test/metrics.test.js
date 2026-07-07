@@ -169,6 +169,29 @@ test('timeSeries com valueSlot ausente soma zero por data', () => {
   assert.ok(res.every((r) => r.value === 0), 'value 0 quando valueSlot ausente');
 });
 
+// MINOR: groupBy/timeSeries so tratavam valueSlot null pra agg='count'. Com 'avg' e
+// 'countDistinct' + coluna null, deviam degradar previsivelmente (nao virar count mudo
+// nem quebrar). Sem numero valido: avg -> 0, countDistinct -> 0 por bucket.
+test('groupBy: valueSlot null com avg/countDistinct degrada para 0 (nao vira count)', () => {
+  const avg = groupBy(rows, colMap, 'canal', null, 'avg');
+  assert.ok(avg.every((r) => r.value === 0), 'avg com coluna null = 0 por bucket');
+  const dist = groupBy(rows, colMap, 'canal', null, 'countDistinct');
+  assert.ok(dist.every((r) => r.value === 0), 'countDistinct com coluna null = 0 por bucket');
+  // count com null continua contando linhas (comportamento ja existente e correto)
+  const cnt = groupBy(rows, colMap, 'canal', null, 'count');
+  assert.equal(Object.fromEntries(cnt.map((r) => [r.key, r.value])).Meta, 2);
+});
+
+test('timeSeries: valueSlot null com avg/countDistinct degrada para 0 (nao vira count)', () => {
+  const avg = timeSeries(rows, colMap, 'data', null, 'avg');
+  assert.ok(avg.every((r) => r.value === 0), 'avg com coluna null = 0 por data');
+  const dist = timeSeries(rows, colMap, 'data', null, 'countDistinct');
+  assert.ok(dist.every((r) => r.value === 0), 'countDistinct com coluna null = 0 por data');
+  // count com null continua contando linhas por data
+  const cnt = timeSeries(rows, colMap, 'data', null, 'count');
+  assert.equal(Object.fromEntries(cnt.map((r) => [r.date, r.value]))['2026-01-01'], 2);
+});
+
 // Slot que casa por NOME exato de coluna no dataset (sem estar no colMap) ainda
 // deve funcionar: mantemos a possibilidade de passar coluna direta.
 test('computeMetric aceita nome de coluna direto quando existe no dataset', () => {

@@ -103,9 +103,14 @@ function headerMatchesAlias(headerTokens, aliasTokens) {
     for (let j = 0; j < k; j += 1) {
       const ht = headerTokens[i + j];
       const at = aliasTokens[j];
-      // tokens do meio precisam ser iguais; o ultimo token do alias aceita prefixo.
+      // Tokens do meio precisam ser iguais. O ultimo token do alias casa por igualdade
+      // OU por prefixo APENAS quando o sufixo restante do header for curtissimo (<=2
+      // chars, cobre plural/flexao: 'venda'->'vendas', 'custo'->'custos'). Assim
+      // 'data'->'database' (sufixo 'base'=4) e 'dia'->'diaria' (sufixo 'ria'=3) sao
+      // rejeitados, matando os falsos positivos de prefixo.
       if (j === k - 1) {
-        if (!ht.startsWith(at)) { ok = false; break; }
+        const prefixoOk = ht.startsWith(at) && (ht.length - at.length) <= 2;
+        if (ht !== at && !prefixoOk) { ok = false; break; }
       } else if (ht !== at) { ok = false; break; }
     }
     if (ok) return true;

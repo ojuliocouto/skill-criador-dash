@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aplicarAccent, contrastRatio, accentForeground, accentText,
+  composite, fgForBackground, funnelBarBg, badgeSoftBg, badgeText,
   BG_DARK, BG_LIGHT, DEFAULT_ACCENT,
 } from '../public/assets/js/lib/color.js';
 
@@ -108,4 +109,120 @@ test('accentForeground/accentText coerentes no modulo compartilhado', () => {
   assert.equal(accentForeground('#6d28d9'), '#fff');
   assert.equal(accentForeground('#f5d90a'), '#111');
   assert.ok(contrastRatio(accentText('#6d28d9', true), BG_DARK) >= 4.5);
+});
+
+// --- Regressao: contraste medido contra o fundo COMPOSTO (nao o accent cru) ---
+//
+// O bug: --accent-fg (branco/preto derivado do ACCENT CRU) ficava sobre a barra
+// do funil, cujo fundo REAL e --accent-graph com opacity 0.85 sobre --bg-elev-2,
+// visivelmente MAIS CLARO que o accent. Pra accents mainstream (indigo etc.) o
+// branco dava so ~3.68:1 e reprovava AA (13px/600 => limiar 4.5). O badge tinha
+// a mesma raiz: --accent-text sobre --accent-soft composto chegava a ~4.26:1.
+// O fix mede o contraste contra a cor composta VISIVEL. Estes testes travam a
+// regressao pros accents mainstream E extremos, nos DOIS temas.
+
+// composite: 100% do fg = fg; 0% = bg; espelha mixSrgb.
+test('composite: alpha 1 = fg, alpha 0 = bg', () => {
+  assert.equal(composite('#ffffff', '#000000', 1), '#ffffff');
+  assert.equal(composite('#ffffff', '#000000', 0), '#000000');
+  // 50% branco sobre preto ~ cinza medio
+  assert.equal(composite('#ffffff', '#000000', 0.5), '#808080');
+});
+
+// fgForBackground escolhe a cor de MAIOR contraste contra o fundo composto.
+test('fgForBackground: escolhe #000 sobre fundo claro e #fff sobre escuro', () => {
+  assert.equal(fgForBackground('#eeeeee'), '#000');
+  assert.equal(fgForBackground('#222222'), '#fff');
+  assert.equal(fgForBackground('nao-e-hex'), '#fff'); // invalido -> fallback
+});
+
+const ACCENTS_CONTRASTE = [
+  '#6366f1', // indigo mainstream
+  '#7c3aed', // violeta mainstream
+  '#2563eb', // azul mainstream
+  '#6d28d9', // roxo padrao
+  '#22d3ee', // ciano extremo (claro)
+  '#f5d90a', // amarelo extremo (claro)
+];
+
+// Nucleo do fix pro funil: apos aplicarAccent, --funnel-fg tem que passar 4.5:1
+// contra a barra COMPOSTA (nao contra o accent cru), nos dois temas.
+for (const accent of ACCENTS_CONTRASTE) {
+  test(`funnel: ${accent} --funnel-fg passa 4.5:1 sobre a barra composta (2 temas)`, () => {
+    for (const isDark of [true, false]) {
+      const el = fakeEl();
+      aplicarAccent(el, accent, isDark);
+      const fg = el._vars['--funnel-fg'];
+      const barBg = funnelBarBg(accent, isDark);
+      const cr = contrastRatio(fg, barBg);
+      assert.ok(
+        cr >= 4.5,
+        `${accent} (${isDark ? 'escuro' : 'claro'}): --funnel-fg ${fg} sobre barra ${barBg} cr=${cr.toFixed(2)} < 4.5`,
+      );
+    }
+  });
+}
+
+// Nucleo do fix pro badge: --badge-fg tem que passar 4.5:1 contra o fundo
+// COMPOSTO do badge (--accent-soft sobre o card), nos dois temas.
+for (const accent of ACCENTS_CONTRASTE) {
+  test(`badge: ${accent} --badge-fg passa 4.5:1 sobre o accent-soft composto (2 temas)`, () => {
+    for (const isDark of [true, false]) {
+      const el = fakeEl();
+      aplicarAccent(el, accent, isDark);
+      const fg = el._vars['--badge-fg'];
+      const softBg = badgeSoftBg(accent, isDark);
+      const cr = contrastRatio(fg, softBg);
+      assert.ok(
+        cr >= 4.5,
+        `${accent} (${isDark ? 'escuro' : 'claro'}): --badge-fg ${fg} sobre soft ${softBg} cr=${cr.toFixed(2)} < 4.5`,
+      );
+    }
+  });
+}
+
+// Prova da raiz do bug: medir contra o accent CRU passava, mas contra o fundo
+// COMPOSTO reprovava com a cor antiga (--accent-fg no funil). O --funnel-fg novo
+// conserta. Usa indigo #6366f1 no escuro (caso citado no brief, ~3.68:1).
+test('funnel: raiz do bug -- accent-fg cru reprovava sobre a barra composta, --funnel-fg conserta', () => {
+  const accent = '#6366f1';
+  const barBg = funnelBarBg(accent, true);
+  // A cor ANTIGA (branco escolhido contra o accent cru escuro) reprova sobre a barra.
+  const crAntigo = contrastRatio(accentForeground(accent), barBg);
+  assert.ok(crAntigo < 4.5, `sanity: --accent-fg antigo sobre a barra deveria reprovar (cr=${crAntigo.toFixed(2)})`);
+  const el = fakeEl();
+  aplicarAccent(el, accent, true);
+  const crNovo = contrastRatio(el._vars['--funnel-fg'], barBg);
+  assert.ok(crNovo >= 4.5, `--funnel-fg novo sobre a barra cr=${crNovo.toFixed(2)} < 4.5`);
+});
+
+// aplicarAccent agora seta tambem --funnel-fg e --badge-fg (alem das 4 antigas).
+test('aplicarAccent: seta --funnel-fg e --badge-fg', () => {
+  const el = fakeEl();
+  aplicarAccent(el, '#6366f1', true);
+  assert.ok(el._vars['--funnel-fg'], 'faltou --funnel-fg');
+  assert.ok(el._vars['--badge-fg'], 'faltou --badge-fg');
+});
+
+// Toggle de tema recalcula as vars compostas no MESMO elemento (nao herda o tema
+// anterior), igual as outras vars derivadas.
+test('aplicarAccent: toggle recalcula --funnel-fg/--badge-fg pro tema novo', () => {
+  const accent = '#2563eb';
+  const el = fakeEl();
+  aplicarAccent(el, accent, true);   // escuro
+  aplicarAccent(el, accent, false);  // toggle pro claro
+  const crFunnel = contrastRatio(el._vars['--funnel-fg'], funnelBarBg(accent, false));
+  const crBadge = contrastRatio(el._vars['--badge-fg'], badgeSoftBg(accent, false));
+  assert.ok(crFunnel >= 4.5, `pos-toggle claro funnel cr=${crFunnel.toFixed(2)} < 4.5`);
+  assert.ok(crBadge >= 4.5, `pos-toggle claro badge cr=${crBadge.toFixed(2)} < 4.5`);
+});
+
+// badgeText mantem o TOM da marca (nao vira branco/preto chapado) quando o
+// proprio accent ja passa: garante que nao viramos tudo em #fff/#111.
+test('badgeText: preserva o tom da marca quando o accent ja passa o contraste', () => {
+  // Amarelo claro no tema claro: fundo do badge e quase branco, o accent puro
+  // provavelmente nao passa e recalibra escurecendo; ainda assim nao e preto puro.
+  const fg = badgeText('#6d28d9', false); // roxo no claro
+  assert.notEqual(fg, '#000000');
+  assert.notEqual(fg, '#ffffff');
 });

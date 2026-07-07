@@ -11,6 +11,26 @@ export const DEFAULT_ACCENT = '#6d28d9';
 export const BG_DARK = '#0c0e12';
 export const BG_LIGHT = '#f5f6f8';
 
+// Constantes de superficie por tema (espelham as vars do main.css). Como as
+// cores de texto SOBRE fundos compostos (barra do funil, badge) precisam ser
+// medidas contra a cor VISIVEL do fundo (nao contra o accent cru), o color.js
+// precisa saber os tons de superficie de cada tema pra recompor esse fundo.
+// Mantenha em sincronia com :root e [data-theme="light"] no main.css:
+//   bgElev2 = --bg-elev-2 (fundo da trilha da barra do funil)
+//   card    = --bg-elev   (fundo do .card onde o badge normalmente vive)
+//   text    = --text      (usado no --accent-graph = accent 70% + text 30%)
+export const THEME_SURFACES = {
+  dark: { bgElev2: '#1b1f27', card: '#14171d', text: '#e9ecf1' },
+  light: { bgElev2: '#eef0f3', card: '#ffffff', text: '#191c22' },
+};
+
+// Opacidade da barra do funil (main.css .funnel__bar { opacity: 0.85 }).
+const FUNNEL_BAR_ALPHA = 0.85;
+// Peso do accent no --accent-soft (main.css: color-mix(accent 13%, transparent)).
+const ACCENT_SOFT_PCT = 13;
+// Peso do accent no --accent-graph (main.css: color-mix(accent 70%, text 30%)).
+const ACCENT_GRAPH_PCT = 70;
+
 // Faz o parse de um hex (#rgb ou #rrggbb) em [r,g,b]. Retorna null se invalido.
 export function parseHex(hex) {
   if (typeof hex !== 'string') return null;
@@ -109,12 +129,107 @@ export function accentForeground(hex) {
 }
 
 /**
- * Aplica no elemento (normalmente documentElement) as 4 variaveis CSS derivadas
+ * Compoe fgHex sobre bgHex com opacidade alpha (0..1) e devolve a cor OPACA
+ * resultante em hex. Espelha o que o navegador pinta quando um elemento com
+ * background semi-transparente (opacity/alpha) fica sobre um fundo solido:
+ * resultado = fg*alpha + bg*(1-alpha). Reusa mixSrgb (pctAccent = alpha*100).
+ *
+ * @param {string} fgHex cor de cima (com "transparencia" simulada por alpha)
+ * @param {string} bgHex cor de baixo (fundo solido)
+ * @param {number} alpha opacidade de fgHex, 0..1
+ * @returns {string} hex de 6 digitos da cor visivel composta
+ */
+export function composite(fgHex, bgHex, alpha) {
+  const a = Math.max(0, Math.min(1, Number(alpha)));
+  return mixSrgb(fgHex, bgHex, a * 100);
+}
+
+/**
+ * Escolhe a cor de texto (#000 ou #fff) de MAIOR contraste contra um fundo JA
+ * COMPOSTO (cor visivel, opaca). Diferente de accentForeground, que mede contra
+ * o accent cru: aqui o bg ja e a cor real pintada na tela (ex: barra do funil
+ * composta). Usa os extremos PUROS (#000/#fff) de proposito: em fundos de tom
+ * medio (accents mainstream sobre a barra) so o extremo puro alcanca AA 4.5:1;
+ * um "quase-preto" como #111 fica ~0.2 abaixo e reprova. Empate favorece o
+ * branco. Hex invalido cai em '#fff'.
+ *
+ * @param {string} bgHex fundo composto (opaco) onde o texto vai aparecer
+ * @returns {'#000'|'#fff'}
+ */
+export function fgForBackground(bgHex) {
+  if (!parseHex(bgHex)) return '#fff';
+  const crBlack = contrastRatio(bgHex, '#000');
+  const crWhite = contrastRatio(bgHex, '#fff');
+  return crWhite >= crBlack ? '#fff' : '#000';
+}
+
+/**
+ * Cor VISIVEL da barra do funil pro accent/tema dados. A barra usa
+ * --accent-graph (accent 70% + text 30%) com opacity 0.85 sobre --bg-elev-2,
+ * entao a cor real e mais clara que o accent cru. Compoe tudo e devolve o hex.
+ *
+ * @param {string} accentHex accent da marca
+ * @param {boolean} isDark tema escuro?
+ * @returns {string} hex da cor composta da barra
+ */
+export function funnelBarBg(accentHex, isDark) {
+  const S = isDark ? THEME_SURFACES.dark : THEME_SURFACES.light;
+  const graph = mixSrgb(accentHex, S.text, ACCENT_GRAPH_PCT);
+  return composite(graph, S.bgElev2, FUNNEL_BAR_ALPHA);
+}
+
+/**
+ * Cor VISIVEL do fundo do badge pro accent/tema dados. O badge usa
+ * --accent-soft (accent 13% sobre transparente) e normalmente vive dentro de um
+ * .card (--bg-elev), o fundo mais claro entre os possiveis: calibrar contra ele
+ * garante contraste tambem sobre --bg e --bg-elev-2 (mais escuros/claros o
+ * suficiente pra so ajudar). Compoe accent 13% sobre o card e devolve o hex.
+ *
+ * @param {string} accentHex accent da marca
+ * @param {boolean} isDark tema escuro?
+ * @returns {string} hex da cor composta do fundo do badge
+ */
+export function badgeSoftBg(accentHex, isDark) {
+  const S = isDark ? THEME_SURFACES.dark : THEME_SURFACES.light;
+  return composite(accentHex, S.card, ACCENT_SOFT_PCT / 100);
+}
+
+/**
+ * Cor de TEXTO do badge: mantem o tom da marca (nao vira branco/preto chapado
+ * como um botao), mas garante >=target contra o fundo COMPOSTO do badge. Parte
+ * do accent e mistura progressivamente na direcao do extremo legivel (branco no
+ * escuro, preto no claro) ate a razao passar. Mesma tecnica do accentText, mas
+ * medida contra o fundo composto do badge, nao contra o fundo do tema.
+ *
+ * @param {string} hex accent da marca
+ * @param {boolean} isDark tema escuro?
+ * @param {number} [target=4.5] razao minima desejada
+ * @returns {string} hex com contraste >= target sobre o fundo do badge
+ */
+export function badgeText(hex, isDark, target = 4.5) {
+  const base = parseHex(hex) ? hex : DEFAULT_ACCENT;
+  const bg = badgeSoftBg(base, isDark);
+  const toward = isDark ? '#ffffff' : '#000000';
+  const pure = toHex(parseHex(base));
+  if (contrastRatio(pure, bg) >= target) return pure;
+  for (let p = 95; p >= 0; p -= 5) {
+    const cand = mixSrgb(base, toward, p);
+    if (contrastRatio(cand, bg) >= target) return cand;
+  }
+  return toward;
+}
+
+/**
+ * Aplica no elemento (normalmente documentElement) as variaveis CSS derivadas
  * do accent, calibradas pro tema atual:
  *   --accent      cor da marca crua
- *   --accent-fg   cor do texto SOBRE o accent (botoes, chips)
+ *   --accent-fg   cor do texto SOBRE o accent cru (botoes, chips solidos)
  *   --accent-text cor de destaque pra TEXTO/links, com contraste AA no tema
  *   --focus-ring  anel de foco (reusa --accent-text, passa >=3:1)
+ *   --funnel-fg   texto SOBRE a barra do funil (fundo COMPOSTO, mais claro que
+ *                 o accent cru): #111/#fff de maior contraste, garante >=4.5:1
+ *   --badge-fg    texto do badge SOBRE o --accent-soft composto: tom da marca
+ *                 recalibrado pra >=4.5:1 (nao vira branco/preto chapado)
  * Tambem grava o accent em el.dataset.accent pra o theme.js reachar no toggle.
  *
  * @param {HTMLElement} el elemento alvo (ex: document.documentElement)
@@ -129,6 +244,11 @@ export function aplicarAccent(el, hex, isDark) {
   el.style.setProperty('--accent-fg', accentForeground(accent));
   el.style.setProperty('--accent-text', txt);
   el.style.setProperty('--focus-ring', txt);
+  // Texto sobre a barra do funil: mede contra a cor VISIVEL (composta) da barra,
+  // nao contra o accent cru (que e mais escuro e levava a branco reprovando AA).
+  el.style.setProperty('--funnel-fg', fgForBackground(funnelBarBg(accent, isDark)));
+  // Texto do badge: tom da marca recalibrado contra o --accent-soft composto.
+  el.style.setProperty('--badge-fg', badgeText(accent, isDark));
   // Guarda o accent escolhido pra o theme.js recalcular no toggle de tema.
   if (el.dataset) el.dataset.accent = accent;
 }

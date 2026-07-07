@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (274 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (337 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -87,7 +87,7 @@ For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 274 unit tests: node --test 'test/*.test.js'
+npm test                      # 337 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
@@ -169,13 +169,16 @@ starter-kit/
         config-wizard.js
         dashboard.js
         index-page.js
+        sources/
+          index.js              # source registry (type, label, canHistory): source of truth
         lib/
           api-client.js
-          automap.js            # slot -> column auto-mapping
-          format.js             # Brazilian parse/format (currency, number, date)
+          automap.js            # slot -> column auto-mapping (token match, no substring)
+          format.js             # Brazilian/US parse/format (currency, number, date)
           metrics.js            # computeMetric, computeAll, groupBy, timeSeries
-          auth.js               # SHA-256 hash for optional password
+          auth.js               # client-side SHA-256 of the optional password (salted PBKDF2 verifier lives server-side)
           theme.js              # light/dark toggle (injected into the topbar)
+          color.js              # WCAG contrast helpers + aplicarAccent (shared by dashboard, theme, wizard)
         templates/
           index.js
           marketing.js
@@ -194,7 +197,7 @@ starter-kit/
 
 ## Testing
 
-There are 274 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 337 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit

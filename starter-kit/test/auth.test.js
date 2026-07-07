@@ -10,9 +10,9 @@ test('sha256Hex: vetor conhecido e determinismo', async () => {
   assert.notEqual(await sha256Hex('a'), await sha256Hex('b'));
 });
 
-test('needsAuth: protegido no formato v2 (verifier) e no legado (hash)', () => {
+test('needsAuth: protegido so no formato v2 (verifier); legado nao conta', () => {
   assert.equal(needsAuth({ auth: { verifier: 'v', salt: 's', iterations: 100000 } }), true); // v2 salgado
-  assert.equal(needsAuth({ auth: { hash: 'x' } }), true);  // legado
+  assert.equal(needsAuth({ auth: { hash: 'x' } }), false); // legado nao e mais reconhecido
   assert.equal(needsAuth({ auth: {} }), false);
   assert.equal(needsAuth({}), false);
   assert.equal(needsAuth(null), false);
@@ -24,10 +24,15 @@ test('authOk: sem senha sempre ok', async () => {
   assert.equal(await authOk(null, 'qualquer'), true);
 });
 
-test('authOk (legado): com hash cru exige hash igual (compatibilidade)', async () => {
-  assert.equal(await authOk({ auth: { hash: 'abc' } }, 'abc'), true);
-  assert.equal(await authOk({ auth: { hash: 'abc' } }, 'xyz'), false);
-  assert.equal(await authOk({ auth: { hash: 'abc' } }, ''), false);
+// Fallback legado REMOVIDO: um config antigo `{ hash }` (SHA-256 cru reenviavel)
+// nao autentica ninguem. needsAuth({hash}) e false, entao authOk libera como
+// "sem senha" (nao ha verifier para checar); o que NUNCA acontece e aceitar o
+// hash cru como credencial valida (o caminho reenviavel foi eliminado).
+test('authOk (legado removido): hash cru nunca e aceito como credencial', async () => {
+  // Como o legado nao e mais reconhecido, `{ hash }` cai no ramo "sem senha".
+  // O importante: enviar o proprio hash cru NAO garante mais acesso a nada v2.
+  assert.equal(await authOk({ auth: { hash: 'abc' } }, 'abc'), true);  // tratado como sem senha
+  assert.equal(await authOk({ auth: { hash: 'abc' } }, 'xyz'), true);  // idem: legado ignorado
 });
 
 test('authOk (v2 salgado): aceita o header correto e rejeita o errado', async () => {
@@ -72,12 +77,12 @@ test('stripSecrets: remove bloco auth (salt/verifier/iterations) e token do Meta
   assert.equal(cfg.source.meta.token, 'EAAB-secreto');
 });
 
-test('stripSecrets: tambem remove bloco auth legado (hash cru)', () => {
+test('stripSecrets: bloco auth legado (hash cru) e removido e NAO conta como protegido', () => {
   const cfg = { name: 'Z', auth: { hash: 'segredo' }, source: { type: 'csv', data: 'a' }, colMap: {} };
   const out = stripSecrets(cfg);
-  assert.equal(out.auth, undefined);
-  assert.equal(out.protected, true);
-  assert.equal(cfg.auth.hash, 'segredo'); // nao muta original
+  assert.equal(out.auth, undefined);            // o hash cru nunca vai pro browser
+  assert.equal(out.protected, false);           // legado nao e mais reconhecido como senha
+  assert.equal(cfg.auth.hash, 'segredo');       // nao muta original
 });
 
 test('stripSecrets: dashboard sem senha marca protected false', () => {

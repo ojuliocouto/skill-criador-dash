@@ -8,6 +8,12 @@ import assert from 'node:assert/strict';
 
 import { onRequest as dashboards } from '../functions/api/dashboards.js';
 import { sha256Hex } from '../public/assets/js/lib/auth.js';
+import { derivePasswordAuth } from '../functions/lib/auth-config.mjs';
+
+// Deriva o bloco auth v2 (salgado) a partir do hash do cliente, como o servidor grava.
+async function saltedAuth(clientHash) {
+  return derivePasswordAuth(clientHash);
+}
 
 // KV fake em memoria (mesmo shape do KV real: get devolve string ou null).
 function fakeKV(initial = {}) {
@@ -114,7 +120,7 @@ test('admin gate: DELETE com token correto -> 200 apaga', async () => {
 //    per-dashboard: token admin correto NAO derruba a protecao por senha do alvo.
 test('admin gate: token admin correto ainda respeita a senha per-dashboard', async () => {
   const hash = await sha256Hex('senha-dash');
-  const original = makeConfig({ id: 'over', name: 'Original', auth: { hash } });
+  const original = makeConfig({ id: 'over', name: 'Original', auth: await saltedAuth(hash) });
   const kv = fakeKV({ 'dash:over': JSON.stringify(original) });
   const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
 

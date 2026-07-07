@@ -173,7 +173,8 @@ test('dashboards GET ?id inexistente -> 404', async () => {
 // 5. GET protegido: sem header -> 401 needsPassword; com hash correto -> 200.
 test('dashboards GET protegido: sem senha 401 needsPassword, com senha 200', async () => {
   const hash = await sha256Hex('minha-senha');
-  const cfg = makeConfig({ id: 'sec', auth: { hash } });
+  // Config JA gravada: no formato v2 salgado (o unico aceito), como o servidor grava.
+  const cfg = makeConfig({ id: 'sec', auth: await saltedAuth(hash) });
   const kv = fakeKV({ 'dash:sec': JSON.stringify(cfg) });
 
   const semSenha = await dashboards(ctx('GET', { id: 'sec', env: { DASHBOARDS_KV: kv } }));
@@ -193,7 +194,7 @@ test('dashboards GET protegido: sem senha 401 needsPassword, com senha 200', asy
 // 6. DELETE protegido: sem senha 401; com senha 200 {ok:true} e chave sai do KV.
 test('dashboards DELETE protegido: gate de senha e remocao', async () => {
   const hash = await sha256Hex('del-senha');
-  const cfg = makeConfig({ id: 'apagar', auth: { hash } });
+  const cfg = makeConfig({ id: 'apagar', auth: await saltedAuth(hash) });
   const kv = fakeKV({ 'dash:apagar': JSON.stringify(cfg) });
 
   const semSenha = await dashboards(ctx('DELETE', { id: 'apagar', env: { DASHBOARDS_KV: kv } }));
@@ -212,7 +213,7 @@ test('dashboards DELETE protegido: gate de senha e remocao', async () => {
 // 7. POST sobrescrevendo (mesmo id) protegido: sem senha 401 (nao sobrescreve); com senha 200.
 test('dashboards POST sobrescrever protegido: gate de senha', async () => {
   const hash = await sha256Hex('over-senha');
-  const original = makeConfig({ id: 'over', name: 'Original', auth: { hash } });
+  const original = makeConfig({ id: 'over', name: 'Original', auth: await saltedAuth(hash) });
   const kv = fakeKV({ 'dash:over': JSON.stringify(original) });
 
   // Tenta sobrescrever sem senha (config nova ate sem auth, tentando "tomar" o id).
@@ -241,7 +242,7 @@ test('dashboards GET listAll -> 200 array sem hash, com flag protected', async (
   const hash = await sha256Hex('x');
   const kv = fakeKV({
     'dash:a': JSON.stringify(makeConfig({ id: 'a', createdAt: '2026-01-01T00:00:00.000Z' })),
-    'dash:b': JSON.stringify(makeConfig({ id: 'b', createdAt: '2026-02-01T00:00:00.000Z', auth: { hash } })),
+    'dash:b': JSON.stringify(makeConfig({ id: 'b', createdAt: '2026-02-01T00:00:00.000Z', auth: await saltedAuth(hash) })),
   });
   const res = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
   assert.equal(res.status, 200);
@@ -263,7 +264,7 @@ test('dashboards GET listAll -> 200 array sem hash, com flag protected', async (
 // 9. GET protegido sem senha -> 401 (nao le D1); com senha correta + snapshot -> 200 DataSet reidratado.
 test('d1 GET protegido: gate de senha antes de ler D1, depois reidrata DataSet', async () => {
   const hash = await sha256Hex('d1-senha');
-  const cfg = makeConfig({ id: 'hist', auth: { hash } });
+  const cfg = makeConfig({ id: 'hist', auth: await saltedAuth(hash) });
   const kv = fakeKV({ 'dash:hist': JSON.stringify(cfg) });
 
   const dataset = { columns: ['data', 'valor'], rows: [{ data: '2026-01-01', valor: 10 }], meta: { fonte: 'x' } };

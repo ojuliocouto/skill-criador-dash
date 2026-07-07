@@ -2,10 +2,11 @@
 // Cada dashboard é guardado na chave `dash:<id>`.
 // A lógica pura `slugify` é testável sem rede nem KV.
 
-// A auth (needsAuth/authOk/safeEqual) mora no modulo neutro auth-config.mjs para
-// que os conectores nao dependam desta camada de config. Reexportamos needsAuth e
-// authOk aqui para nao quebrar quem ja importa de dashboards.js (ex: os testes).
-import { needsAuth, authOk, safeEqual, derivePasswordAuth } from '../lib/auth-config.mjs';
+// A auth (needsAuth/authOk/safeEqual/checkAdminToken) mora no modulo neutro
+// auth-config.mjs para que os conectores nao dependam desta camada de config.
+// Reexportamos needsAuth e authOk aqui para nao quebrar quem ja importa de
+// dashboards.js (ex: os testes).
+import { needsAuth, authOk, checkAdminToken, derivePasswordAuth } from '../lib/auth-config.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -70,19 +71,10 @@ const kvKey = (id) => `${PREFIX}${id}`;
 // arbitrario numa CSS custom property (--accent) via config.accent.
 const HEX_COLOR = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
 
-/**
- * Trava global opcional de mutacao. Se env.ADMIN_TOKEN estiver definido, exige o
- * header x-admin-token igual a ele (comparacao em tempo constante). Devolve uma
- * Response 401 quando o token esta definido mas o header falta/nao bate; devolve
- * null (segue o fluxo) quando o token nao esta definido ou o header confere.
- */
-export function checkAdminToken(env, request) {
-  const adminToken = env && env.ADMIN_TOKEN;
-  if (!adminToken) return null; // sem token configurado: instancia aberta (comportamento atual).
-  const provided = request.headers.get('x-admin-token') || '';
-  if (safeEqual(provided, adminToken)) return null;
-  return json({ error: 'Token de administrador necessário ou incorreto.', needsAdmin: true }, 401);
-}
+// A trava global de mutacao (checkAdminToken) mora em auth-config.mjs (modulo
+// neutro), para que os conectores possam usa-la sem importar deste handler.
+// Reexportada aqui para nao quebrar quem ja importava de dashboards.js.
+export { checkAdminToken } from '../lib/auth-config.mjs';
 
 /**
  * Handler Cloudflare Pages Function. Roteia por método HTTP.
