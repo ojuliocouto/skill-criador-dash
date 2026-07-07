@@ -202,7 +202,12 @@ export function render(props, data) {} // -> string HTML (o kit padroniza string
 - `table.js`: tabela paginada simples. Recebe `{columns, rows}`.
 - `ranking.js`: barras horizontais ordenadas. Recebe `[{key,value}]`.
 
-Widgets NÃO conhecem template nem conector. Recebem dados já calculados.
+Widgets NÃO conhecem template nem conector: `render(props, data)` recebe dados já prontos e devolve HTML.
+
+O registry `widgets/index.js` e a FRONTEIRA que prepara os dados: cada entrada tem `toHtml(item, ctx)`
+que faz a agregacao especifica do widget (ex: chamar `groupBy`/`timeSeries` de `lib/metrics.js`,
+montar os steps do funil) e so entao chama o `render` puro. Ou seja, quem toca metricas e o registry,
+nao o widget. Adicionar um widget = criar `widgets/<nome>.js` (render puro) + uma entrada no registry.
 
 ---
 

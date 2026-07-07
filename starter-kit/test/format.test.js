@@ -53,3 +53,15 @@ test('formatadores lidam com NaN/invalido sem quebrar', () => {
   assert.equal(fmtInteger(NaN), '0');
   assert.equal(fmtPercent(NaN), '0,00%');
 });
+
+test('parseNumberBR: bordas de milhar e decimal', () => {
+  assert.equal(parseNumberBR('12.345'), 12345);      // milhar sem decimal
+  assert.equal(parseNumberBR('1.234.567'), 1234567); // dois grupos de milhar
+  assert.equal(parseNumberBR('-5,5'), -5.5);         // negativo com decimal BR
+  // formato ambiguo/invalido: grupo do meio com 2 digitos nao e milhar valido
+  assert.ok(Number.isNaN(parseNumberBR('1.23.456')));
+});
+
+test('fmtNumber: saida no padrao BR', () => {
+  assert.equal(fmtNumber(1234.5), '1.234,5'); // ponto = milhar, virgula = decimal
+});

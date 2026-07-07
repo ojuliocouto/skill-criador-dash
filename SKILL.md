@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PECAS (biblioteca provada em `starter-kit/`)
 
-Codigo real e testado (185 testes verdes, TDD). Voce compoe a partir daqui.
+Codigo real e testado (194 testes verdes, TDD). Voce compoe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Nao sabem de metricas.
@@ -134,6 +134,11 @@ sobrescrito ou apagado por qualquer um que tenha o id (fluxo self-serve). Para d
 senha. Para travar a instancia inteira, defina a env `ADMIN_TOKEN` no projeto Pages: com ela setada,
 POST/DELETE exigem o header `x-admin-token`, entao so o dono cria/apaga dashboards.
 
+Detalhe do gate por fonte: a senha protege a config e os conectores POR ID (D1 e Meta GET checam a
+senha antes de devolver dado). Ja sheets/csv sao lidos com a URL/arquivo que estao na config: quem
+nao passa a senha nao pega a config, entao nao chega na URL. O `POST` de preview do Meta (usado so no
+wizard, com token transiente no corpo) e aberto por design e nao grava nada.
+
 Tema claro/escuro: botao na topbar (`lib/theme.js`), injetado em todas as paginas; persiste no
 localStorage e respeita a preferencia do sistema no primeiro acesso. A estetica e de ferramenta de
 analytics (superficie chapada, borda de 1px, numeros tabulares, sem gradiente decorativo), pra NAO
@@ -172,7 +177,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           185 testes (npm test  ->  node --test test/*.test.js)
+test/                           194 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local:
@@ -300,5 +305,6 @@ prontos. Para um novo (ex: gauge), TDD: teste antes.
 
 Ao terminar um trabalho nesta skill:
 1. Atualize este `SKILL.md` se algo mudou (novo dominio, novo conector, novo modo, novo passo).
-2. Salve o contexto do projeto da pessoa em `references/YYYYMMDD-descricao.md`: projeto Pages, dominio,
-   modo de dados, fontes usadas, decisoes. Nunca coloque token, Account ID ou id de KV/D1 real: use placeholders.
+2. Salve o contexto do projeto da pessoa em `references/YYYYMMDD-descricao.md` (crie a pasta com
+   `mkdir -p references` se nao existir): projeto Pages, dominio, modo de dados, fontes usadas,
+   decisoes. Nunca coloque token, Account ID ou id de KV/D1 real: use placeholders.

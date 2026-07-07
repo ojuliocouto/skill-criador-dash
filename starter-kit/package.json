@@ -4,7 +4,7 @@
   "description": "Construtor guiado de dashboards (Marketing, Vendas, Suporte) para Cloudflare Pages + Functions + KV/D1",
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "node --test \"test/*.test.js\"",
     "dev": "wrangler pages dev public --compatibility-date=2026-01-01"
   },
   "license": "MIT"
