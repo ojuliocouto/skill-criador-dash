@@ -70,7 +70,27 @@ export function parseCSV(text, opts = {}) {
     return { columns: [], rows: [] };
   }
 
-  const columns = records[0].map((c) => c.trim());
+  // Desambigua cabeçalhos repetidos sufixando os subsequentes ('Valor', 'Valor'
+  // -> 'Valor', 'Valor_2'). Sem isso, colunas de header duplicado colapsam na
+  // mesma chave de objeto ao montar a row (a última vence), perdendo o dado das
+  // anteriores de forma silenciosa. O sufixo incrementa até achar um nome livre,
+  // sem colidir com um header que já exista com esse nome sufixado ('Valor',
+  // 'Valor_2', 'Valor' -> a última vira 'Valor_3').
+  const seenHeaders = new Set();
+  const columns = records[0].map((c) => c.trim()).map((name) => {
+    if (!seenHeaders.has(name)) {
+      seenHeaders.add(name);
+      return name;
+    }
+    let n = 2;
+    let candidate = `${name}_${n}`;
+    while (seenHeaders.has(candidate)) {
+      n += 1;
+      candidate = `${name}_${n}`;
+    }
+    seenHeaders.add(candidate);
+    return candidate;
+  });
   const rows = [];
 
   for (let i = 1; i < records.length; i++) {

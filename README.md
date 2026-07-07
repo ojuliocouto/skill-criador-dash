@@ -6,7 +6,7 @@ A guided builder for marketing, sales, and support dashboards on Cloudflare Page
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (377 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
+- A library of real, tested code (406 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
 - A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
@@ -87,7 +87,7 @@ For the MVP (Google Sheets or CSV) you need no token, no OAuth, and no API key.
 git clone <YOUR-REPO-URL>
 cd <REPO>/starter-kit
 
-npm test                      # 377 unit tests: node --test 'test/*.test.js'
+npm test                      # 406 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
 
@@ -141,7 +141,7 @@ starter-kit/
     vendas-exemplo.csv
     suporte-exemplo.csv
   functions/
-    _middleware.js              # CORS + KV cache (JSON only)
+    _middleware.js              # CORS + KV cache (only /api/connectors/* responses) + security headers
     api/
       dashboards.js             # CRUD of dashboard configs in KV + password gate + secret strip
       connectors/
@@ -156,7 +156,8 @@ starter-kit/
       sheets-url.mjs            # sheetUrlToCsv (shared by connector and Worker)
       meta.mjs                  # buildInsightsUrl + mapInsightsToDataSet (pure)
       snapshots.mjs             # historical-mode SQL + rowToDataSet (pure)
-      auth-config.mjs           # needsAuth/authOk/safeEqual (neutral; connectors import from here)
+      auth-config.mjs           # needsAuth/authOk (salted PBKDF2)/safeEqual/checkAdminToken (neutral)
+      rate-limit.mjs            # KV fixed-window limiter (password gate + Meta preview throttle)
   workers/
     snapshot/                   # Worker with a cron trigger that writes D1 snapshots
   public/
@@ -197,7 +198,7 @@ starter-kit/
 
 ## Testing
 
-There are 377 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 406 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit
@@ -209,7 +210,7 @@ The full browser flow (Marketing and Sales, including the brand accent color swa
 ## Security
 
 - No token is required for the default source: a link-shared public Google Sheet or a CSV upload is enough.
-- Optional password per dashboard: the server stores a salted PBKDF2-SHA256 verifier per dashboard (never the plain password, never a directly replayable hash), and the config API strips the whole `auth` block (salt, verifier, iterations) before responding. There is no server-side rate limit beyond the KV throttle on failed attempts, and the `x-dash-auth` header (a SHA-256 of the password) is a bearer-style credential protected by TLS in transit: this is a shared view password, not user accounts. For anything sensitive, also set an `ADMIN_TOKEN`.
+- Optional password per dashboard: the server stores a salted PBKDF2-SHA256 verifier per dashboard (never the plain password, never a directly replayable hash), and the config API strips the whole `auth` block (salt, verifier, iterations) before responding. A KV fixed-window rate limiter throttles wrong-password attempts (by IP + dashboard id) and the Meta Ads preview POST (by IP), so the gate and the preview relay cannot be hammered. The `x-dash-auth` header (a SHA-256 of the password) is still a bearer-style credential protected by TLS in transit: this is a shared view password, not user accounts. For anything sensitive, also set an `ADMIN_TOKEN`.
 - Meta Ads access token is stored in the dashboard config and never returned to the browser: the connector Function reads it server-side by dashboard id. The config API strips the token from every response.
 - A link-shared Google Sheet is readable by anyone with the link, and a published dashboard has no login unless you set a password. Use data you are comfortable sharing by link, and set a password for anything sensitive.
 - Nothing sensitive lives in the code. No tokens, Account IDs, or KV ids are committed. Use `<...>` placeholders in any public repo.

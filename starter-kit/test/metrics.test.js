@@ -192,6 +192,45 @@ test('timeSeries: valueSlot null com avg/countDistinct degrada para 0 (nao vira 
   assert.equal(Object.fromEntries(cnt.map((r) => [r.date, r.value]))['2026-01-01'], 2);
 });
 
+// CORRETUDE 2 (metrics.js:157): agg 'count' com valueSlot NAO-nulo contava so
+// celulas numericas (parseNumberBR finito), subcontando linhas com valor de TEXTO.
+// 'count' deve contar PRESENCA da linha (celula nao-vazia), independente de ser
+// numero. groupBy/timeSeries devem contar todas as linhas nao-vazias da coluna.
+test('groupBy: count sobre coluna de TEXTO conta linhas nao-vazias (nao zero)', () => {
+  // 'canal' e texto (Meta/Google/Meta/''). Por canal: Meta 2, Google 1.
+  const res = groupBy(rows, colMap, 'canal', 'canal', 'count');
+  const map = Object.fromEntries(res.map((r) => [r.key, r.value]));
+  assert.equal(map.Meta, 2, 'count de texto conta as 2 linhas Meta, nao 0');
+  assert.equal(map.Google, 1, 'count de texto conta a linha Google, nao 0');
+});
+
+test('groupBy: count sobre coluna com valores mistos (texto + vazio) conta os nao-vazios', () => {
+  // Agrupa por canal, conta a coluna 'receita' (tem '3.000,00', '5.000,00', 'abc', ...).
+  // Meta: linha1 receita '3.000,00' + linha3 receita 'abc' -> ambas nao-vazias = 2.
+  // Google: linha2 receita '5.000,00' = 1.
+  const res = groupBy(rows, colMap, 'canal', 'receita', 'count');
+  const map = Object.fromEntries(res.map((r) => [r.key, r.value]));
+  assert.equal(map.Meta, 2, 'conta linha com receita numerica E a com texto abc');
+  assert.equal(map.Google, 1);
+});
+
+test('timeSeries: count sobre coluna de TEXTO conta linhas nao-vazias por data', () => {
+  // Conta 'canal' (texto) por data. 01/01: 2 linhas (Meta, Google); 02/01: 1 (Meta).
+  const res = timeSeries(rows, colMap, 'data', 'canal', 'count');
+  const map = Object.fromEntries(res.map((r) => [r.date, r.value]));
+  assert.equal(map['2026-01-01'], 2, 'count de texto conta as 2 linhas do dia');
+  assert.equal(map['2026-01-02'], 1);
+});
+
+test('groupBy: count com valueSlot numerico ainda conta as linhas (nao muda o total)', () => {
+  // Conta 'investimento' por canal. Todas as celulas de invest sao numericas aqui.
+  // Meta: linha1 + linha3 = 2; Google: 1. count = presenca de celula nao-vazia.
+  const res = groupBy(rows, colMap, 'canal', 'investimento', 'count');
+  const map = Object.fromEntries(res.map((r) => [r.key, r.value]));
+  assert.equal(map.Meta, 2);
+  assert.equal(map.Google, 1);
+});
+
 // Slot que casa por NOME exato de coluna no dataset (sem estar no colMap) ainda
 // deve funcionar: mantemos a possibilidade de passar coluna direta.
 test('computeMetric aceita nome de coluna direto quando existe no dataset', () => {

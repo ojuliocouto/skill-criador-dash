@@ -45,14 +45,29 @@ export function parseNumberBR(v) {
     if (looksThousand) s = grupos.join('');
     else s = s.replace(',', '.');
   } else if (hasDot) {
-    // So ponto, ambiguo (ex '100.000' pode ser 100 mil ou 100.0). Regra adotada:
-    // se cada grupo apos o 1o ponto tem exatamente 3 digitos, e milhar -> remove os pontos
-    // ('100.000' -> 100000, '1.234.567' -> 1234567). Caso contrario, mantem ponto decimal
-    // ('1234.56' -> 1234.56).
+    // So ponto, ambiguo (ex '100.000' pode ser 100 mil ou 100.0).
+    // HEURISTICA (limitacao conhecida e AMBIGUA): se cada grupo apos o 1o ponto
+    // tem exatamente 3 digitos, tratamos como milhar -> remove os pontos
+    // ('100.000' -> 100000, '1.234.567' -> 1234567). Caso contrario, mantem o
+    // ponto como decimal ('1234.56' -> 1234.56).
+    // ATENCAO: essa regra CORROMPE um preco decimal legitimo de 3 casas, ex
+    // '1.234' que deveria ser 1.234 reais e lido como 1234. Nao da pra desfazer
+    // essa ambiguidade so pela string (o mesmo texto pode ser mil-e-poucos OU
+    // um decimal de 3 casas). A escolha "3 digitos = milhar" e deliberada e esta
+    // travada em teste; se um dia precisar do outro comportamento, o caminho e
+    // um override explicito de locale/decimais no chamador, nunca adivinhar aqui.
     const parts = s.split('.');
     const looksThousand = parts.length > 1 && parts.slice(1).every((p) => p.length === 3);
     if (looksThousand) s = parts.join('');
   }
+  // Guard de corretude: neste ponto `s` deveria ser um numero DECIMAL plausivel
+  // (digitos, no maximo um ponto decimal, sinal opcional). Number() sozinho e
+  // permissivo demais: aceita hexadecimal ('0x1A'), binario ('0b101'), notacao
+  // cientifica ('1e3' -> 1000), 'Infinity' e formas degeneradas ('5.', '.5').
+  // Numa celula de planilha isso vira mis-parse silencioso ('FF' ou '1e3' como
+  // numero). Validamos o formato antes de converter: exige pelo menos um digito
+  // ANTES e, se houver ponto, pelo menos um digito DEPOIS. Rejeita o resto.
+  if (!/^[+-]?\d+(\.\d+)?$/.test(s)) return NaN;
   const n = Number(s);
   return Number.isFinite(n) ? n : NaN;
 }

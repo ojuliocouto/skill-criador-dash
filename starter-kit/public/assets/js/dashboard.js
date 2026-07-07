@@ -14,6 +14,7 @@ import { render as renderKpi } from './widgets/kpi.js';
 import { getWidget } from './widgets/index.js';
 import { getSource } from './sources/index.js';
 import { DEFAULT_ACCENT, aplicarAccent } from './lib/color.js';
+import { esc } from './lib/html.js';
 
 /**
  * Agrupa itens de layout: kpis consecutivos viram um unico bloco 'kpis';
@@ -111,16 +112,6 @@ export function buildGoal(config, computed) {
 }
 
 // ---- Helpers de UI (browser) ----
-
-function esc(v) {
-  if (v == null) return '';
-  return String(v)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 // Envolve o HTML de um widget num .card com titulo opcional.
 function cardWith(title, innerHtml, extraClass = '') {

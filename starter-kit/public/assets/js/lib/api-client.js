@@ -116,10 +116,14 @@ export async function uploadCsv(text) {
 }
 
 // Meta Ads: preview no wizard (token transiente no corpo, nao gravado ainda).
+// Mesmo padrao de mutacao do saveDashboard: manda x-admin-token (quando ha token
+// guardado) e usa mutationOrThrow, que propaga .needsAdmin no 401 para o wizard
+// oferecer o campo de admin token e reenviar. Sem isso, com ADMIN_TOKEN setado no
+// ambiente o preview morre com erro generico e o conector Meta fica inacessivel.
 export async function previewMeta(params) {
-  return jsonOrThrow(await fetch('/api/connectors/meta-ads', {
+  return mutationOrThrow(await fetch('/api/connectors/meta-ads', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...adminHeader() },
     body: JSON.stringify(params || {}),
   }));
 }

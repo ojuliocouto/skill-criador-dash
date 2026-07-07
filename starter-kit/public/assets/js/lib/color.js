@@ -260,12 +260,52 @@ export function accentGraph(hex, isDark, target = 3) {
 }
 
 /**
+ * Cor de PREENCHIMENTO solido derivada do accent, pra elementos que pintam o
+ * accent CRU e precisam se destacar da superficie atras deles: a barra de
+ * progresso da meta (.kpi__goal-fill, objeto grafico que carrega dado, WCAG
+ * 1.4.11) e os decorativos de marca (.kpi::before, .dot). Diferente do
+ * accentGraph (que mistura accent 70% + text 30% e mede contra --bg-elev, o
+ * fundo do card), aqui parte do accent PURO e mede contra --bg-elev-2, a
+ * superficie imediatamente atras desses elementos (a trilha da meta, a borda do
+ * card). Se o accent puro ja tem >=target, mantem o tom da marca; senao empurra
+ * progressivamente na direcao do extremo legivel do tema (clareia no escuro,
+ * escurece no claro) ate passar. Assim o accent padrao escuro nao some no fundo
+ * escuro e o accent claro nao some no fundo claro.
+ *
+ * @param {string} hex accent da marca (#rgb ou #rrggbb)
+ * @param {boolean} isDark tema escuro?
+ * @param {number} [target=3] razao minima desejada (objeto grafico = 3:1)
+ * @returns {string} hex com contraste >= target sobre --bg-elev-2 do tema
+ */
+export function accentFill(hex, isDark, target = 3) {
+  const base = parseHex(hex) ? hex : DEFAULT_ACCENT;
+  const S = isDark ? THEME_SURFACES.dark : THEME_SURFACES.light;
+  const surface = S.bgElev2; // --bg-elev-2, superficie atras da fill/decorativos
+  const pure = toHex(parseHex(base));
+  // Se o accent puro ja passa, mantem a cor da marca.
+  if (contrastRatio(pure, surface) >= target) return pure;
+  // Senao, empurra o accent na direcao do extremo legivel do tema (branco no
+  // escuro, preto no claro) ate alcancar o alvo. Preserva o maximo do tom
+  // (comeca com pouca mistura).
+  const toward = isDark ? '#ffffff' : '#000000';
+  for (let p = 5; p <= 100; p += 5) {
+    const cand = mixSrgb(toward, base, p);
+    if (contrastRatio(cand, surface) >= target) return cand;
+  }
+  return toward;
+}
+
+/**
  * Aplica no elemento (normalmente documentElement) as variaveis CSS derivadas
  * do accent, calibradas pro tema atual:
  *   --accent      cor da marca crua
  *   --accent-fg   cor do texto SOBRE o accent cru (botoes, chips solidos)
  *   --accent-text cor de destaque pra TEXTO/links, com contraste AA no tema
  *   --focus-ring  anel de foco (reusa --accent-text, passa >=3:1)
+ *   --accent-fill-calc  accent solido recalibrado pra >=3:1 contra --bg-elev-2:
+ *                 usado na barra de progresso da meta (objeto grafico) e nos
+ *                 decorativos de marca (.kpi::before, .dot, borda de :focus), que
+ *                 pintavam o accent CRU e sumiam com accent muito escuro/claro
  *   --funnel-fg   texto SOBRE a barra do funil (fundo COMPOSTO, mais claro que
  *                 o accent cru): #111/#fff de maior contraste, garante >=4.5:1
  *   --badge-fg    texto do badge SOBRE o --accent-soft composto: tom da marca
@@ -291,6 +331,12 @@ export function aplicarAccent(el, hex, isDark) {
   // --accent-graph: var(--accent-graph-calc, <mix fallback>). Nao setamos
   // --accent-graph direto pra evitar auto-referencia da custom property.
   el.style.setProperty('--accent-graph-calc', accentGraph(accent, isDark));
+  // Accent solido calibrado (>=3:1 contra --bg-elev-2) pra barra de progresso da
+  // meta (objeto grafico, WCAG 1.4.11) e decorativos de marca (.kpi::before,
+  // .dot, borda de foco do input): pintavam o accent CRU e sumiam quando o accent
+  // era muito escuro (fundo escuro) ou muito claro (fundo claro). O main.css usa
+  // var(--accent-fill-calc, var(--accent)).
+  el.style.setProperty('--accent-fill-calc', accentFill(accent, isDark));
   // Texto sobre a barra do funil: mede contra a cor VISIVEL (composta) da barra,
   // nao contra o accent cru (que e mais escuro e levava a branco reprovando AA).
   el.style.setProperty('--funnel-fg', fgForBackground(funnelBarBg(accent, isDark)));

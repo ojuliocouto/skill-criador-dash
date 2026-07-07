@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   aplicarAccent, contrastRatio, accentForeground, accentText,
   composite, fgForBackground, funnelBarBg, badgeSoftBg, badgeText,
-  accentGraph, THEME_SURFACES,
+  accentGraph, accentFill, THEME_SURFACES,
   BG_DARK, BG_LIGHT, DEFAULT_ACCENT,
 } from '../public/assets/js/lib/color.js';
 
@@ -277,6 +277,76 @@ test('accentGraph: preserva o mix quando ja passa 3:1', () => {
   const g = accentGraph('#6d28d9', true);
   assert.notEqual(g, '#ffffff');
   assert.notEqual(g, '#000000');
+});
+
+// --- Regressao: --accent-fill-calc (barra de progresso da meta, objeto grafico
+// WCAG 1.4.11; + decorativos de marca .kpi::before/.dot e borda de foco do
+// input) tem que passar >=3:1 contra --bg-elev-2, a superficie imediatamente
+// atras desses elementos. Antes esses pontos pintavam o accent CRU: o accent
+// padrao #6d28d9 media so 2.32:1 no escuro (reprova) e accents claros extremos
+// (#ffff00 1.11, #ffffff 1.14, #22d3ee 1.35) sumiam no tema claro. ---
+
+const ACCENTS_FILL = [
+  '#6d28d9', // roxo padrao (reprovava CRU no escuro)
+  '#ffff00', // amarelo claro extremo (sumia CRU no claro)
+  '#22d3ee', // ciano claro extremo
+  '#ffffff', // branco extremo
+  '#6366f1', // indigo mainstream
+];
+
+for (const accent of ACCENTS_FILL) {
+  test(`accent-fill: ${accent} --accent-fill-calc passa 3:1 sobre --bg-elev-2 (2 temas)`, () => {
+    for (const isDark of [true, false]) {
+      const el = fakeEl();
+      aplicarAccent(el, accent, isDark);
+      const surface = (isDark ? THEME_SURFACES.dark : THEME_SURFACES.light).bgElev2;
+      const fill = el._vars['--accent-fill-calc'];
+      assert.ok(fill, `${accent} (${isDark ? 'escuro' : 'claro'}): faltou --accent-fill-calc`);
+      const cr = contrastRatio(fill, surface);
+      assert.ok(
+        cr >= 3,
+        `${accent} (${isDark ? 'escuro' : 'claro'}): --accent-fill-calc ${fill} sobre --bg-elev-2 ${surface} cr=${cr.toFixed(2)} < 3`,
+      );
+    }
+  });
+}
+
+// Prova da raiz do bug: o accent CRU reprovava 3:1 sobre --bg-elev-2 (accent
+// padrao no escuro, accent claro no claro), e o --accent-fill-calc conserta.
+test('accent-fill: raiz do bug -- accent cru reprovava sobre --bg-elev-2, --accent-fill-calc conserta', () => {
+  // roxo padrao no escuro: cru ~2.32:1 (reprova)
+  const darkSurf = THEME_SURFACES.dark.bgElev2;
+  assert.ok(
+    contrastRatio('#6d28d9', darkSurf) < 3,
+    `sanity: #6d28d9 cru sobre --bg-elev-2 escuro deveria reprovar (cr=${contrastRatio('#6d28d9', darkSurf).toFixed(2)})`,
+  );
+  const elDark = fakeEl();
+  aplicarAccent(elDark, '#6d28d9', true);
+  assert.ok(contrastRatio(elDark._vars['--accent-fill-calc'], darkSurf) >= 3);
+  // branco extremo no claro: cru ~1.14:1 (reprova)
+  const lightSurf = THEME_SURFACES.light.bgElev2;
+  assert.ok(
+    contrastRatio('#ffffff', lightSurf) < 3,
+    `sanity: #ffffff cru sobre --bg-elev-2 claro deveria reprovar (cr=${contrastRatio('#ffffff', lightSurf).toFixed(2)})`,
+  );
+  const elLight = fakeEl();
+  aplicarAccent(elLight, '#ffffff', false);
+  assert.ok(contrastRatio(elLight._vars['--accent-fill-calc'], lightSurf) >= 3);
+});
+
+// aplicarAccent grava --accent-fill-calc.
+test('aplicarAccent: seta --accent-fill-calc', () => {
+  const el = fakeEl();
+  aplicarAccent(el, '#22d3ee', false);
+  assert.ok(el._vars['--accent-fill-calc'], 'faltou --accent-fill-calc');
+});
+
+// accentFill preserva o tom da marca quando o accent puro ja passa 3:1.
+test('accentFill: preserva o accent puro quando ja passa 3:1', () => {
+  // indigo #6366f1 no escuro contra --bg-elev-2 escuro deve passar folgado.
+  const f = accentFill('#6366f1', true);
+  assert.notEqual(f, '#ffffff');
+  assert.notEqual(f, '#000000');
 });
 
 // badgeText mantem o TOM da marca (nao vira branco/preto chapado) quando o

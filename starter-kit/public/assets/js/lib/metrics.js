@@ -154,9 +154,14 @@ export function groupBy(rows, colMap, dimensionSlot, valueSlot, agg = 'sum') {
     if (!isNonEmpty(dim)) continue;
     const key = String(dim).trim();
     if (!buckets.has(key)) buckets.set(key, []);
-    if (valueSlot == null && agg === 'count') {
-      // apenas marca presença da linha; o count usa o tamanho do array
-      buckets.get(key).push(1);
+    if (agg === 'count') {
+      // 'count' conta PRESENCA da linha, nao "linha com valor numerico". Com
+      // valueSlot null marca todas as linhas do bucket; com valueSlot definido,
+      // marca as linhas cuja celula nao e vazia (texto tambem conta). Antes, o
+      // ramo numerico subcontava colunas de texto (parseNumberBR -> NaN -> nada).
+      if (valueSlot == null || isNonEmpty(cellRaw(row, valueSlot, colMap, safeRows))) {
+        buckets.get(key).push(1);
+      }
     } else {
       const n = parseNumberBR(cellRaw(row, valueSlot, colMap, safeRows));
       if (Number.isFinite(n)) buckets.get(key).push(n);
@@ -182,8 +187,13 @@ export function timeSeries(rows, colMap, dateSlot, valueSlot, agg = 'sum') {
     const iso = parseDateBR(cellRaw(row, dateSlot, colMap, safeRows));
     if (!iso) continue;
     if (!buckets.has(iso)) buckets.set(iso, []);
-    if (valueSlot == null && agg === 'count') {
-      buckets.get(iso).push(1);
+    if (agg === 'count') {
+      // 'count' conta PRESENCA da linha (ver groupBy): valueSlot null marca todas
+      // as linhas da data; valueSlot definido marca as de celula nao-vazia (texto
+      // tambem conta), corrigindo a subcontagem de colunas de texto.
+      if (valueSlot == null || isNonEmpty(cellRaw(row, valueSlot, colMap, safeRows))) {
+        buckets.get(iso).push(1);
+      }
     } else {
       const n = parseNumberBR(cellRaw(row, valueSlot, colMap, safeRows));
       if (Number.isFinite(n)) buckets.get(iso).push(n);

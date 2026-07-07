@@ -2,16 +2,10 @@
 
 import { fmtCurrency, fmtNumber, fmtPercent, fmtInteger } from '../lib/format.js';
 
-// Escapa texto para evitar injecao de HTML.
-export function esc(v) {
-  if (v == null) return '';
-  return String(v)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+// Escape de HTML: reexportado da fonte unica em lib/html.js para nao duplicar.
+// Os widgets importam `esc` daqui, entao mantemos o reexport para nao quebrar
+// os imports existentes.
+export { esc } from '../lib/html.js';
 
 // Formata um numero de acordo com o formato semantico do template.
 export function fmtBy(format, value) {

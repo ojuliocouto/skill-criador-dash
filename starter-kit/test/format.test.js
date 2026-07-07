@@ -160,3 +160,49 @@ test('parseDateBR: aceita ISO com mes/dia de 1 digito', () => {
   assert.equal(parseDateBR('2026/1/1'), '2026-01-01');
   assert.equal(parseDateBR('2026-12-31'), '2026-12-31'); // 2 digitos continua
 });
+
+// CORRETUDE 1: parseNumberBR usava Number() cru, que aceita hexadecimal
+// ('0x1A'), notacao cientifica ('1e3') e formas degeneradas ('5.', '.5').
+// Esses casos devem virar NaN (texto, nao numero decimal plausivel), sem
+// mis-parsear 'FF'/'1e3'/'0x1A' como numero. Numeros validos BR/US continuam.
+test('parseNumberBR: rejeita hexadecimal, notacao cientifica e degenerados', () => {
+  assert.ok(Number.isNaN(parseNumberBR('FF')), "'FF' nao e numero decimal");
+  assert.ok(Number.isNaN(parseNumberBR('0x1A')), "'0x1A' hex vira NaN");
+  assert.ok(Number.isNaN(parseNumberBR('1e3')), "'1e3' cientifica NAO vira 1000");
+  assert.ok(Number.isNaN(parseNumberBR('1E3')), "'1E3' cientifica maiuscula NaN");
+  assert.ok(Number.isNaN(parseNumberBR('2.5e2')), "'2.5e2' cientifica NaN");
+  assert.ok(Number.isNaN(parseNumberBR('Infinity')), "'Infinity' vira NaN");
+  assert.ok(Number.isNaN(parseNumberBR('0b101')), "binario vira NaN");
+  assert.ok(Number.isNaN(parseNumberBR('5.')), "'5.' degenerado vira NaN");
+  assert.ok(Number.isNaN(parseNumberBR('.5')), "'.5' degenerado vira NaN");
+});
+
+test('parseNumberBR: numeros validos continuam funcionando apos o guard', () => {
+  // Reforca que o guard nao regrediu os casos ja cobertos.
+  assert.equal(parseNumberBR('1.234,56'), 1234.56);
+  assert.equal(parseNumberBR('1,234.56'), 1234.56);
+  assert.equal(parseNumberBR('1234'), 1234);
+  assert.equal(parseNumberBR('1234.56'), 1234.56);
+  assert.equal(parseNumberBR('0,5'), 0.5);
+  assert.equal(parseNumberBR('-5,5'), -5.5);
+  assert.equal(parseNumberBR('+42'), 42);
+  assert.equal(parseNumberBR('R$ 1.234,50'), 1234.5);
+  assert.equal(parseNumberBR('50%'), 50);
+  assert.equal(parseNumberBR('100.000'), 100000);
+  assert.equal(parseNumberBR('1.000.000'), 1000000);
+});
+
+// CORRETUDE 4 (format.js:52): a heuristica "3 digitos apos ponto = milhar"
+// e AMBIGUA de verdade (nao da pra saber se '1.234' e mil-e-poucos ou 1.234
+// reais so pela string). NAO resolvemos a ambiguidade aqui: apenas TRAVAMOS o
+// comportamento escolhido (ponto unico + 3 digitos = milhar) pra nao regredir.
+test('parseNumberBR: ponto unico 3 digitos = milhar e comportamento TRAVADO (ambiguidade documentada)', () => {
+  // Escolha: milhar. Um preco decimal legitimo de 3 casas ('1.234' = 1.234 reais)
+  // e lido como 1234. Isso e conhecido e documentado no comentario do codigo.
+  assert.equal(parseNumberBR('1.234'), 1234);
+  assert.equal(parseNumberBR('100.000'), 100000);
+  // 2 casas apos o ponto NAO e milhar -> decimal ('1.23' = 1.23).
+  assert.equal(parseNumberBR('1.23'), 1.23);
+  // 4 casas apos o ponto NAO e milhar -> decimal ('1.2345' = 1.2345).
+  assert.equal(parseNumberBR('1.2345'), 1.2345);
+});

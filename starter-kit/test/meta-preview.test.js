@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { onRequest as metaAds } from '../functions/api/connectors/meta-ads.js';
+import { previewMeta, setAdminToken } from '../public/assets/js/lib/api-client.js';
 
 // Response fake minima compativel com o que o handler usa (ok/status/json).
 function fakeResponse({ ok = true, status = 200, json = null } = {}) {
@@ -166,4 +167,115 @@ test('preview: sem KV de cache o preview ainda funciona (rate limit no-op)', asy
     const res = await metaAds(ctx('POST', { body: { token: 'TK', account: '123' }, env: {} }));
     assert.equal(res.status, 200, 'sem cache, o rate limit nao pode derrubar o preview');
   });
+});
+
+// ---------------------------------------------------------------------------
+// LADO CLIENTE: previewMeta em api-client.js (GRAVE 2).
+// O preview do wizard tem de seguir o MESMO padrao do saveDashboard: mandar o
+// header x-admin-token quando ha token guardado, e propagar .needsAdmin no 401
+// para o wizard oferecer o campo de admin token e re-tentar. Sem isso, com
+// ADMIN_TOKEN setado no ambiente o conector Meta morria no wizard.
+// ---------------------------------------------------------------------------
+
+// localStorage minimo em memoria (nao existe no Node); adminHeader() le dele.
+function stubLocalStorage(initial = {}) {
+  const original = globalThis.localStorage;
+  const store = new Map(Object.entries(initial));
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => { store.set(k, String(v)); },
+    removeItem: (k) => { store.delete(k); },
+  };
+  return { store, restore() { globalThis.localStorage = original; } };
+}
+
+// Stub de fetch que captura a chamada e devolve uma Response controlada.
+function stubFetch(respond) {
+  const calls = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init: init || {} });
+    return typeof respond === 'function' ? respond(String(url), init || {}) : respond;
+  };
+  return { calls, restore() { globalThis.fetch = original; } };
+}
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+}
+
+// 9. Sem admin token guardado: previewMeta faz o POST SEM o header x-admin-token
+//    (instancia aberta continua aberta), mas o endpoint continua sendo o certo.
+test('previewMeta (cliente): sem admin token guardado nao manda x-admin-token', async () => {
+  const ls = stubLocalStorage();
+  const f = stubFetch(jsonResponse({ columns: [], rows: [], meta: { source: 'meta' } }));
+  try {
+    await previewMeta({ token: 'TK', account: '123' });
+    assert.equal(f.calls.length, 1);
+    const u = new URL(f.calls[0].url, 'https://base');
+    assert.equal(u.pathname, '/api/connectors/meta-ads');
+    assert.equal(f.calls[0].init.method, 'POST');
+    const headers = f.calls[0].init.headers || {};
+    assert.equal(headers['x-admin-token'], undefined);
+  } finally {
+    f.restore();
+    ls.restore();
+  }
+});
+
+// 10. Com admin token guardado (via setAdminToken): previewMeta inclui o header
+//     x-admin-token, exatamente como o saveDashboard.
+test('previewMeta (cliente): inclui x-admin-token quando ha token guardado', async () => {
+  const ls = stubLocalStorage();
+  const f = stubFetch(jsonResponse({ columns: [], rows: [], meta: { source: 'meta' } }));
+  try {
+    setAdminToken('super-token-admin');
+    await previewMeta({ token: 'TK', account: '123' });
+    const headers = f.calls[0].init.headers || {};
+    assert.equal(headers['x-admin-token'], 'super-token-admin');
+  } finally {
+    setAdminToken(null);
+    f.restore();
+    ls.restore();
+  }
+});
+
+// 11. 401 needsAdmin da rede: previewMeta lanca Error com a flag .needsAdmin
+//     exposta, para o wizard reaproveitar o fluxo de admin token (mesmo do save).
+test('previewMeta (cliente): 401 needsAdmin lanca Error com .needsAdmin true', async () => {
+  const ls = stubLocalStorage();
+  const f = stubFetch(jsonResponse({ needsAdmin: true, error: 'Este ambiente exige um token de administrador.' }, 401));
+  try {
+    await assert.rejects(
+      () => previewMeta({ token: 'TK', account: '123' }),
+      (err) => {
+        assert.ok(err instanceof Error);
+        assert.equal(err.needsAdmin, true);
+        return true;
+      },
+    );
+  } finally {
+    f.restore();
+    ls.restore();
+  }
+});
+
+// 12. Erro comum (nao-needsAdmin) NAO ganha a flag .needsAdmin: o wizard cai no
+//     tratamento generico de erro, nao no prompt de admin token.
+test('previewMeta (cliente): erro comum nao marca .needsAdmin', async () => {
+  const ls = stubLocalStorage();
+  const f = stubFetch(jsonResponse({ error: 'Nao foi possivel validar o token/conta.' }, 400));
+  try {
+    await assert.rejects(
+      () => previewMeta({ token: 'TK', account: '123' }),
+      (err) => {
+        assert.ok(err instanceof Error);
+        assert.equal(err.needsAdmin, undefined);
+        return true;
+      },
+    );
+  } finally {
+    f.restore();
+    ls.restore();
+  }
 });

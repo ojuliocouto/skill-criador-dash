@@ -48,8 +48,8 @@ Explique em uma frase cada palavra técnica antes de mandar comando (a pessoa po
 Checklist (um item por vez; se faltar algo, resolva antes de seguir):
 - [ ] Tem conta no Cloudflare? (o plano grátis já cobre Pages + Functions + KV; D1 também tem free tier). Se não tiver, peça pra criar em dash.cloudflare.com.
 - [ ] Tem Node instalado? (`node -v`). Sem Node não roda `wrangler` nem os testes.
-- [ ] Instale o wrangler: `npm i -g wrangler`. No Mac, se der erro de permissão (EACCES), rode `sudo npm i -g wrangler`. Confirme com `wrangler --version`; se der "command not found", o bin global do npm não está no PATH (`npm prefix -g` mostra a pasta; adicione ao PATH).
-- [ ] Faça login: `wrangler login` (abre o browser; a pessoa escolhe a conta Cloudflare dela e autoriza).
+- [ ] Instale o wrangler: `npm i -g wrangler` (use uma versão recente, 3.60+ ou 4.x; o formato de saída do `kv namespace create` varia entre elas, veja a nota mais abaixo). No Mac, se der erro de permissão (EACCES), rode `sudo npm i -g wrangler`. Confirme com `wrangler --version`; se der "command not found", o bin global do npm não está no PATH (`npm prefix -g` mostra a pasta; adicione ao PATH).
+- [ ] Faça login: `wrangler login` (abre o browser; a pessoa escolhe a conta Cloudflare dela e autoriza). Atenção: se houver um `CLOUDFLARE_API_TOKEN` exportado no shell, ele SOBREPÕE o login do browser e pode apontar pra outra conta. Antes de logar/deployar, cheque `echo $CLOUDFLARE_API_TOKEN`; se tiver valor indevido, rode `unset CLOUDFLARE_API_TOKEN` na mesma sessão.
 - [ ] Confirme a conta certa: `wrangler whoami` (mostra o email e o Account ID logado). Se for a conta errada, `wrangler logout` e login de novo.
 - [ ] Tem Claude Code? (é por ele que eu conduzo a construção).
 
@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PEÇAS (biblioteca provada em `starter-kit/`)
 
-Código real e testado (377 testes verdes, TDD). Você compõe a partir daqui.
+Código real e testado (406 testes verdes, TDD). Você compõe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Não sabem de métricas.
@@ -149,7 +149,10 @@ valor, então só você (o dono, que conhece o token) consegue criar ou apagar d
 Detalhe do gate por fonte: a senha protege a config e os conectores POR ID (D1 e Meta GET checam a
 senha antes de devolver dado). Já sheets/csv são lidos com a URL/arquivo que estão na config: quem
 não passa a senha não pega a config, então não chega na URL. O `POST` de preview do Meta (usado só no
-wizard, com token transiente no corpo) é aberto por design e não grava nada.
+wizard, com token transiente no corpo) não grava nada, tem rate limit por IP e, quando `ADMIN_TOKEN`
+está setado, TAMBÉM exige o header `x-admin-token` (o wizard já manda esse header e, se faltar, pede o
+token e re-tenta, igual ao salvar). Ou seja: se você fechou a instância com `ADMIN_TOKEN`, o preview
+Meta continua funcionando pra você (que tem o token), e fica barrado pra anônimo.
 
 Tema claro/escuro: botão na topbar (`lib/theme.js`), injetado em todas as páginas; persiste no
 localStorage e respeita a preferência do sistema no primeiro acesso. A estética é de ferramenta de
@@ -178,7 +181,8 @@ functions/
     sheets-url.mjs              sheetUrlToCsv (compartilhado por sheets.js e pelo worker)
     meta.mjs                    buildInsightsUrl + mapInsightsToDataSet (puro)
     snapshots.mjs               SQL do modo historico + rowToDataSet (puro)
-    auth-config.mjs             needsAuth/authOk/safeEqual (neutro; conectores importam daqui)
+    auth-config.mjs             needsAuth/authOk (PBKDF2 salgado)/safeEqual/checkAdminToken (neutro)
+    rate-limit.mjs              rate limiter em KV (gate de senha + preview Meta)
 workers/
   snapshot/ src/index.js        Worker com cron que grava snapshots no D1 (SNAPSHOT_FETCHERS)
 public/
@@ -190,7 +194,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js  color.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           377 testes (npm test  ->  node --test test/*.test.js)
+test/                           406 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local (o `npm run dev` já embute a `--compatibility-date` do `package.json`):

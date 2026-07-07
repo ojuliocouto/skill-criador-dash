@@ -104,6 +104,41 @@ test('parseCSV: texto vazio devolve columns e rows vazios', () => {
   assert.deepEqual(rows, []);
 });
 
+// CORRETUDE 3 (csv.mjs:82): headers duplicados colapsavam na mesma chave de
+// objeto (a ultima coluna vencia, perda de dado silenciosa). Devem ser
+// desambiguados por sufixo ('Valor', 'Valor' -> 'Valor', 'Valor_2') pra
+// preservar ambas as colunas e todos os dados.
+test('parseCSV: headers duplicados sao desambiguados por sufixo', () => {
+  const { columns, rows } = parseCSV('Valor,Valor\n10,20');
+  assert.deepEqual(columns, ['Valor', 'Valor_2'], 'segunda coluna vira Valor_2');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].Valor, '10', 'primeira coluna preservada');
+  assert.equal(rows[0].Valor_2, '20', 'segunda coluna preservada (nao perdida)');
+});
+
+test('parseCSV: triplo header duplicado incrementa o sufixo', () => {
+  const { columns, rows } = parseCSV('X,X,X\n1,2,3');
+  assert.deepEqual(columns, ['X', 'X_2', 'X_3']);
+  assert.deepEqual(rows[0], { X: '1', X_2: '2', X_3: '3' });
+});
+
+test('parseCSV: desambiguacao nao colide com header ja existente', () => {
+  // Ja existe 'Valor_2' no header + dois 'Valor'. O segundo 'Valor' precisa
+  // achar um sufixo livre (Valor_3), sem sobrescrever o 'Valor_2' real.
+  const { columns, rows } = parseCSV('Valor,Valor_2,Valor\na,b,c');
+  assert.equal(columns[0], 'Valor');
+  assert.equal(columns[1], 'Valor_2', 'o Valor_2 original fica intacto');
+  assert.equal(columns[2], 'Valor_3', 'o Valor duplicado pula pra Valor_3');
+  assert.equal(rows[0].Valor, 'a');
+  assert.equal(rows[0].Valor_2, 'b');
+  assert.equal(rows[0].Valor_3, 'c');
+});
+
+test('parseCSV: headers unicos nao ganham sufixo (sem regressao)', () => {
+  const { columns } = parseCSV('Data,Canal,Investimento\n01/01,Meta,100');
+  assert.deepEqual(columns, ['Data', 'Canal', 'Investimento']);
+});
+
 test('sheetUrlToCsv: link completo vira endpoint gviz com gid', () => {
   const url = 'https://docs.google.com/spreadsheets/d/1AbC-dEf_123/edit#gid=42';
   assert.equal(

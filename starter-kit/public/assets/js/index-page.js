@@ -1,15 +1,8 @@
 // Landing/lista de dashboards. Busca as configs no KV via api-client e renderiza.
 import { listDashboards, deleteDashboard } from './lib/api-client.js';
+import { esc } from './lib/html.js';
 
 const lista = document.getElementById('lista');
-
-function esc(v) {
-  return String(v == null ? '' : v)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 function fmtData(iso) {
   if (!iso) return '';

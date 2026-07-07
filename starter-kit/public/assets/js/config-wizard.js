@@ -82,6 +82,47 @@ function errorBox(message) {
 }
 
 // ---------------------------------------------------------------------------
+// Fluxo compartilhado de admin token.
+// Quando o operador seta ADMIN_TOKEN no ambiente, as mutacoes E o preview do
+// Meta respondem 401 needsAdmin sem o header x-admin-token. Este helper mostra um
+// campo pra colar o token, guarda com setAdminToken e re-tenta a MESMA operacao
+// (que a partir daí ja mandara o header). Reaproveitado pelo save (passo 4) e
+// pelo card Meta (passo 2), para nao duplicar a logica.
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {HTMLElement} feedback  container onde o prompt é renderizado
+ * @param {() => (void|Promise<void>)} retry  operação a re-tentar após colar o token
+ */
+function pedirAdminToken(feedback, retry) {
+  const tokenInput = el('input', {
+    class: 'input', id: 'adminToken', type: 'password',
+    placeholder: 'Token de administrador', autocomplete: 'off',
+  });
+  const salvarBtn = el('button', { class: 'btn', type: 'button', text: 'Continuar com token' });
+  const box = el('div', { class: 'card' }, [
+    el('h3', { text: 'Este ambiente exige um token de administrador' }),
+    el('p', { class: 'hint', text: 'Esta operacao esta protegida por um token. Cole o token de administrador para continuar.' }),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Token de administrador' }),
+      tokenInput,
+    ]),
+    salvarBtn,
+  ]);
+  box.style.marginTop = '16px';
+  feedback.appendChild(box);
+  const reenviar = () => {
+    const token = tokenInput.value.trim();
+    if (!token) { tokenInput.focus(); return; }
+    setAdminToken(token);
+    retry();
+  };
+  salvarBtn.addEventListener('click', reenviar);
+  tokenInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') reenviar(); });
+  tokenInput.focus();
+}
+
+// ---------------------------------------------------------------------------
 // Barra de passos.
 // ---------------------------------------------------------------------------
 
@@ -307,7 +348,29 @@ function renderSource(body) {
   });
 
   if (metaCard) {
-    metaCard.querySelector('#connectMeta').addEventListener('click', async () => {
+    // Tenta o preview do Meta. Se o ambiente exigir admin token (401 needsAdmin,
+    // mesmo caso do save), reaproveita o fluxo compartilhado: pede o token e
+    // re-tenta a MESMA chamada (que agora ja mandara o header x-admin-token).
+    async function tentarConectarMeta(params) {
+      setConnecting(true);
+      feedback.innerHTML = '';
+      feedback.appendChild(el('p', { class: 'hint', text: 'Conectando ao Meta Ads...' }));
+      try {
+        const ds = await previewMeta(params);
+        onConnected(ds, { type: 'meta', meta: params });
+      } catch (e) {
+        feedback.innerHTML = '';
+        if (e && e.needsAdmin) {
+          pedirAdminToken(feedback, () => tentarConectarMeta(params));
+          return;
+        }
+        onError(e);
+      } finally {
+        setConnecting(false);
+      }
+    }
+
+    metaCard.querySelector('#connectMeta').addEventListener('click', () => {
       if (state.connecting) return;
       const token = metaCard.querySelector('#metaToken').value.trim();
       const account = metaCard.querySelector('#metaAccount').value.trim();
@@ -315,16 +378,7 @@ function renderSource(body) {
       const until = metaCard.querySelector('#metaUntil').value || undefined;
       feedback.innerHTML = '';
       if (!token || !account) { feedback.appendChild(errorBox('Informe o access token e o ID da conta de anuncios.')); return; }
-      setConnecting(true);
-      feedback.appendChild(el('p', { class: 'hint', text: 'Conectando ao Meta Ads...' }));
-      try {
-        const ds = await previewMeta({ token, account, since, until });
-        onConnected(ds, { type: 'meta', meta: { token, account, since, until } });
-      } catch (e) {
-        onError(e);
-      } finally {
-        setConnecting(false);
-      }
+      tentarConectarMeta({ token, account, since, until });
     });
   }
 }
@@ -530,43 +584,14 @@ function renderFinish(body) {
     } catch (e) {
       feedback.innerHTML = '';
       if (e && e.needsAdmin) {
-        pedirAdminToken(config);
+        // Mesmo fluxo compartilhado do card Meta: pede o token e re-tenta o save.
+        createBtn.disabled = false;
+        pedirAdminToken(feedback, () => tentarSalvar(config));
         return;
       }
       feedback.appendChild(errorBox(e && e.message ? e.message : 'Não foi possível salvar o dashboard.'));
       createBtn.disabled = false;
     }
-  }
-
-  // Campo simples de admin token (input + botao). Ao confirmar, guarda o token e
-  // reenvia a config pela tentarSalvar (que ja mandara o header x-admin-token).
-  function pedirAdminToken(config) {
-    createBtn.disabled = false;
-    const tokenInput = el('input', {
-      class: 'input', id: 'adminToken', type: 'password',
-      placeholder: 'Token de administrador', autocomplete: 'off',
-    });
-    const salvarBtn = el('button', { class: 'btn', type: 'button', text: 'Salvar com token' });
-    const box = el('div', { class: 'card' }, [
-      el('h3', { text: 'Este ambiente exige um token de administrador' }),
-      el('p', { class: 'hint', text: 'A criacao de dashboards esta protegida por um token. Cole o token de administrador para continuar.' }),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'lbl', text: 'Token de administrador' }),
-        tokenInput,
-      ]),
-      salvarBtn,
-    ]);
-    box.style.marginTop = '16px';
-    feedback.appendChild(box);
-    const reenviar = () => {
-      const token = tokenInput.value.trim();
-      if (!token) { tokenInput.focus(); return; }
-      setAdminToken(token);
-      tentarSalvar(config);
-    };
-    salvarBtn.addEventListener('click', reenviar);
-    tokenInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') reenviar(); });
-    tokenInput.focus();
   }
 }
 
