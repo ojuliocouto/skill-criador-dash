@@ -89,7 +89,7 @@ modo de dados). Nunca coloque token, Account ID ou id de KV/D1 real: use placeho
 
 ## A CAIXA DE PECAS (biblioteca provada em `starter-kit/`)
 
-Codigo real e testado (221 testes verdes, TDD). Voce compoe a partir daqui.
+Codigo real e testado (242 testes verdes, TDD). Voce compoe a partir daqui.
 
 Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Nao sabem de metricas.
@@ -177,7 +177,7 @@ public/
     lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
-test/                           221 testes (npm test  ->  node --test test/*.test.js)
+test/                           242 testes (npm test  ->  node --test test/*.test.js)
 ```
 
 Rodar local:
@@ -314,3 +314,5 @@ Ao terminar um trabalho nesta skill:
 2. Salve o contexto do projeto da pessoa em `references/YYYYMMDD-descricao.md` (crie a pasta com
    `mkdir -p references` se nao existir): projeto Pages, dominio, modo de dados, fontes usadas,
    decisoes. Nunca coloque token, Account ID ou id de KV/D1 real: use placeholders.
+3. Antes de distribuir/publicar o repo, apague o cache local `rm -rf starter-kit/.wrangler` (fica
+   gitignored, mas guarda Account ID e dados de dev em cache; nao deve ir junto num zip/copia).

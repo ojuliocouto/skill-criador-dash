@@ -27,6 +27,13 @@ test('detectDelimiter: usa só a primeira linha', () => {
   assert.equal(detectDelimiter('a;b;c\n1,2,3,4,5'), ';');
 });
 
+test('detectDelimiter: ignora separadores dentro de aspas duplas', () => {
+  // As duas vírgulas estão DENTRO das aspas (conteúdo do campo, não fronteira),
+  // e o único separador real, fora das aspas, é o ';'. Sem respeitar aspas o
+  // detector contaria 2 vírgulas e escolheria ',' errado; o certo é ';'.
+  assert.equal(detectDelimiter('"a,b,c";d'), ';');
+});
+
 test('parseCSV: CSV separado por vírgula', () => {
   const { columns, rows } = parseCSV('Data,Canal,Investimento\n01/01,Meta,100\n02/01,Google,200');
   assert.deepEqual(columns, ['Data', 'Canal', 'Investimento']);
@@ -70,6 +77,18 @@ test('parseCSV: descarta linhas totalmente vazias', () => {
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[0], { a: '1', b: '2' });
   assert.deepEqual(rows[1], { a: '3', b: '4' });
+});
+
+test('parseCSV: linha "ragged" com mais campos que o header descarta o extra', () => {
+  // Comportamento real do parseCSV: o loop de montagem da linha percorre apenas
+  // columns.length, então qualquer campo além do número de colunas do header é
+  // ignorado (não vira propriedade da row). Este teste trava esse contrato.
+  const { columns, rows } = parseCSV('a,b\n1,2,3,4');
+  assert.deepEqual(columns, ['a', 'b']);
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0], { a: '1', b: '2' });
+  // o campo extra (3 e 4) foi descartado: a row tem só as chaves do header
+  assert.deepEqual(Object.keys(rows[0]), ['a', 'b']);
 });
 
 test('parseCSV: lida com \\r\\n (CRLF)', () => {

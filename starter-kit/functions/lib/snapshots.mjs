@@ -57,7 +57,7 @@ export function listSnapshotsSQL(dashboardId, limit = 100) {
   const sql =
     `SELECT id, captured_at FROM ${TABLE} ` +
     `WHERE dashboard_id = ? ORDER BY captured_at DESC LIMIT ?`;
-  return { sql, params: [String(dashboardId), limit] };
+  return { sql, params: [String(dashboardId), Number(limit)] };
 }
 
 /**

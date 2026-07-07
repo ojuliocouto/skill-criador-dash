@@ -221,6 +221,15 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 .error { color: var(--bad); font-size: 13.5px; margin-top: 8px; }
 .hint { color: var(--text-faint); font-size: 12.5px; }
 
+/* Skip-link (WCAG 2.4.1): escondido ate receber foco pelo teclado. */
+.skip-link {
+  position: absolute; left: 8px; top: -48px; z-index: 100;
+  background: var(--accent); color: var(--accent-fg, #fff);
+  padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  transition: top 0.15s;
+}
+.skip-link:focus { top: 8px; outline: 2px solid var(--text); outline-offset: 2px; }
+
 /* Botao de tema claro/escuro (injetado pelo theme.js na topbar) */
 .theme-toggle {
   display: inline-flex; align-items: center; justify-content: center;

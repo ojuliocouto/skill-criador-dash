@@ -12,6 +12,7 @@ import { parseDateBR, fmtPercent } from './lib/format.js';
 import { sha256Hex } from './lib/auth.js';
 import { render as renderKpi } from './widgets/kpi.js';
 import { registry } from './widgets/index.js';
+import { getSource } from './sources/index.js';
 
 const DEFAULT_ACCENT = '#6d28d9';
 
@@ -273,7 +274,9 @@ function renderDashboard(app, ctx) {
     ? fetchedAt.toLocaleString('pt-BR')
     : '';
   const rowCount = meta.rowCount != null ? meta.rowCount : (dataset.rows || []).length;
-  const sourceLabel = meta.source === 'sheets' ? 'Google Sheets' : meta.source === 'csv' ? 'CSV' : (meta.source || 'fonte');
+  // Label da fonte lido do registry de fontes (sources/index.js). Fallback pro
+  // proprio nome do tipo, ou 'fonte' quando nem isso houver.
+  const sourceLabel = (getSource(meta.source) && getSource(meta.source).label) || meta.source || 'fonte';
   const metaBits = [
     `Fonte: ${sourceLabel}`,
     `${rowCount} linha${rowCount === 1 ? '' : 's'}`,

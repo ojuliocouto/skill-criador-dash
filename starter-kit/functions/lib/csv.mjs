@@ -6,8 +6,10 @@
 
 /**
  * Detecta o delimitador analisando apenas a primeira linha do texto.
- * Conta as ocorrências de vírgula, ponto e vírgula e tabulação; o que aparecer
- * mais vezes vence. Empate ou ausência de separador cai no default vírgula.
+ * Conta as ocorrências de vírgula, ponto e vírgula e tabulação FORA de aspas
+ * duplas; o que aparecer mais vezes vence. Empate ou ausência de separador cai
+ * no default vírgula. Separadores dentro de aspas ("a,b") são ignorados, pois
+ * são conteúdo de campo, não fronteira de coluna.
  * @param {string} text
  * @returns {','|';'|'\t'}
  */
@@ -16,15 +18,29 @@ export function detectDelimiter(text) {
   // Primeira linha, tolerando \r\n e \n.
   const firstLine = String(text).split(/\r\n|\n/, 1)[0] || '';
   const candidates = [',', ';', '\t'];
+  const counts = { ',': 0, ';': 0, '\t': 0 };
+  // Varre a linha respeitando aspas duplas: só conta separadores fora de aspas.
+  // Aspa dupla escapada ("") dentro de campo mantém o estado (par de aspas).
+  let inQuotes = false;
+  for (let i = 0; i < firstLine.length; i++) {
+    const ch = firstLine[i];
+    if (ch === '"') {
+      if (inQuotes && firstLine[i + 1] === '"') {
+        i++; // aspa escapada, continua dentro das aspas
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (!inQuotes && Object.prototype.hasOwnProperty.call(counts, ch)) {
+      counts[ch]++;
+    }
+  }
   let best = ',';
   let bestCount = 0;
   for (const delim of candidates) {
-    let count = 0;
-    for (const ch of firstLine) {
-      if (ch === delim) count++;
-    }
-    if (count > bestCount) {
-      bestCount = count;
+    if (counts[delim] > bestCount) {
+      bestCount = counts[delim];
       best = delim;
     }
   }

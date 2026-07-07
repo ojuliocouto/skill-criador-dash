@@ -1,6 +1,32 @@
 // Cliente único de API. Todas as chamadas ao backend (Functions) passam por aqui.
 // Puro fetch, sem dependências. ESM.
 
+import { getSource } from '../sources/index.js';
+
+// ---- Admin token (trava global opcional de mutacao) ----
+// Se o operador setar env.ADMIN_TOKEN, os POST/DELETE de /api/dashboards exigem
+// o header x-admin-token. O dono guarda o token no localStorage (chave abaixo) e
+// o cliente passa a mandar o header automaticamente. Sem token guardado, nada
+// muda (instancia aberta continua aberta).
+const ADMIN_TOKEN_KEY = 'cd-admin-token';
+
+// Guarda o admin token no localStorage (chamado pelo wizard apos um 401 needsAdmin).
+export function setAdminToken(t) {
+  try {
+    if (t) localStorage.setItem(ADMIN_TOKEN_KEY, t);
+    else localStorage.removeItem(ADMIN_TOKEN_KEY);
+  } catch { /* ignora */ }
+}
+
+// Devolve { 'x-admin-token': ... } quando ha token guardado, senao {}.
+export function adminHeader() {
+  try {
+    const t = localStorage.getItem(ADMIN_TOKEN_KEY);
+    if (t) return { 'x-admin-token': t };
+  } catch { /* ignora */ }
+  return {};
+}
+
 async function jsonOrThrow(res) {
   const text = await res.text();
   let data;
@@ -38,15 +64,33 @@ export async function getDashboard(id) {
   if (!res.ok) throw new Error((data && (data.error || data.message)) || `Erro ${res.status}`);
   return data;
 }
+// Le a Response de uma mutacao. Em 401 needsAdmin, lanca um Error com a flag
+// .needsAdmin marcada, para o wizard oferecer o campo de admin token e reenviar.
+async function mutationOrThrow(res) {
+  const text = await res.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (res.status === 401 && data && data.needsAdmin) {
+    const e = new Error(data.error || 'Este ambiente exige um token de administrador.');
+    e.needsAdmin = true;
+    throw e;
+  }
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || `Erro ${res.status}`);
+  return data;
+}
+
 export async function saveDashboard(config) {
-  return jsonOrThrow(await fetch('/api/dashboards', {
+  return mutationOrThrow(await fetch('/api/dashboards', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...adminHeader() },
     body: JSON.stringify(config),
   }));
 }
 export async function deleteDashboard(id) {
-  return jsonOrThrow(await fetch(`/api/dashboards?id=${encodeURIComponent(id)}`, { method: 'DELETE' }));
+  return mutationOrThrow(await fetch(`/api/dashboards?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { ...adminHeader() },
+  }));
 }
 
 // Header de senha (se houver) para os endpoints de DADOS por id (D1, Meta).
@@ -89,12 +133,21 @@ export async function fetchD1(id) {
   return jsonOrThrow(await fetch(`/api/connectors/d1?id=${encodeURIComponent(id)}`, { headers: authHeader(id) }));
 }
 
+// Handlers de fetch por tipo de fonte. Cada fonte nova = 1 entrada aqui + 1
+// entrada no registry (sources/index.js). O 'd1' nao entra aqui: o modo
+// historico usa a funcao dedicada fetchD1(id), fora deste roteamento.
+const FETCHERS = {
+  sheets: (source) => fetchSheet(source.url, source.gid || '0'),
+  csv: (source) => uploadCsv(source.data || ''),
+  meta: (source, id) => fetchMetaById(id),
+};
+
 // Busca o DataSet de acordo com o source salvo na config.
 // `id` e necessario para o conector Meta (o token e resolvido no servidor por id).
+// O registry (getSource) valida que o tipo existe; o FETCHERS faz a chamada.
 export async function fetchDataForSource(source, id) {
   if (!source || !source.type) throw new Error('Fonte de dados não configurada.');
-  if (source.type === 'sheets') return fetchSheet(source.url, source.gid || '0');
-  if (source.type === 'csv') return uploadCsv(source.data || '');
-  if (source.type === 'meta') return fetchMetaById(id);
-  throw new Error(`Tipo de fonte desconhecido: ${source.type}`);
+  const fetcher = getSource(source.type) && FETCHERS[source.type];
+  if (!fetcher) throw new Error(`Tipo de fonte desconhecido: ${source.type}`);
+  return fetcher(source, id);
 }

@@ -34,7 +34,9 @@ Todo conector devolve **exatamente** este formato:
  * @typedef {Object} DataSet
  * @property {string[]} columns   Cabeçalhos, na ordem original. Ex: ["Data","Canal","Investimento"]
  * @property {Object[]} rows      Cada linha é um objeto { [coluna]: valor }. Valores são STRING crua.
- * @property {Object}   meta       { source: 'sheets'|'csv'|'meta', fetchedAt: ISO string, rowCount: number, name?: string }
+ * @property {Object}   meta       { source: string, fetchedAt: ISO string, rowCount: number, name?: string }
+ *                                  source e um identificador EXTENSIVEL: hoje 'sheets'|'csv'|'meta'
+ *                                  (e 'd1' no modo historico); um conector sob medida usa o seu proprio.
  */
 ```
 
@@ -248,6 +250,11 @@ Campos opcionais da config (o código só os grava quando o usuário os preenche
   protegida, o cliente manda a senha no header `x-dash-auth`; o `hash` nunca é exposto na resposta.
 - `storage: 'd1'`: liga o modo histórico. Nesse modo o Worker de snapshot (cron) grava o `DataSet`
   no D1 e o dashboard lê o snapshot mais recente. Ausente (ou diferente de `'d1'`) = modo ao vivo.
+
+Trava global de mutação (opcional): a env `ADMIN_TOKEN` no projeto Pages. Quando definida, `POST` e
+`DELETE` de `/api/dashboards` exigem o header `x-admin-token` igual a ela (comparação em tempo constante);
+sem/errado devolve 401 `{ needsAdmin: true }`. O cliente guarda o token em `localStorage` (`cd-admin-token`)
+e o injeta em `saveDashboard`/`deleteDashboard`. Sem `ADMIN_TOKEN` definida, a API fica aberta (self-serve).
 
 Fluxo do wizard (`config.html` + `config-wizard.js`), 4 passos:
 1. Escolher domínio (marketing/vendas/suporte)

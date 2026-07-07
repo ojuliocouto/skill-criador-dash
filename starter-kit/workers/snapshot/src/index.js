@@ -14,6 +14,10 @@ import { parseCSV } from '../../../functions/lib/csv.mjs';
 import { sheetUrlToCsv } from '../../../functions/lib/sheets-url.mjs';
 import { buildInsightsUrl, mapInsightsToDataSet } from '../../../functions/lib/meta.mjs';
 import { insertSnapshotSQL } from '../../../functions/lib/snapshots.mjs';
+// Registry de fontes: qual tipo suporta snapshot historico (canHistory). Mesma
+// fonte de verdade que o wizard usa, pra decidir aqui quais fontes tirar snapshot.
+// O modulo e puro (sem DOM/browser), roda igual no runtime do Worker.
+import { getSource } from '../../../public/assets/js/sources/index.js';
 
 // Reexporta a lógica pura compartilhada para que o teste de paridade
 // (test/worker-parity.test.js) possa importar daqui e conferir que é a MESMA
@@ -51,8 +55,11 @@ export default {
         const source = config && config.source;
         const type = source && source.type;
 
-        // Só fontes vivas. 'csv' é estático (dado já salvo na config): pula.
-        if (type !== 'sheets' && type !== 'meta') continue;
+        // Só fontes que suportam historico (canHistory no registry de fontes).
+        // 'csv' é estático (dado já salvo na config) e 'd1' já é o proprio
+        // historico: ambos tem canHistory=false e sao pulados aqui.
+        const descriptor = getSource(type);
+        if (!descriptor || !descriptor.canHistory) continue;
 
         const dataset = await fetchDataSet(type, source);
         if (!dataset) continue;

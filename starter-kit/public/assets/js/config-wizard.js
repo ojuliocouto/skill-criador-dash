@@ -1,9 +1,10 @@
 // Wizard de configuração do dashboard. 4 passos, tudo client-side vanilla ESM.
 // Importa apenas módulos prontos (read-only): api-client, templates, automap.
 
-import { fetchSheet, uploadCsv, saveDashboard, previewMeta } from './lib/api-client.js';
+import { fetchSheet, uploadCsv, saveDashboard, previewMeta, setAdminToken } from './lib/api-client.js';
 import { templates, getTemplate } from './templates/index.js';
 import { autoMap } from './lib/automap.js';
+import { getSource } from './sources/index.js';
 import { sha256Hex } from './lib/auth.js';
 
 // ---------------------------------------------------------------------------
@@ -426,9 +427,10 @@ function renderFinish(body) {
     el('input', { class: 'input', id: 'dashPassword', type: 'password', placeholder: 'Deixe em branco para dashboard aberto', autocomplete: 'new-password' }),
     el('span', { class: 'hint', text: 'Com senha, quem abrir o link precisa digita-la. A senha nao e guardada em texto puro, so o hash.' }),
   ]));
-  // Modo de dados: so oferece historico para fontes vivas (planilha/Meta).
+  // Modo de dados: so oferece historico para fontes que suportam (canHistory no
+  // registry de fontes). Hoje: planilha e Meta suportam; CSV nao.
   const sourceType = state.source && state.source.type;
-  const podeHistorico = sourceType === 'sheets' || sourceType === 'meta';
+  const podeHistorico = !!(getSource(sourceType) && getSource(sourceType).canHistory);
   if (podeHistorico) {
     const modeSelect = el('select', { class: 'input', id: 'dashStorage' }, [
       el('option', { value: 'live', text: 'Ao vivo (le a fonte na hora)' }),
@@ -492,7 +494,15 @@ function renderFinish(body) {
       config.storage = 'd1';
     }
 
+    await tentarSalvar(config);
+  }
+
+  // Envia a config. Se o backend responder 401 needsAdmin (o operador setou
+  // ADMIN_TOKEN neste ambiente), mostra um campo pra digitar o token, guarda com
+  // setAdminToken e reenvia a MESMA config. So aparece nesse caso.
+  async function tentarSalvar(config) {
     createBtn.disabled = true;
+    feedback.innerHTML = '';
     feedback.appendChild(el('p', { class: 'hint', text: 'Salvando...' }));
     try {
       const saved = await saveDashboard(config);
@@ -501,9 +511,44 @@ function renderFinish(body) {
       window.location.href = `/dashboard.html?id=${encodeURIComponent(id)}`;
     } catch (e) {
       feedback.innerHTML = '';
+      if (e && e.needsAdmin) {
+        pedirAdminToken(config);
+        return;
+      }
       feedback.appendChild(errorBox(e && e.message ? e.message : 'Não foi possível salvar o dashboard.'));
       createBtn.disabled = false;
     }
+  }
+
+  // Campo simples de admin token (input + botao). Ao confirmar, guarda o token e
+  // reenvia a config pela tentarSalvar (que ja mandara o header x-admin-token).
+  function pedirAdminToken(config) {
+    createBtn.disabled = false;
+    const tokenInput = el('input', {
+      class: 'input', id: 'adminToken', type: 'password',
+      placeholder: 'Token de administrador', autocomplete: 'off',
+    });
+    const salvarBtn = el('button', { class: 'btn', type: 'button', text: 'Salvar com token' });
+    const box = el('div', { class: 'card' }, [
+      el('h3', { text: 'Este ambiente exige um token de administrador' }),
+      el('p', { class: 'hint', text: 'A criacao de dashboards esta protegida por um token. Cole o token de administrador para continuar.' }),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'lbl', text: 'Token de administrador' }),
+        tokenInput,
+      ]),
+      salvarBtn,
+    ]);
+    box.style.marginTop = '16px';
+    feedback.appendChild(box);
+    const reenviar = () => {
+      const token = tokenInput.value.trim();
+      if (!token) { tokenInput.focus(); return; }
+      setAdminToken(token);
+      tentarSalvar(config);
+    };
+    salvarBtn.addEventListener('click', reenviar);
+    tokenInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') reenviar(); });
+    tokenInput.focus();
   }
 }
 
