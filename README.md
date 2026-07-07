@@ -86,6 +86,19 @@ Before you start:
 
 For the MVP data source (Google Sheets or CSV) you need no token, no OAuth, and no API key. (Managing dashboards still needs an `ADMIN_TOKEN` set at deploy time, since mutations are fail-closed: see Deploy and Access model below.)
 
+## Install as a Claude Code skill
+
+The skill name in the frontmatter is `criador-dash`, so the install folder must match it (the repo
+name has a `skill-` prefix; do not reuse it as the folder name):
+
+```
+git clone <YOUR-REPO-URL> ~/.claude/skills/criador-dash
+```
+
+Repo layout: `SKILL.md` (the agent playbook), `references/` (infra commands, security model, features,
+extension guides — loaded on demand), `scripts/preflight.py` (environment + wrangler.toml checks before
+deploy), and `starter-kit/` (the deployable code library).
+
 ## Quick start
 
 ```
@@ -95,6 +108,9 @@ cd <REPO>/starter-kit
 npm test                      # 527 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
+For the full local flow (creating dashboards through the wizard or curl), first create
+`starter-kit/.dev.vars` with `ADMIN_TOKEN=<any-dev-value>` — mutations are fail-closed even in dev.
+Run `python3 scripts/preflight.py --starter-kit starter-kit` to check your environment at any time.
 
 Then open `config.html` and create your first dashboard through the 4-step wizard:
 
