@@ -365,6 +365,65 @@ test('dashboards listAll: protegido esconde nome/dominio (so id+protected)', asy
   assert.equal(byId.privado.domain, undefined, 'dominio (cliente) de dashboard protegido nao pode vazar');
 });
 
+// --- GRUPO (dashboard com abas): agrega dashboards existentes sob um so link ---
+
+// Grupo valido: kind:'group' + tabs, SEM domain/source/colMap (nao tem fonte propria).
+test('dashboards POST grupo valido -> 200, grava kind/tabs sem exigir fonte', async () => {
+  const kv = fakeKV();
+  const body = {
+    name: 'Apple Music',
+    kind: 'group',
+    accent: '#FA243C',
+    tabs: [
+      { id: 'apple-music-marketing', label: 'Marketing' },
+      { id: 'apple-music-vendas', label: 'Vendas' },
+    ],
+  };
+  const res = await dashboards(ctx('POST', { body, headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } }));
+  assert.equal(res.status, 200);
+  const j = await readJSON(res);
+  assert.equal(j.kind, 'group');
+  assert.equal(j.id, 'apple-music');
+  assert.equal(j.tabs.length, 2);
+  assert.ok(kv._map.has('dash:apple-music'), 'grupo persistido no KV');
+});
+
+// Grupo sem tabs -> 400 (o array de abas e obrigatorio no lugar de domain/source).
+test('dashboards POST grupo sem tabs -> 400', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(ctx('POST', {
+    body: { name: 'Grupo Vazio', kind: 'group' },
+    headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN },
+  }));
+  assert.equal(res.status, 400);
+  const j = await readJSON(res);
+  assert.match(j.error, /tabs|obrigat/i);
+  assert.equal(kv._map.size, 0, 'nada gravado sem tabs');
+});
+
+// Grupo com aba sem id -> 400 (cada aba precisa referenciar um dashboard por id).
+test('dashboards POST grupo com aba sem id -> 400', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(ctx('POST', {
+    body: { name: 'G', kind: 'group', tabs: [{ label: 'Sem id' }] },
+    headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN },
+  }));
+  assert.equal(res.status, 400);
+});
+
+// listAll expoe `kind` pra landing distinguir grupo de dashboard comum (aberto).
+test('dashboards listAll: expoe kind do grupo (aberto)', async () => {
+  const kv = fakeKV({
+    'dash:grp': JSON.stringify({ id: 'grp', name: 'Grupo', kind: 'group', tabs: [{ id: 'x', label: 'X' }], createdAt: '2026-03-01T00:00:00.000Z' }),
+    'dash:d': JSON.stringify(makeConfig({ id: 'd', createdAt: '2026-01-01T00:00:00.000Z' })),
+  });
+  const res = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  const arr = await readJSON(res);
+  const byId = Object.fromEntries(arr.map((x) => [x.id, x]));
+  assert.equal(byId.grp.kind, 'group');
+  assert.equal(byId.d.kind, undefined, 'dashboard comum nao tem kind');
+});
+
 // 8c. RATE LIMIT (GRAVE 2): brute force online da senha no GET ?id. 8 senhas
 //     erradas do mesmo IP -> 401; a 9a -> 429 Retry-After. Senha certa nao conta.
 test('dashboards GET protegido: brute force da senha estoura em 429', async () => {

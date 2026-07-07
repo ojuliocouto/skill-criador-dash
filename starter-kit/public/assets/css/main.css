@@ -89,7 +89,7 @@ body {
 a { color: var(--accent-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 64px; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 20px 64px; }
 
 /* Header */
 .topbar {
@@ -129,11 +129,54 @@ h2 { font-size: 18px; letter-spacing: -0.01em; margin: 0 0 14px; }
 .grid.two { grid-template-columns: 1fr 1fr; }
 @media (max-width: 780px) { .grid.two { grid-template-columns: 1fr; } }
 
+/* Dashboard grid 2D: os widgets (nao-kpi) ocupam um grid de 12 colunas, cada um
+   declarando quantas colunas span via .span-N (vem do `col` no layout do template).
+   Sem `col`, o widget ocupa a largura toda (span 12). No mobile, tudo colapsa pra
+   1 coluna. min-width:0 nas celulas deixa a tabela larga rolar dentro do proprio
+   card (overflow-x) em vez de estourar o grid. align-items:start deixa cada card
+   com a altura do proprio conteudo (um ranking curto ao lado de uma tabela alta
+   nao vira um card gigante vazio). */
+.dash-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; margin-top: 24px; align-items: start; }
+.dash-cell { grid-column: span 12; min-width: 0; }
+.dash-cell.span-4 { grid-column: span 4; }
+.dash-cell.span-5 { grid-column: span 5; }
+.dash-cell.span-6 { grid-column: span 6; }
+.dash-cell.span-7 { grid-column: span 7; }
+.dash-cell.span-8 { grid-column: span 8; }
+@media (max-width: 900px) {
+  .dash-cell,
+  .dash-cell.span-4, .dash-cell.span-5, .dash-cell.span-6,
+  .dash-cell.span-7, .dash-cell.span-8 { grid-column: span 12; }
+}
+
+/* Barra de filtros (periodo + dimensoes). Controles compactos, quebram linha em
+   telas estreitas; o "Limpar" e empurrado pra direita no desktop. */
+.filterbar { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; margin: 4px 0 2px; }
+.filterbar .fb-field { display: flex; flex-direction: column; gap: 5px; }
+.filterbar .fb-label { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.filterbar .fb-input { width: auto; min-width: 150px; padding: 8px 11px; font-size: 13.5px; }
+.filterbar .fb-reset { margin-left: auto; align-self: flex-end; padding: 9px 14px; font-size: 13.5px; }
+@media (max-width: 620px) {
+  .filterbar { gap: 8px; }
+  .filterbar .fb-field { flex: 1 1 140px; }
+  .filterbar .fb-input { min-width: 0; width: 100%; }
+  .filterbar .fb-reset { margin-left: 0; width: 100%; }
+}
+
+/* Abas de um dashboard-grupo (varios dashboards sob um so link). Linha de abas
+   sublinhada; a ativa marca com a cor da marca. Rolam na horizontal em telas
+   estreitas em vez de quebrar. */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: 10px 0 4px; overflow-x: auto; }
+.tab { background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--text-dim); padding: 10px 16px; font-size: 14.5px; font-weight: 600; cursor: pointer; font-family: var(--font); white-space: nowrap; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); border-bottom-color: var(--accent-fill-calc, var(--accent)); }
+.tab:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: -2px; }
+
 /* KPI */
 .kpi { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; position: relative; overflow: hidden; }
 .kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent-fill-calc, var(--accent)); opacity: 0.85; }
 .kpi .kpi-label, .kpi__label { color: var(--text-dim); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
-.kpi .kpi-value, .kpi__value { font-size: 26px; font-weight: 680; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
+.kpi .kpi-value, .kpi__value { font-size: 23px; font-weight: 680; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
 .kpi__value, .funnel__value, .ranking__value, .funnel__conv, td { font-variant-numeric: tabular-nums; }
 .kpi .kpi-hint, .kpi__hint { color: var(--text-faint); font-size: 12px; margin-top: 6px; }
 .kpi__trend { font-size: 12.5px; font-weight: 600; margin-top: 8px; }

@@ -33,12 +33,12 @@ export const template = {
     { widget: 'kpi', props: { metricKey: 'taxa_resolucao' } },
     { widget: 'kpi', props: { metricKey: 'tempo_resposta' } },
     { widget: 'kpi', props: { metricKey: 'csat' } },
-    { widget: 'funnel', props: { title: 'Resolução', steps: [
+    { widget: 'timeseries', col: 8, props: { dateSlot: 'data', valueSlot: 'atendimentos', title: 'Atendimentos no tempo' } },
+    { widget: 'funnel', col: 4, props: { title: 'Resolução', steps: [
       { label: 'Atendimentos', metricKey: 'atendimentos' },
       { label: 'Resolvidos', metricKey: 'resolvidos' },
     ] } },
-    { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'atendimentos', title: 'Atendimentos no tempo' } },
-    { widget: 'ranking', props: { dimensionSlot: 'canal', valueSlot: 'atendimentos', title: 'Atendimentos por canal' } },
-    { widget: 'table', props: {} },
+    { widget: 'ranking', col: 4, props: { dimensionSlot: 'canal', valueSlot: 'atendimentos', title: 'Atendimentos por canal' } },
+    { widget: 'table', col: 8, props: {} },
   ],
 };

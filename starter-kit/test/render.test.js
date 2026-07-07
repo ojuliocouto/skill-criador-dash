@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planLayout } from '../public/assets/js/dashboard.js';
+import { planLayout, cellSpanClass, resolveActiveTab } from '../public/assets/js/dashboard.js';
 import { registry, getWidget } from '../public/assets/js/widgets/index.js';
 
 // ---------- registry de widgets ----------
@@ -13,6 +13,35 @@ test('registry: tem as chaves esperadas e cada entrada expoe toHtml funcao', () 
   }
   assert.equal(typeof getWidget('table').toHtml, 'function', 'getWidget resolve a entrada');
   assert.equal(getWidget('inexistente'), undefined, 'getWidget de tipo desconhecido e undefined');
+});
+
+// ---------- cellSpanClass (grid 2D) ----------
+test('cellSpanClass: spans permitidos viram classe span-N', () => {
+  assert.equal(cellSpanClass(4), ' span-4');
+  assert.equal(cellSpanClass(6), ' span-6');
+  assert.equal(cellSpanClass(8), ' span-8');
+});
+test('cellSpanClass: full-width e valores invalidos NAO geram classe (span 12 = padrao)', () => {
+  assert.equal(cellSpanClass(12), '');
+  assert.equal(cellSpanClass(undefined), '');
+  assert.equal(cellSpanClass(3), '');
+  assert.equal(cellSpanClass(9), '');
+  assert.equal(cellSpanClass('8'), ''); // so aceita number, nao string
+});
+
+// ---------- resolveActiveTab (grupo com abas) ----------
+test('resolveActiveTab: pedida valida vence', () => {
+  const tabs = [{ id: 'mkt' }, { id: 'vendas' }];
+  assert.equal(resolveActiveTab(tabs, 'vendas'), 'vendas');
+});
+test('resolveActiveTab: pedida invalida ou ausente cai na primeira', () => {
+  const tabs = [{ id: 'mkt' }, { id: 'vendas' }];
+  assert.equal(resolveActiveTab(tabs, 'inexistente'), 'mkt');
+  assert.equal(resolveActiveTab(tabs, null), 'mkt');
+});
+test('resolveActiveTab: sem abas devolve null; ignora abas sem id', () => {
+  assert.equal(resolveActiveTab([], 'x'), null);
+  assert.equal(resolveActiveTab([{ label: 'sem id' }, { id: 'ok' }], null), 'ok');
 });
 
 // ---------- planLayout ----------

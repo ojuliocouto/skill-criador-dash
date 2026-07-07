@@ -51,14 +51,14 @@ export const template = {
     { widget: 'kpi', props: { metricKey: 'CPL' } },
     { widget: 'kpi', props: { metricKey: 'CPA' } },
     { widget: 'kpi', props: { metricKey: 'ROAS' } },
-    { widget: 'funnel', props: { title: 'Funil de conversão', steps: [
+    { widget: 'timeseries', col: 8, props: { dateSlot: 'data', valueSlot: 'investimento', title: 'Investimento no tempo' } },
+    { widget: 'funnel', col: 4, props: { title: 'Funil de conversão', steps: [
       { label: 'Impressões', metricKey: 'impressoes' },
       { label: 'Cliques', metricKey: 'cliques' },
       { label: 'Leads', metricKey: 'leads' },
       { label: 'Conversões', metricKey: 'conversoes' },
     ] } },
-    { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'investimento', title: 'Investimento no tempo' } },
-    { widget: 'ranking', props: { dimensionSlot: 'canal', valueSlot: 'investimento', title: 'Ranking por canal' } },
-    { widget: 'table', props: {} },
+    { widget: 'ranking', col: 4, props: { dimensionSlot: 'canal', valueSlot: 'investimento', title: 'Ranking por canal' } },
+    { widget: 'table', col: 8, props: {} },
   ],
 };

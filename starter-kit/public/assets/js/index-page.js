@@ -35,7 +35,9 @@ function renderErro(msg) {
 function itemHTML(dash) {
   const id = esc(dash.id);
   const nome = esc(dash.name || dash.id);
-  const dominio = esc(dash.domain || '');
+  // Grupo (dashboard com abas) nao tem dominio: mostra o rotulo "Grupo" no badge,
+  // pra distinguir de um dashboard comum na lista.
+  const dominio = dash.kind === 'group' ? 'Grupo' : esc(dash.domain || '');
   const data = fmtData(dash.createdAt);
   const metaData = data ? `<span class="meta">Criado em ${data}</span>` : '';
   // Logo do dashboard ao lado do nome, quando o src for seguro (https/data:image).

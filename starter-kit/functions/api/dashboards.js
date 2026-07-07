@@ -189,6 +189,9 @@ async function listAll(kv) {
       id: c.id,
       name: c.name,
       domain: c.domain,
+      // kind:'group' (dashboard com abas) sai na listagem pra landing distinguir
+      // grupo de dashboard comum. Ausente nos dashboards normais.
+      kind: c.kind,
       accent: c.accent,
       createdAt: c.createdAt,
       protected: false,
@@ -234,21 +237,39 @@ async function create(kv, request, providedHash, env) {
     return erro('Configuração inválida. Envie um objeto JSON com os dados do dashboard.', 400);
   }
 
+  // GRUPO (dashboard com abas): kind:'group' agrega dashboards existentes sob um
+  // unico link. Nao tem fonte propria (domain/source/colMap), entao a validacao
+  // troca esses obrigatorios por `tabs` (lista de { id, label }).
+  const isGroup = config.kind === 'group';
+
   const faltando = [];
   if (!config.name || !String(config.name).trim()) faltando.push('name');
-  if (!config.domain || !String(config.domain).trim()) faltando.push('domain');
-  if (!config.source || typeof config.source !== 'object') faltando.push('source');
-  if (!config.colMap || typeof config.colMap !== 'object') faltando.push('colMap');
+  if (isGroup) {
+    if (!Array.isArray(config.tabs) || !config.tabs.length) faltando.push('tabs');
+  } else {
+    if (!config.domain || !String(config.domain).trim()) faltando.push('domain');
+    if (!config.source || typeof config.source !== 'object') faltando.push('source');
+    if (!config.colMap || typeof config.colMap !== 'object') faltando.push('colMap');
+  }
   if (faltando.length) {
     return erro(`Campos obrigatórios ausentes: ${faltando.join(', ')}.`, 400);
   }
 
-  // Valida o dominio contra a lista canonica (functions/lib/domains.mjs), a MESMA
-  // fonte que alimenta o registry de templates do front-end. Derivar daqui (em vez
-  // de um enum literal no handler) faz com que adicionar um dominio novo NAO exija
-  // editar esta validacao: basta registrar a chave em domains.mjs + criar o
-  // template. Dominios fora da lista continuam rejeitados (contrato preservado).
-  if (!isDomain(config.domain)) {
+  if (isGroup) {
+    // Cada aba referencia um dashboard por id (slug). Valida so a forma aqui; a
+    // existencia do dashboard-filho e checada na hora de abrir a aba (uma aba pode
+    // ser criada depois do grupo, ou ficar orfa sem derrubar o grupo inteiro).
+    for (const t of config.tabs) {
+      if (!t || !t.id || !String(t.id).trim()) {
+        return erro('Cada aba do grupo precisa de um id de dashboard (tabs: [{ id, label }]).', 400);
+      }
+    }
+  } else if (!isDomain(config.domain)) {
+    // Valida o dominio contra a lista canonica (functions/lib/domains.mjs), a MESMA
+    // fonte que alimenta o registry de templates do front-end. Derivar daqui (em vez
+    // de um enum literal no handler) faz com que adicionar um dominio novo NAO exija
+    // editar esta validacao: basta registrar a chave em domains.mjs + criar o
+    // template. Dominios fora da lista continuam rejeitados (contrato preservado).
     return erro(`Domínio inválido: "${config.domain}". Use um de: ${DOMAINS.join(', ')}.`, 400);
   }
 

@@ -65,13 +65,13 @@ export const template = {
     { widget: 'kpi', props: { metricKey: 'vendas_ganhas' } },
     { widget: 'kpi', props: { metricKey: 'taxa_conversao' } },
     { widget: 'kpi', props: { metricKey: 'ticket_medio' } },
-    { widget: 'funnel', props: { title: 'Funil de fechamento', steps: [
+    { widget: 'timeseries', col: 8, props: { dateSlot: 'data', valueSlot: 'valor', title: 'Faturamento no tempo' } },
+    { widget: 'funnel', col: 4, props: { title: 'Funil de fechamento', steps: [
       { label: 'Negócios', metricKey: 'num_vendas' },
       { label: 'Ganhas', metricKey: 'vendas_ganhas' },
     ] } },
-    { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'valor', title: 'Faturamento no tempo' } },
-    { widget: 'ranking', props: { dimensionSlot: 'vendedor', valueSlot: 'valor', title: 'Ranking por vendedor' } },
-    { widget: 'ranking', props: { dimensionSlot: 'produto', valueSlot: 'valor', title: 'Ranking por produto' } },
-    { widget: 'table', props: {} },
+    { widget: 'ranking', col: 6, props: { dimensionSlot: 'vendedor', valueSlot: 'valor', title: 'Ranking por vendedor' } },
+    { widget: 'ranking', col: 6, props: { dimensionSlot: 'produto', valueSlot: 'valor', title: 'Ranking por produto' } },
+    { widget: 'table', col: 12, props: {} },
   ],
 };

@@ -125,6 +125,45 @@ Recursos dos KPIs:
 - Meta vs realizado (opcional): meta na métrica principal do domínio (`primaryMetric`); o card mostra
   barra de progresso e percentual da meta.
 
+Layout em grid 2D (desktop): os widgets não-kpi entram num grid de 12 colunas. Cada item do `layout`
+do template pode declarar `col` (spans permitidos 4..8; ausente ou 12 = largura toda). Assim série e
+funil ficam lado a lado, rankings pareiam, e a tabela ocupa a linha inteira, em vez de tudo empilhado
+verticalmente. No mobile (≤900px) tudo colapsa pra 1 coluna. A lógica pura é `cellSpanClass(col)` em
+`dashboard.js` (testada); o CSS são as classes `.dash-grid`/`.dash-cell.span-N` em `main.css`.
+
+Filtros (client-side, sempre ligados quando há o que filtrar): uma barra acima dos widgets com período
+(de/até, pela coluna de data do domínio) e um seletor por dimensão mapeada (canal, vendedor, produto,
+status: qualquer slot que não seja o eixo de tempo nem coluna numérica de métrica), com 2..200 valores
+distintos. Ao mudar, recalcula TUDO (KPIs, tendência, funil, série, ranking, tabela e a contagem de
+linhas) só no navegador, sem recarregar nem tocar a fonte; "Limpar filtros" volta ao período/valores
+cheios. Lógica pura em `lib/filters.js` (`dimensionSlots`/`distinctValues`/`dateBounds`/`applyFilters`,
+testada em `test/filters.test.js`); a barra sobrevive aos repaints (fica fora do `#dashbody`, que é a
+única parte repintada). No modo histórico (D1) o filtro age sobre o snapshot lido, igual ao ao vivo.
+
+Dashboard-grupo (vários dashboards num único link, com ABAS): quando a mesma operação tem mais de uma
+área (Marketing + Vendas + Suporte do mesmo negócio), em vez de mandar 3 links, crie um GRUPO. É uma
+config-pai no mesmo KV com `kind:'group'` e `tabs:[{id,label}]` apontando pros ids dos dashboards já
+criados. A página `dashboard.html?id=<grupo>` mostra o nome do grupo + uma barra de abas; cada aba
+carrega o dashboard-filho sob demanda (sem recarregar), com os filtros próprios daquele domínio, e a
+aba ativa fica na URL (`?tab=`, compartilhável). O grupo NÃO tem fonte própria: o POST valida `name` +
+`tabs` no lugar de domain/source/colMap (`isDomain` só vale pra dashboard comum). Duas formas de criar:
+- Pelo WIZARD (self-service): a landing tem o botão "Novo grupo" (`group.html` + `group-wizard.js`). A
+  pessoa marca os dashboards que entram (grupos e protegidos ficam de fora), edita o rótulo de cada aba,
+  dá nome e cor, e publica; cai no mesmo gate de admin token do config-wizard (401 needsAdmin -> cola o
+  token uma vez). As abas saem na ordem de criação dos dashboards.
+- Por API (o agente, igual ao seed de um dashboard):
+```
+curl -X POST "$BASE/api/dashboards" -H "content-type: application/json" -H "x-admin-token: $ADMIN" \
+  -d '{"name":"Minha Empresa","kind":"group","accent":"#RRGGBB",
+       "tabs":[{"id":"dash-marketing","label":"Marketing"},{"id":"dash-vendas","label":"Vendas"}]}'
+```
+O id do grupo sai do slug do name. A landing (`index-page.js`) lista o grupo com o badge "Grupo" e o
+link único. Código: `initGroup`/`loadDashboardInto`/`resolveActiveTab` (puro, testado) em `dashboard.js`;
+`group-wizard.js` (`eligibleForGroup`/`buildGroupConfig`/`validateGroup` puros, testados); validação em
+`functions/api/dashboards.js`; testes em `test/handlers.test.js`, `test/render.test.js`,
+`test/group-wizard.test.js`. Aba que aponta pra um dashboard protegido por senha não embute (mostra
+"abrir direto"); as demais abrem.
+
 Proteção por senha (opcional): senha por dashboard. O cliente manda um SHA-256 da senha no header
 `x-dash-auth`; o servidor guarda só um verifier PBKDF2-SHA256 salgado por dashboard (nunca a senha, nunca
 um hash reenviável), recomputa e compara em tempo constante. O dashboard pede a senha; a API só devolve a
@@ -193,12 +232,12 @@ functions/
 workers/
   snapshot/ src/index.js        Worker com cron que grava snapshots no D1 (SNAPSHOT_FETCHERS)
 public/
-  index.html  config.html (wizard)  dashboard.html
+  index.html  config.html (wizard)  group.html (wizard de grupo)  dashboard.html
   assets/css/main.css
   assets/js/
-    config-wizard.js  dashboard.js  index-page.js  domains.mjs (lista DOMAINS do browser: fonte da verdade dos dominios)
+    config-wizard.js  group-wizard.js  dashboard.js  index-page.js  domains.mjs (lista DOMAINS do browser: fonte da verdade dos dominios)
     sources/ index.js (registry de fontes: type, label, canHistory)
-    lib/ api-client.js  automap.js  format.js  metrics.js  auth.js  theme.js  color.js  html.js
+    lib/ api-client.js  automap.js  format.js  metrics.js  filters.js (filtro puro)  auth.js  theme.js  color.js  html.js
     templates/ index.js  marketing.js  vendas.js  suporte.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
 test/                           476 testes (npm test  ->  node --test test/*.test.js)
@@ -319,7 +358,11 @@ Marketing, Vendas e Suporte já vêm prontos. Para um novo (ex: Financeiro), sig
 1. `public/assets/js/templates/<dominio>.js` exportando `template` com `id`, `label`, `primaryMetric`,
    `dateSlot` (qual slot é o eixo de tempo, ex `'data'`), `slots` (com `aliases` lowercase sem acento pro
    auto-mapeamento), `metrics` (base antes das derivadas; marque `betterWhen` nas que têm direção) e `layout`
-   (kpi/timeseries/funnel/table/ranking).
+   (kpi/timeseries/funnel/table/ranking). Nos itens não-kpi do `layout`, opcionalmente declare `col`
+   (span de 4 a 8 no grid de 12 colunas; sem `col` = largura toda) pra dispor os widgets em 2D no desktop,
+   ex: `{ widget:'timeseries', col:8, ... }` ao lado de `{ widget:'funnel', col:4, ... }`. A ordem do array
+   é a ordem do fluxo no grid. Slots categóricos (nem o `dateSlot`, nem coluna de métrica) viram filtro
+   automático na barra, então nomeie-os com clareza.
    Ex Financeiro: slots data, categoria, entrada, saida; métricas receita (sum entrada), despesa (sum saida),
    saldo (derived entrada-saida), margem (ratio saldo/entrada).
 2. Registre a CHAVE do domínio (ex `'financeiro'`) no array `DOMAINS`, em DOIS lugares que um teste de

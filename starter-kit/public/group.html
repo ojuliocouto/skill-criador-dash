@@ -1,39 +1,31 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script>try{var t=localStorage.getItem('cd-theme');if(t!=='light'&&t!=='dark'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';}document.documentElement.dataset.theme=t;}catch(e){}</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236d28d9'/%3E%3Crect x='8' y='16' width='4' height='9' fill='white'/%3E%3Crect x='14' y='11' width='4' height='14' fill='white'/%3E%3Crect x='20' y='7' width='4' height='18' fill='white'/%3E%3C/svg%3E" />
-  <title>Criador Dash</title>
-  <link rel="stylesheet" href="/assets/css/main.css">
+  <title>Novo grupo</title>
+  <link rel="stylesheet" href="/assets/css/main.css" />
 </head>
 <body>
   <a class="skip-link" href="#main">Pular para o conteúdo</a>
   <header class="topbar">
     <div class="brand">
       <span class="dot"></span>
-      Criador Dash
-      <small>painéis de marketing e vendas</small>
+      Criador de Dashboard <small>novo grupo</small>
     </div>
-    <div class="actions" style="display:flex;gap:8px">
-      <a class="btn ghost" href="/group.html">Novo grupo</a>
-      <a class="btn" href="/config.html">Novo dashboard</a>
-    </div>
+    <a class="btn ghost" href="/index.html">Meus dashboards</a>
   </header>
 
   <main id="main" tabindex="-1" class="wrap">
-    <h1>Seus dashboards</h1>
-    <p class="subtitle">Conecte uma planilha ou CSV, escolha o domínio e publique. Sem código.</p>
+    <h1>Novo grupo</h1>
+    <p class="subtitle">Junte dashboards que você já criou num único link, com abas. Cada dashboard vira uma aba.</p>
 
-    <div id="lista" class="section">
-      <div class="card">
-        <p class="hint">Carregando...</p>
-      </div>
-    </div>
+    <section id="groupApp"></section>
   </main>
 
-  <script type="module" src="/assets/js/index-page.js"></script>
+  <script type="module" src="/assets/js/group-wizard.js"></script>
   <script type="module" src="/assets/js/lib/theme.js"></script>
 </body>
 </html>
