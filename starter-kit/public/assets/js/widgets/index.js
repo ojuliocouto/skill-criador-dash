@@ -89,7 +89,12 @@ export const registry = {
       // Agregacao por dimensao deriva do `agg` da MetricDef do valueSlot (ex:
       // 'avg' para CSAT), com fallback seguro pra 'sum' quando nao ha MetricDef.
       const agg = bucketAggFor(template, findMetricDef, props.valueSlot);
-      const items = groupBy(dataset.rows, colMap, props.dimensionSlot, props.valueSlot, agg);
+      let items = groupBy(dataset.rows, colMap, props.dimensionSlot, props.valueSlot, agg);
+      // hideZeros: descarta a linha cujo valor agregado deu zero. Existe pro
+      // financeiro, onde a MESMA coluna de categoria descreve os dois lados do
+      // caixa (entrada e saida): sem o filtro, o ranking de saidas listaria as
+      // categorias de receita zeradas e vice-versa, enchendo a tela de barra vazia.
+      if (props.hideZeros) items = items.filter((it) => Number(it.value) !== 0);
       if (!items.length) return '';
       const title = props.title || `Ranking por ${props.dimensionSlot || ''}`.trim();
       // formato herda da MetricDef que casa com o valueSlot, se houver; senao number.

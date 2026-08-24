@@ -10,6 +10,7 @@ import { needsAuth, authOk, checkAdminToken, derivePasswordAuth } from '../lib/a
 import { authRateLimit } from '../lib/rate-limit.mjs';
 import { DOMAINS, isDomain } from '../lib/domains.mjs';
 import { validarFonte } from '../lib/source-shape.mjs';
+import { validarColMap, colunasDaFonte } from '../lib/colmap-shape.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -28,6 +29,77 @@ export function slugify(name) {
     .replace(/-+/g, '-')             // colapsa hífens repetidos
     .replace(/^-+|-+$/g, '');        // apara hífens das pontas
   return base || 'dashboard';
+}
+
+/**
+ * Indica se a config chegou COM senha (dashboard protegido). Cobre os dois
+ * formatos que podem aparecer num POST: `{ hash }` (payload cru do wizard, que
+ * ainda vira verifier salgado mais abaixo no create) e `{ verifier }` (bloco v2
+ * ja derivado, quando o cliente reenvia uma config vinda do servidor).
+ * @param {*} config
+ * @returns {boolean}
+ */
+export function temSenha(config) {
+  const a = config && typeof config === 'object' ? config.auth : null;
+  if (!a || typeof a !== 'object') return false;
+  return !!(a.hash || a.verifier);
+}
+
+/**
+ * Id OPACO para dashboard protegido: 16 bytes aleatorios (128 bits) em hex, com
+ * prefixo neutro. Nao carrega nada do nome, do cliente nem da data, e continua
+ * sendo um slug seguro ([a-z0-9-]) para virar chave KV.
+ * @returns {string}
+ */
+export function gerarIdOpaco() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let hex = '';
+  for (const b of bytes) hex += b.toString(16).padStart(2, '0');
+  return `dash-${hex}`;
+}
+
+/**
+ * Resolve o id definitivo do dashboard no POST.
+ *
+ * P7 (vazamento de nome pelo id): o id sai na listagem PUBLICA e na URL. Enquanto
+ * ele era sempre slugify(name), a listagem anonima devolvia
+ * {"id":"faturamento-acme-janeiro","protected":true} e entregava o nome do cliente
+ * de graca, mesmo com a listagem ja endurecida para omitir name/domain/accent.
+ * Pior: com o id adivinhavel, GET ?id=<slug do nome> respondia 401 needsPassword
+ * (existe) contra 404 (nao existe), virando oraculo para confirmar nomes.
+ *
+ * Regra:
+ *  - SEM senha: nada muda. O id continua o slug legivel do nome (ou do id que o
+ *    cliente mandou, sempre sanitizado), porque a landing precisa listar e a
+ *    pessoa precisa reconhecer o proprio dashboard.
+ *  - COM senha, criando: id OPACO aleatorio. Nem o nome, nem um id escolhido pelo
+ *    cliente entram na conta (senao bastaria um POST com id:"sigiloso-cliente"
+ *    para reintroduzir o vazamento por fora do wizard).
+ *  - COM senha, sobrescrevendo um id que JA existe E JA era protegido: preserva
+ *    o id. O link de um dashboard protegido publicado nao pode mudar por causa
+ *    de uma edicao.
+ *  - COM senha, sobrescrevendo um id que JA existe mas NAO era protegido ainda
+ *    (dashboard publico ganhando senha agora): id OPACO novo (ROTACIONA). Um
+ *    dashboard que nasceu publico tem o slug legivel na listagem e na URL; se
+ *    o POST que adiciona a senha preservasse esse slug, o nome do cliente
+ *    continuaria vazando do mesmo jeito que o id opaco existe pra evitar. Quem
+ *    chama (o handler `create`) e responsavel por migrar o registro no KV
+ *    (gravar no id novo, apagar o antigo) e devolver o id novo na resposta.
+ *
+ * @param {Object} config           config recebida no POST
+ * @param {{ existe?: boolean, eraProtegido?: boolean }} [opts]
+ *   `existe` = ja ha um dashboard gravado com esse id.
+ *   `eraProtegido` = esse dashboard, do jeito que estava gravado ANTES deste
+ *   POST, ja exigia senha (so importa quando `existe` e true).
+ * @returns {string}
+ */
+export function resolverId(config, { existe = false, eraProtegido = false } = {}) {
+  const idPedido = config && config.id != null ? String(config.id).trim() : '';
+  const nome = config ? config.name : '';
+  if (!temSenha(config)) return slugify(idPedido || nome);
+  if (idPedido && existe && eraProtegido) return slugify(idPedido);
+  return gerarIdOpaco();
 }
 
 // Qualquer chave cujo nome soe a credencial e removida antes de ir pro browser.
@@ -281,6 +353,17 @@ async function create(kv, request, providedHash, env) {
   if (!isGroup) {
     const fonteInvalida = validarFonte(config.source);
     if (fonteInvalida) return erro(fonteInvalida, 400);
+
+    // Valida a FORMA do colMap logo na sequencia (functions/lib/colmap-shape.mjs).
+    // Sem isso, um colMap vazio ou incompleto era gravado com 200 e o dashboard
+    // publicava "INVESTIMENTO R$ 0,00" no KPI com a linha certa na tabela logo
+    // abaixo: numero errado com cara de numero certo. O wizard ja barrava no
+    // front (validateRequired), mas o POST, que e o caminho do agente, nao tinha
+    // gate nenhum. Quando a fonte e csv, as colunas reais sao conhecidas aqui,
+    // entao tambem checamos que cada coluna escolhida existe de verdade.
+    const colunas = colunasDaFonte(config.source);
+    const colMapInvalido = validarColMap(config.domain, config.colMap, colunas);
+    if (colMapInvalido) return erro(colMapInvalido, 400);
   }
 
   // Valida a cor de destaque no servidor: se vier e nao for hex (#rgb/#rrggbb),
@@ -305,17 +388,45 @@ async function create(kv, request, providedHash, env) {
     return erro('Logo inválido: use uma URL https ou um data:image.', 400);
   }
 
-  // SEGURANCA: nunca usar o id CRU do cliente como chave KV. Um id arbitrario
-  // (com espacos, barras, '..', caracteres de controle) viraria uma chave KV
-  // perigosa/ambigua. Passa SEMPRE pelo mesmo slugify do contrato: se o cliente
-  // mandou um id, e sanitizado; se nao mandou, deriva do name. Assim a chave
-  // gravada e sempre um slug seguro.
-  config.id = slugify(config.id || config.name);
+  // SEGURANCA do id. Regras que convivem aqui:
+  //
+  // 1) Nunca usar o id CRU do cliente como chave KV. Um id arbitrario (com
+  //    espacos, barras, '..', caracteres de controle) viraria uma chave KV
+  //    perigosa/ambigua, entao tudo passa pelo slugify do contrato.
+  // 2) Dashboard PROTEGIDO nao pode ter id derivado do nome (P7): o id sai na
+  //    listagem publica e na URL. Com senha, o id vira opaco e aleatorio.
+  // 3) PROTEGER DEPOIS um dashboard que ja existia PUBLICO (P7, rodada 2) tem
+  //    que ROTACIONAR o id pro formato opaco, nao preservar o slug legivel:
+  //    senao o nome do cliente continua vazando pela listagem e pela URL do
+  //    jeito que a regra 2 existe pra evitar. `eraProtegido` carrega se o
+  //    registro que hoje esta gravado com esse id JA tinha bloco auth, pra
+  //    resolverId() distinguir "editar um protegido" (preserva) de "proteger
+  //    um publico" (rotaciona).
+  //
+  // A sobrescrita de um dashboard PROTEGIDO que JA existe preserva o id (o link
+  // publicado nao pode mudar por causa de uma edicao). Ver resolverId() e
+  // references/seguranca.md.
+  const idPedido = config.id == null ? '' : String(config.id).trim();
+  const idResolvidoDoPedido = idPedido ? slugify(idPedido) : '';
+  const existenteAntigo = idResolvidoDoPedido ? await loadConfig(kv, idResolvidoDoPedido) : null;
+  const idJaExiste = !!existenteAntigo;
+  const eraProtegido = idJaExiste && needsAuth(existenteAntigo);
+  config.id = resolverId(config, { existe: idJaExiste, eraProtegido });
   if (!config.createdAt) config.createdAt = new Date().toISOString();
 
+  // ROTACAO (P7, rodada 2): o id pedido apontava pra um dashboard PUBLICO que
+  // existia, e o id resolvido saiu diferente (rotacionou pro opaco porque este
+  // POST trouxe senha nova). O registro velho, com o slug legivel, precisa
+  // sumir do KV: senao o dashboard fica duplicado (um orfao publico e legivel
+  // convivendo com o novo protegido), o que reabriria o vazamento pela chave
+  // antiga que continuaria respondendo com o mesmo conteudo.
+  const rotacionando = idJaExiste && idResolvidoDoPedido !== config.id;
+
   // Nao deixa SOBRESCREVER um dashboard protegido sem a senha dele (senao qualquer
-  // um com o id apagaria/trocaria a config de um dashboard protegido).
-  const existente = await loadConfig(kv, config.id);
+  // um com o id apagaria/trocaria a config de um dashboard protegido). Numa
+  // rotacao o id resolvido e NOVO por definicao (ainda nao existe no KV), entao
+  // nao ha o que checar aqui.
+  const existente = rotacionando ? null : await loadConfig(kv, config.id);
   if (existente && needsAuth(existente) && !(await authOk(existente, providedHash))) {
     // RATE LIMIT: sobrescrever dashboard protegido tambem e superficie de brute force.
     const rl = await authRateLimit(env, request, config.id);
@@ -333,6 +444,11 @@ async function create(kv, request, providedHash, env) {
   }
 
   await kv.put(kvKey(config.id), JSON.stringify(config));
+  // So depois de gravar o novo com sucesso e que o antigo e apagado: assim uma
+  // falha no meio do caminho nunca deixa o dashboard sem nenhum registro valido.
+  if (rotacionando) {
+    await kv.delete(kvKey(idResolvidoDoPedido));
+  }
   return json(stripSecrets(config));
 }
 

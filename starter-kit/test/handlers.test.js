@@ -13,6 +13,7 @@ import { onRequest as middleware } from '../functions/_middleware.js';
 import { sha256Hex } from '../public/assets/js/lib/auth.js';
 import { authOk, derivePasswordAuth } from '../functions/lib/auth-config.mjs';
 import { DOMAINS } from '../functions/lib/domains.mjs';
+import { slotsObrigatorios } from '../functions/lib/colmap-shape.mjs';
 
 // Modelo FAIL-CLOSED: toda mutacao (POST/DELETE) exige ADMIN_TOKEN no servidor E o
 // header x-admin-token. Os testes de mutacao setam este token no env e mandam o
@@ -175,8 +176,11 @@ test('dashboards POST com fonte de conector sob medida -> 200', async () => {
   assert.equal(res.status, 200);
 });
 
-// 2. POST valido -> 200, gera id (slug) e createdAt; resposta NAO expoe auth.hash.
-test('dashboards POST valido -> 200 gera slug/createdAt, salga a senha e nao vaza auth', async () => {
+// 2. POST valido -> 200, gera id e createdAt; resposta NAO expoe auth.hash.
+// P7: como esta config TEM senha, o id gerado e OPACO (nao e mais o slug do
+// nome). A cobertura de slug legivel vive no dashboard SEM senha, em
+// test/protected-id.test.js e nos testes unitarios de slugify.
+test('dashboards POST valido -> 200 gera id opaco/createdAt, salga a senha e nao vaza auth', async () => {
   const kv = fakeKV();
   const hash = await sha256Hex('segredo');
   const res = await dashboards(
@@ -184,13 +188,15 @@ test('dashboards POST valido -> 200 gera slug/createdAt, salga a senha e nao vaz
   );
   assert.equal(res.status, 200);
   const j = await readJSON(res);
-  assert.equal(j.id, 'cafe-da-manha'); // slug com acento removido
+  // Dashboard protegido: id opaco, sem nenhum pedaco do nome (P7).
+  assert.match(j.id, /^dash-[0-9a-f]{32}$/, 'protegido recebe id opaco');
+  assert.ok(!/cafe|manha/.test(j.id), 'o id nao pode carregar o nome do dashboard');
   assert.ok(j.createdAt, 'deve gerar createdAt');
   // Gate de seguranca: nenhum material de auth vaza pro cliente.
   assert.equal(j.auth, undefined);
   assert.equal(j.protected, true);
   // Persistido no KV JA SALGADO: nunca o hash cru que o header carrega.
-  const stored = JSON.parse(kv._map.get('dash:cafe-da-manha'));
+  const stored = JSON.parse(kv._map.get(`dash:${j.id}`));
   assert.equal(stored.auth.hash, undefined, 'nao pode gravar o hash cru reenviavel');
   assert.ok(stored.auth.salt && stored.auth.verifier, 'grava salt + verifier');
   assert.equal(stored.auth.algo, 'PBKDF2-SHA256');
@@ -218,8 +224,13 @@ test('dashboards POST aceita todo dominio do registry (sem enum hardcoded no han
   // este teste passa a cobri-lo automaticamente.
   for (const domain of DOMAINS) {
     const kv = fakeKV();
+    // O colMap base de makeConfig serve ao dominio 'vendas'. Depois do gate de
+    // colMap no POST (functions/lib/colmap-shape.mjs), cada dominio exige os
+    // SEUS slots obrigatorios, entao o mapeamento e derivado da mesma fonte que
+    // o servidor usa: assim um dominio novo continua coberto sem editar daqui.
+    const colMap = Object.fromEntries(slotsObrigatorios(domain).map((slot) => [slot.key, 'A']));
     const res = await dashboards(
-      ctx('POST', { body: makeConfig({ name: `Dash ${domain}`, domain }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
+      ctx('POST', { body: makeConfig({ name: `Dash ${domain}`, domain, colMap }), headers: adminHeaders(), env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN } })
     );
     assert.equal(res.status, 200, `dominio ${domain} deve ser aceito`);
     const j = await readJSON(res);

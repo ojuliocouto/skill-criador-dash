@@ -32,8 +32,13 @@ export const template = {
     { widget: 'kpi', props: { metricKey: 'saldo' } },
     { widget: 'kpi', props: { metricKey: 'margem' } },
     { widget: 'timeseries', col: 8, props: { dateSlot: 'data', valueSlot: 'entrada', title: 'Entradas no tempo' } },
-    { widget: 'ranking', col: 4, props: { dimensionSlot: 'categoria', valueSlot: 'saida', title: 'Saídas por categoria' } },
-    { widget: 'ranking', col: 12, props: { dimensionSlot: 'categoria', valueSlot: 'entrada', title: 'Entradas por categoria' } },
+    // hideZeros: no fluxo de caixa a MESMA coluna de categoria descreve os dois
+    // lados (Fornecedor e despesa, Vendas balcão e receita). Sem o filtro, o
+    // ranking de saídas lista as categorias de receita zeradas e o de entradas
+    // lista as de despesa zeradas, enchendo a tela de barra vazia. O flag manda
+    // o widget descartar a linha cujo valor agregado deu zero.
+    { widget: 'ranking', col: 4, props: { dimensionSlot: 'categoria', valueSlot: 'saida', title: 'Saídas por categoria', hideZeros: true } },
+    { widget: 'ranking', col: 12, props: { dimensionSlot: 'categoria', valueSlot: 'entrada', title: 'Entradas por categoria', hideZeros: true } },
     { widget: 'table', col: 12, props: {} },
   ],
 };
