@@ -407,7 +407,26 @@ async function create(kv, request, providedHash, env) {
   // publicado nao pode mudar por causa de uma edicao). Ver resolverId() e
   // references/seguranca.md.
   const idPedido = config.id == null ? '' : String(config.id).trim();
-  const idResolvidoDoPedido = idPedido ? slugify(idPedido) : '';
+  let idResolvidoDoPedido = idPedido ? slugify(idPedido) : '';
+
+  // P7 RODADA 3 (caminho real da UI): a rotacao acima so acontecia quando o
+  // POST trazia `id` explicito. Mas o config-wizard.js real NUNCA manda id de
+  // volta (o botao "Reconfigurar" abria um wizard em branco, sem ler ?id= da
+  // URL: ver fix no proprio config-wizard.js). Resultado: aluno cria publico,
+  // refaz com senha, e o POST sem id sempre CRIAVA um dashboard novo (opaco),
+  // deixando o PUBLICO original orfao e vivo, vazando o nome do cliente na
+  // listagem anonima do mesmo jeito que o id opaco existe pra fechar. Sem id
+  // explicito mas COM senha nova, tratamos como o MESMO caso: se ja existe um
+  // dashboard PUBLICO gravado no slug do NOME, migra pra ele (rotaciona),
+  // exatamente como a rotacao por id explicito ja faz logo abaixo.
+  if (!idResolvidoDoPedido && temSenha(config) && config.name) {
+    const slugDoNome = slugify(config.name);
+    const existentePeloNome = await loadConfig(kv, slugDoNome);
+    if (existentePeloNome && !needsAuth(existentePeloNome)) {
+      idResolvidoDoPedido = slugDoNome;
+    }
+  }
+
   const existenteAntigo = idResolvidoDoPedido ? await loadConfig(kv, idResolvidoDoPedido) : null;
   const idJaExiste = !!existenteAntigo;
   const eraProtegido = idJaExiste && needsAuth(existenteAntigo);

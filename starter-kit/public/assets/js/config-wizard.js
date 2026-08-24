@@ -1,7 +1,10 @@
 // Wizard de configuração do dashboard. 4 passos, tudo client-side vanilla ESM.
 // Importa apenas módulos prontos (read-only): api-client, templates, automap.
 
-import { fetchSheet, uploadCsv, saveDashboard, previewMeta, setAdminToken } from './lib/api-client.js';
+import {
+  fetchSheet, uploadCsv, saveDashboard, previewMeta, setAdminToken,
+  getDashboard, fetchDataForSource, setDashboardAuth,
+} from './lib/api-client.js';
 import { templates, getTemplate } from './templates/index.js';
 import { autoMap } from './lib/automap.js';
 import { getSource } from './sources/index.js';
@@ -42,6 +45,7 @@ export function validateRequired(slots, colMap) {
 
 const state = {
   step: 1, // 1..4
+  id: null, // id do dashboard sendo EDITADO (?id= na URL). null = dashboard novo.
   domain: null, // 'marketing' | 'vendas' | 'suporte'
   source: null, // { type:'sheets', url, gid } | { type:'csv', data }
   dataset: null, // DataSet { columns, rows, meta }
@@ -52,6 +56,64 @@ const state = {
   accent2: '', // cor secundaria hex (opcional). Vazio = derivada da primaria.
   connecting: false, // trava o botão Conectar durante a chamada
 };
+
+// ---------------------------------------------------------------------------
+// P7 (RODADA 3): "Reconfigurar" era link morto.
+//
+// O botao "Reconfigurar" do dashboard aponta pra /config.html?id=<id>, mas o
+// wizard sempre ignorava o parametro e abria "Novo dashboard" em branco. Na
+// pratica: aluno cria um dashboard PUBLICO, clica em Reconfigurar pra ADICIONAR
+// senha, refaz os 4 passos do zero (porque nada veio pre-preenchido) e salva.
+// Como o POST nunca manda `id`, o servidor cria um registro NOVO com id opaco;
+// o dashboard PUBLICO original fica orfao, vivo, e continua vazando o nome do
+// cliente na listagem anonima (o vazamento que o id opaco existe pra fechar).
+//
+// Duas funcoes PURAS abaixo (testaveis sem DOM) fazem a parte que importa pra
+// corretude; o resto (bootstrap, telas de senha/erro) e orquestracao de DOM,
+// no mesmo espirito do restante deste arquivo (render/actions tambem nao sao
+// testados diretamente, so via wizard-cards.test.js e verificacao manual).
+// ---------------------------------------------------------------------------
+
+/**
+ * Le o id do dashboard a ser editado a partir da query string de config.html.
+ * Pura (recebe a query string pronta, nao le `window` direto) pra ser
+ * testavel sem DOM.
+ * @param {string} search  ex: '?id=abc-123' (tipicamente location.search)
+ * @returns {string|null} o id, ou null se ausente/vazio
+ */
+export function idDaQueryString(search) {
+  const params = new URLSearchParams(search || '');
+  const raw = params.get('id');
+  const v = raw == null ? '' : String(raw).trim();
+  return v || null;
+}
+
+/**
+ * Monta o novo estado do wizard a partir de uma config carregada do servidor
+ * (GET /api/dashboards?id=...). Pura: nao muta `state`, nao toca DOM nem rede,
+ * devolve um objeto novo pra o chamador aplicar (`Object.assign(state, ...)`).
+ *
+ * NAO preenche `dataset`: isso exige religar a fonte (rede), responsabilidade
+ * de quem chama (fetchDataForSource). Preserva o `dataset` atual do state
+ * recebido, caso ja exista (ex: o operador reconectou manualmente antes).
+ * @param {object} state estado atual do wizard
+ * @param {object} cfg config devolvida pelo GET (ja passou por stripSecrets)
+ * @returns {object} novo objeto de estado
+ */
+export function prefillStateFromConfig(state, cfg) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  return {
+    ...state,
+    id: c.id || state.id || null,
+    domain: c.domain || state.domain || null,
+    name: typeof c.name === 'string' ? c.name : state.name,
+    accent: c.accent || state.accent,
+    accent2: typeof c.accent2 === 'string' ? c.accent2 : '',
+    logo: typeof c.logo === 'string' ? c.logo : '',
+    colMap: (c.colMap && typeof c.colMap === 'object') ? { ...c.colMap } : {},
+    source: (c.source && typeof c.source === 'object') ? c.source : state.source,
+  };
+}
 
 // Cor secundaria default do input color quando o usuario liga o toggle. So um
 // valor de partida do seletor; enquanto o checkbox "usar padrao" estiver marcado,
@@ -296,7 +358,14 @@ function renderSource(body) {
   body.appendChild(feedback);
 
   // Se já conectou antes, mostra o preview de novo.
-  if (state.dataset) feedback.appendChild(preview(state.dataset));
+  if (state.dataset) {
+    feedback.appendChild(preview(state.dataset));
+  } else if (state.id && state.source) {
+    // Editando um dashboard existente: a fonte foi carregada da config, mas a
+    // reconexao automatica (fetchDataForSource) falhou ou nao se aplica (ex:
+    // Meta Ads sem token no cliente por seguranca). Pede pra reconectar manual.
+    feedback.appendChild(errorBox('Não foi possível reconectar à fonte automaticamente. Reconecte abaixo.'));
+  }
 
   const nav = actions({
     onBack: () => goTo(1),
@@ -673,6 +742,10 @@ function renderFinish(body) {
       colMap: state.colMap,
       accent,
     };
+    // Editando um dashboard existente (?id= na URL): manda o id de volta. Sem
+    // isso o servidor sempre cria um registro NOVO (P7, ver comentario acima),
+    // deixando o dashboard original orfao, publico e vazando o nome do cliente.
+    if (state.id) config.id = state.id;
 
     // Logo (opcional): so envia se o operador preencheu. O backend valida o src;
     // o cliente tambem valida na hora de renderizar (brand.js).
@@ -750,7 +823,97 @@ function render() {
   else if (state.step === 4) renderFinish(body);
 }
 
+// ---------------------------------------------------------------------------
+// Bootstrap: carrega ?id= (edicao) antes do primeiro render, se houver.
+// ---------------------------------------------------------------------------
+
+/**
+ * Carrega a config do dashboard `id`, prefila o state e religa a fonte (pra
+ * ter as colunas do passo 3 sem o operador reconectar manualmente). Falha de
+ * reconexao da fonte (ex: Meta Ads sem token no cliente) nao é fatal: o passo
+ * 2 mostra um aviso e pede pra reconectar na mao.
+ * @param {string} id
+ */
+async function carregarEIniciar(id) {
+  const cfg = await getDashboard(id); // pode lancar .needsPassword
+  Object.assign(state, prefillStateFromConfig(state, cfg));
+  if (state.source) {
+    try {
+      state.dataset = await fetchDataForSource(state.source, state.id);
+    } catch {
+      state.dataset = null;
+    }
+  }
+  render();
+}
+
+/** Tela isolada (fora dos 4 passos): dashboard protegido pede a senha antes de editar. */
+function renderPedidoSenhaEdicao(id) {
+  document.getElementById('steps').innerHTML = '';
+  const body = document.getElementById('stepBody');
+  body.innerHTML = '';
+
+  const senhaInput = el('input', {
+    class: 'input', type: 'password', placeholder: 'Senha do dashboard', autocomplete: 'off',
+  });
+  const feedback = el('div');
+  const btn = el('button', { class: 'btn', type: 'button', text: 'Continuar' });
+
+  const tentar = async () => {
+    const pw = senhaInput.value;
+    if (!pw) { senhaInput.focus(); return; }
+    btn.disabled = true;
+    feedback.innerHTML = '';
+    try {
+      setDashboardAuth(id, await sha256Hex(pw));
+      await carregarEIniciar(id);
+    } catch {
+      feedback.innerHTML = '';
+      feedback.appendChild(errorBox('Senha incorreta, ou não foi possível carregar o dashboard.'));
+      btn.disabled = false;
+    }
+  };
+  btn.addEventListener('click', tentar);
+  senhaInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') tentar(); });
+
+  body.appendChild(el('div', { class: 'card' }, [
+    el('h2', { text: 'Este dashboard é protegido por senha' }),
+    el('p', { class: 'hint', text: 'Digite a senha atual para carregar a configuração e editar.' }),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Senha' }),
+      senhaInput,
+    ]),
+    btn,
+    feedback,
+  ]));
+  senhaInput.focus();
+}
+
+/** Tela isolada: a config nao pode ser carregada (404, erro de rede etc). */
+function renderErroCarregarExistente(err) {
+  document.getElementById('steps').innerHTML = '';
+  const body = document.getElementById('stepBody');
+  body.innerHTML = '';
+  body.appendChild(el('div', { class: 'card' }, [
+    el('h2', { text: 'Não foi possível carregar este dashboard' }),
+    el('p', { class: 'hint', text: (err && err.message) || 'Erro inesperado ao carregar a configuração.' }),
+    el('a', { class: 'btn', href: '/config.html', text: 'Criar um novo dashboard' }),
+  ]));
+}
+
+async function bootstrap() {
+  const id = idDaQueryString(window.location.search);
+  if (!id) { render(); return; }
+  state.id = id;
+  try {
+    await carregarEIniciar(id);
+  } catch (e) {
+    if (e && e.needsPassword) { renderPedidoSenhaEdicao(id); return; }
+    renderErroCarregarExistente(e);
+  }
+}
+
 // Só inicializa a UI quando há DOM (evita rodar sob node:test).
 if (typeof document !== 'undefined' && document.getElementById('steps')) {
-  render();
+  bootstrap();
 }

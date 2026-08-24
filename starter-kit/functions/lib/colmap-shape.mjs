@@ -24,32 +24,77 @@
 import { parseCSV, detectDelimiter } from './csv.mjs';
 
 /**
- * Slots obrigatorios por dominio. Espelho dos slots com `required: true` nos
- * templates de public/assets/js/templates/*.js (paridade coberta por teste).
- * @type {Readonly<{ [domain: string]: ReadonlyArray<{ key: string, label: string }> }>}
+ * TODOS os slots (obrigatorios e opcionais) por dominio. Espelho COMPLETO dos
+ * slots dos templates de public/assets/js/templates/*.js (paridade coberta por
+ * teste: compara key+label+required, na mesma ordem).
+ *
+ * P5 RODADA 2 (auditoria adversarial achou o buraco): so os OBRIGATORIOS eram
+ * validados (REQUIRED_SLOTS, abaixo). Uma chave de colMap com o NOME ERRADO de
+ * um slot (ex: "saidas" em vez de "saida" no financeiro) passava batido: nao e
+ * obrigatoria (nao entra em slotsFaltando) e nao e "coluna inexistente"
+ * (colunasInexistentes so olha o VALOR do colMap, nao a CHAVE). O dashboard
+ * publicava com o slot real ("saida") vazio: SAIDAS R$ 0,00 no KPI, SALDO e
+ * MARGEM calculados errados, com a tabela logo abaixo mostrando os valores
+ * certos, exatamente o mesmo defeito que este arquivo existe pra fechar.
+ * ALL_SLOTS existe pra validarColMap rejeitar qualquer chave que nao seja slot
+ * nenhum do dominio (ver chavesDesconhecidas/validarColMap abaixo).
+ * @type {Readonly<{ [domain: string]: ReadonlyArray<{ key: string, label: string, required: boolean }> }>}
  */
-export const REQUIRED_SLOTS = Object.freeze({
+export const ALL_SLOTS = Object.freeze({
   marketing: Object.freeze([
-    Object.freeze({ key: 'data', label: 'Data' }),
-    Object.freeze({ key: 'investimento', label: 'Investimento' }),
+    Object.freeze({ key: 'data', label: 'Data', required: true }),
+    Object.freeze({ key: 'canal', label: 'Canal', required: false }),
+    Object.freeze({ key: 'investimento', label: 'Investimento', required: true }),
+    Object.freeze({ key: 'impressoes', label: 'Impressões', required: false }),
+    Object.freeze({ key: 'cliques', label: 'Cliques', required: false }),
+    Object.freeze({ key: 'leads', label: 'Leads', required: false }),
+    Object.freeze({ key: 'conversoes', label: 'Conversões', required: false }),
+    Object.freeze({ key: 'receita', label: 'Receita', required: false }),
   ]),
   vendas: Object.freeze([
-    Object.freeze({ key: 'data', label: 'Data' }),
-    Object.freeze({ key: 'valor', label: 'Valor' }),
+    Object.freeze({ key: 'data', label: 'Data', required: true }),
+    Object.freeze({ key: 'vendedor', label: 'Vendedor', required: false }),
+    Object.freeze({ key: 'produto', label: 'Produto', required: false }),
+    Object.freeze({ key: 'valor', label: 'Valor', required: true }),
+    Object.freeze({ key: 'status', label: 'Status', required: false }),
   ]),
   suporte: Object.freeze([
-    Object.freeze({ key: 'data', label: 'Data' }),
-    Object.freeze({ key: 'atendimentos', label: 'Atendimentos' }),
+    Object.freeze({ key: 'data', label: 'Data', required: true }),
+    Object.freeze({ key: 'canal', label: 'Canal', required: false }),
+    Object.freeze({ key: 'atendimentos', label: 'Atendimentos', required: true }),
+    Object.freeze({ key: 'resolvidos', label: 'Resolvidos', required: false }),
+    Object.freeze({ key: 'tempo_resposta', label: 'Tempo de resposta', required: false }),
+    Object.freeze({ key: 'csat', label: 'CSAT', required: false }),
   ]),
   financeiro: Object.freeze([
-    Object.freeze({ key: 'data', label: 'Data' }),
-    Object.freeze({ key: 'entrada', label: 'Entrada' }),
+    Object.freeze({ key: 'data', label: 'Data', required: true }),
+    Object.freeze({ key: 'categoria', label: 'Categoria', required: false }),
+    Object.freeze({ key: 'entrada', label: 'Entrada', required: true }),
+    Object.freeze({ key: 'saida', label: 'Saída', required: false }),
   ]),
   estoque: Object.freeze([
-    Object.freeze({ key: 'produto', label: 'Produto' }),
-    Object.freeze({ key: 'quantidade', label: 'Qtd. vendida' }),
+    Object.freeze({ key: 'data', label: 'Data', required: false }),
+    Object.freeze({ key: 'produto', label: 'Produto', required: true }),
+    Object.freeze({ key: 'categoria', label: 'Categoria', required: false }),
+    Object.freeze({ key: 'quantidade', label: 'Qtd. vendida', required: true }),
+    Object.freeze({ key: 'estoque', label: 'Em estoque', required: false }),
+    Object.freeze({ key: 'valor', label: 'Faturamento', required: false }),
   ]),
 });
+
+/**
+ * Slots obrigatorios por dominio. DERIVADO de ALL_SLOTS (filtro required:true),
+ * pra nunca divergir por esquecimento quando um dominio ganha slot novo.
+ * @type {Readonly<{ [domain: string]: ReadonlyArray<{ key: string, label: string }> }>}
+ */
+export const REQUIRED_SLOTS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(ALL_SLOTS).map(([domain, slots]) => [
+      domain,
+      Object.freeze(slots.filter((s) => s.required).map((s) => Object.freeze({ key: s.key, label: s.label }))),
+    ])
+  )
+);
 
 /**
  * Slots obrigatorios de um dominio. Dominio fora da lista devolve [] (permissivo).
@@ -59,6 +104,17 @@ export const REQUIRED_SLOTS = Object.freeze({
 export function slotsObrigatorios(domain) {
   if (typeof domain !== 'string') return [];
   return REQUIRED_SLOTS[domain] || [];
+}
+
+/**
+ * TODOS os slots (obrigatorios e opcionais) de um dominio. Dominio fora da
+ * lista canonica devolve [] (permissivo: a validacao de dominio e outra).
+ * @param {unknown} domain
+ * @returns {ReadonlyArray<{ key: string, label: string, required: boolean }>}
+ */
+export function slotsValidos(domain) {
+  if (typeof domain !== 'string') return [];
+  return ALL_SLOTS[domain] || [];
 }
 
 /** Um valor de colMap so conta como mapeado se for string nao vazia. */
@@ -121,6 +177,22 @@ export function colunasDaFonte(source) {
   }
 }
 
+/**
+ * Chaves do colMap que NAO sao slot nenhum do dominio (erro de digitacao tipo
+ * "saidas" no lugar de "saida"). Dominio fora da lista canonica e permissivo:
+ * sem ALL_SLOTS[domain] nao ha contra o que checar, entao devolve [] (a
+ * validacao de dominio, essa sim estrita, e feita antes, em outro lugar).
+ * @param {unknown} domain
+ * @param {object|null|undefined} colMap
+ * @returns {string[]} chaves desconhecidas, na ordem em que aparecem no colMap
+ */
+export function chavesDesconhecidas(domain, colMap) {
+  if (typeof domain !== 'string' || !ALL_SLOTS[domain]) return [];
+  const map = colMap && typeof colMap === 'object' ? colMap : {};
+  const conhecidas = new Set(ALL_SLOTS[domain].map((s) => s.key));
+  return Object.keys(map).filter((k) => !conhecidas.has(k));
+}
+
 /** Formata "Investimento (investimento)" para a mensagem de erro. */
 function descreve(slot) {
   return `${slot.label} (${slot.key})`;
@@ -133,14 +205,27 @@ function juntar(itens) {
 }
 
 /**
- * Valida o colMap contra os slots obrigatorios do dominio e, quando as colunas
- * da fonte sao conhecidas, contra a existencia real das colunas escolhidas.
+ * Valida o colMap contra os slots VALIDOS do dominio (nenhuma chave desconhecida),
+ * contra os OBRIGATORIOS (nenhum faltando) e, quando as colunas da fonte sao
+ * conhecidas, contra a existencia real das colunas escolhidas. Nessa ordem: uma
+ * chave errada (typo) e um defeito estrutural mais basico do que "faltou
+ * escolher", entao e checada primeiro.
  * @param {unknown} domain dominio canonico do dashboard
  * @param {object|null|undefined} colMap { slotKey: nomeDaColuna }
  * @param {string[]|null} [columns] colunas reais da fonte, ou null se desconhecidas
  * @returns {string|null} mensagem de erro em PT-BR, ou null se valido
  */
 export function validarColMap(domain, colMap, columns = null) {
+  const desconhecidas = chavesDesconhecidas(domain, colMap);
+  if (desconhecidas.length) {
+    const plural = desconhecidas.length > 1;
+    const validos = slotsValidos(domain).map((s) => s.key).join(', ');
+    return (
+      `Slot${plural ? 's' : ''} desconhecido${plural ? 's' : ''} no domínio "${domain}": ` +
+      `${juntar(desconhecidas.map((k) => `"${k}"`))}. ` +
+      `Slots válidos: ${validos}.`
+    );
+  }
   const faltando = slotsFaltando(domain, colMap);
   if (faltando.length) {
     return (

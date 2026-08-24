@@ -88,10 +88,29 @@ test('timeseries: lista vazia mostra Sem dados', () => {
   assert.ok(!html.includes('<polyline'), 'nao desenha polyline');
 });
 
-test('timeseries: um ponto desenha o ponto', () => {
+// P3 (auditoria adversarial, rodada 2): com 1 ponto so, a escala de eixo
+// (niceScale) recebe min===max e abre uma faixa artificial so pra nao quebrar,
+// gerando ticks sem sentido nenhum pro dado real (passo fracionado, "eixo de
+// meio centavo") e um circulo sozinho flutuando no meio do card, sem eixo que
+// sustente aquele numero. Trocar o CSV de exemplo (fix anterior) so escondia o
+// sintoma: qualquer aluno com planilha de um unico dia caia nisso de novo.
+// Correcao: 1 ponto vira um estado HONESTO (texto com a data e o valor), sem
+// fingir que existe uma escala de tempo pra desenhar. Zero eixo, zero SVG.
+test('timeseries: UM ponto mostra estado honesto (data + valor), sem SVG nem eixo quebrado', () => {
   const html = renderTimeseries({ title: 'Um' }, [{ date: '2026-01-01', value: 42 }]);
-  assert.ok(html.includes('<svg'));
-  assert.ok(html.includes('<circle'), 'desenha o ponto unico');
+  assert.ok(!html.includes('<svg'), 'nao desenha SVG/eixo pra 1 ponto so');
+  assert.ok(!html.includes('<circle'), 'nao desenha o circulo perdido');
+  assert.ok(html.includes('chart__empty'), 'usa o mesmo estado honesto do "Sem dados"');
+  assert.ok(html.includes('uma data só'), 'mensagem explica que o periodo tem 1 data so');
+  assert.ok(html.includes('01/01'), 'mostra a data do ponto unico');
+  assert.ok(html.includes('42'), 'mostra o valor do ponto unico');
+});
+
+test('timeseries: UM ponto sem data valida ainda mostra o valor (nao quebra)', () => {
+  const html = renderTimeseries({ title: 'Um' }, [{ date: null, value: 7 }]);
+  assert.ok(html.includes('chart__empty'));
+  assert.ok(html.includes('7'));
+  assert.ok(!/NaN|undefined|null/.test(html), 'sem lixo de valor invalido no texto');
 });
 
 // ---------- funnel ----------
@@ -251,18 +270,20 @@ test('timeseries: deriva agg avg da MetricDef quando presente', () => {
   };
   const item = { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'nota' } };
   const html = registry.timeseries.toHtml(item, { template, dataset, colMap, findMetricDef, card });
-  // Ponto unico com avg(10,30)=20 vira o tick central do eixo Y. Sum daria 40.
-  // Checa o texto exato do ytick pra evitar falso-positivo com "240" do viewBox.
-  assert.ok(/chart__ytick[^>]*>20</.test(html), 'timeseries usa avg da MetricDef (tick 20)');
-  assert.ok(!/chart__ytick[^>]*>40</.test(html), 'nao usou sum (sem tick 40)');
+  // Ponto UNICO (as 2 linhas caem na mesma data): apos o fix P3, 1 ponto vira o
+  // estado honesto (sem eixo, sem tick), entao o valor agregado aparece no TEXTO
+  // da mensagem em vez do chart__ytick. avg(10,30)=20; sum daria 40.
+  assert.ok(html.includes('chart__empty'), 'timeseries de 1 ponto usa o estado honesto (P3)');
+  assert.ok(html.includes('valor 20'), 'timeseries usa avg da MetricDef (valor 20)');
+  assert.ok(!html.includes('valor 40'), 'nao usou sum (sem valor 40)');
 });
 
 test('timeseries: fallback sum quando MetricDef nao tem agg', () => {
   const template = { metrics: [] };
   const item = { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'nota' } };
   const html = registry.timeseries.toHtml(item, { template, dataset, colMap, findMetricDef, card });
-  // avg(10,30)=20 nao aparece; sum=40 vira o tick central.
-  assert.ok(/chart__ytick[^>]*>40</.test(html), 'timeseries fallback sum soma 10+30=40');
+  // avg(10,30)=20 nao aparece; sum=40 aparece no texto do valor (1 ponto so).
+  assert.ok(html.includes('valor 40'), 'timeseries fallback sum soma 10+30=40');
 });
 
 // ---------- HARDENING fix 1: contrato explicito do bucketAggFor ----------
@@ -300,7 +321,7 @@ test('timeseries: colisao de namespace tambem cai no fallback sum', () => {
   };
   const item = { widget: 'timeseries', props: { dateSlot: 'data', valueSlot: 'nota' } };
   const html = registry.timeseries.toHtml(item, { template, dataset, colMap, findMetricDef, card });
-  assert.ok(/chart__ytick[^>]*>40</.test(html), 'fallback sum (tick 40), nao o avg da metrica homonima');
+  assert.ok(html.includes('valor 40'), 'fallback sum (valor 40), nao o avg da metrica homonima');
 });
 
 // Trava o comportamento dos 3 dominios reais: o valueSlot dos widgets
@@ -329,7 +350,9 @@ test('dominios reais: ranking/timeseries seguem agregando por sum', async () => 
       if (item.widget === 'ranking') {
         assert.ok(html.includes('40'), `${template.id}/${item.props.valueSlot}: ranking soma (sum=40)`);
       } else {
-        assert.ok(/chart__ytick[^>]*>40</.test(html), `${template.id}/${item.props.valueSlot}: timeseries soma (sum=40)`);
+        // Dataset de 1 ponto so (mesma data): P3 renderiza o estado honesto, sem
+        // eixo. O valor agregado (sum=40) aparece no texto da mensagem.
+        assert.ok(html.includes('valor 40'), `${template.id}/${item.props.valueSlot}: timeseries soma (sum=40)`);
       }
     }
   }

@@ -1,63 +1,69 @@
 // P6: gate de PLAUSIBILIDADE no conector de CSV (functions/api/connectors/csv.js).
 //
-// Defeito que motivou (teste na pele do aluno): um arquivo que NAO e CSV (um
-// texto solto, um relatorio colado, um .md) entrava com HTTP 200 e virava um
-// dashboard de zeros, sem nenhum aviso. O parse devolve UMA coluna so, cujo
-// nome e o texto inteiro da primeira linha, e isso passava batido.
+// Defeito que motivou (teste na pele do aluno, rodada 1): um arquivo que NAO e
+// CSV (um texto solto, um relatorio colado, um .md) entrava com HTTP 200 e
+// virava um dashboard de zeros, sem nenhum aviso. O parse devolve UMA coluna
+// so, cujo nome e o texto inteiro da primeira linha, e isso passava batido.
 //
 // A trava roda DEPOIS do parse e so dispara no caso implausivel. CSV legitimo
 // de uma coluna so, com nome curto e linhas de dados, continua passando.
 //
-// RODADA 2 (auditoria independente reprovou o fix anterior): a regra original so
-// disparava com 1 coluna E (nome > 40 chars OU nome com espaco E zero linhas). O
-// fixture de teste tinha 47 chars, entao passava, mas isto AINDA entrava com 200
-// e virava dashboard de zeros: um .md (`# Relatorio...`), uma anotacao solta
-// (`Notas da reuniao` + linhas de texto) e um JSON colado (cabecalho `{`). A
-// heuristica ganhou 3 sinais NOVOS de que o nome nao e rotulo de coluna:
-//   - comeca com um caractere tipico de outro formato (# { [ < - * ou aspas);
-//   - tem pontuacao de frase (. ! ? :) ou termina em virgula;
-//   - tem espaco, tem linhas de dados, mas NENHUMA delas carrega um delimitador
-//     comum (, ; tab |): nem o cabecalho nem o corpo jamais tiveram como virar
-//     tabela. Isso pega a "Notas da reuniao" solta sem quebrar CSV legitimo de
-//     uma coluna, porque dado real de uma coluna so costuma trazer o delimitador
-//     dentro do proprio valor (nome "Sobrenome, Nome", moeda "1.500,00" citada).
+// RODADA 3 (auditoria adversarial derrubou a rodada 2 e achou mais um buraco):
+//
+// 1) REGRESSAO (a mais grave): o sinal "espaco no cabecalho + corpo sem
+//    delimitador" da rodada 2 barrava CSV LEGITIMO de coluna unica sempre que
+//    a celula nao trouxesse por acaso uma virgula: "Nome do Cliente" com "Ana
+//    Souza" e "Valor Gasto" com "1500" viravam 400. Pior do que o defeito
+//    original. O sinal foi REMOVIDO: o gate volta a olhar SO para o FORMATO
+//    do nome da coluna (comeca com # { [ < * - aspas, tem pontuacao de frase
+//    ou termina em virgula, ou passa de 40 caracteres), nunca para o conteudo
+//    das celulas.
+// 2) BURACO: o gate so rodava com columns.length === 1. Um JSON minificado com
+//    virgulas numa linha so vira 2+ "colunas" e ZERO linhas de dado, e
+//    escapava com 200/rows:[]/rowCount:0. Dois sinais novos que NAO dependem
+//    do numero de colunas: (a) cabecalho sem NENHUMA linha de dado abaixo, e
+//    (b) os sinais de formato do cabecalho valem pra QUALQUER coluna.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { onRequest as csv, csvImplausivel } from '../functions/api/connectors/csv.js';
 
 // ---------------------------------------------------------------------------
-// Logica pura
+// Logica pura: sinal de FORMATO do cabecalho (nao depende do conteudo)
 // ---------------------------------------------------------------------------
 
 const LINHA_LONGA = 'Relatorio consolidado de investimento em midia paga do mes de janeiro';
 
-test('1 coluna com cabecalho longo (texto inteiro) -> implausivel', () => {
-  const msg = csvImplausivel([LINHA_LONGA], [{ [LINHA_LONGA]: '' }]);
+test('1 coluna com cabecalho longo (texto inteiro), COM linha de dado -> implausivel (formato)', () => {
+  const msg = csvImplausivel([LINHA_LONGA], [{ [LINHA_LONGA]: 'x' }]);
   assert.match(msg, /1 coluna/);
 });
 
-test('1 coluna com cabecalho multi-palavra e SEM linhas de dados -> implausivel', () => {
-  assert.match(csvImplausivel(['Relatorio mensal'], []), /1 coluna/);
+test('1 coluna com cabecalho multi-palavra e SEM linhas de dados -> implausivel (zero linhas)', () => {
+  const msg = csvImplausivel(['Relatorio mensal'], []);
+  assert.match(msg, /1 coluna/);
+  assert.match(msg, /nenhuma linha de dado/i);
 });
 
 test('CSV legitimo de UMA coluna so, nome curto e com dados -> plausivel', () => {
   assert.equal(csvImplausivel(['Valor'], [{ Valor: '10' }, { Valor: '20' }]), null);
   assert.equal(csvImplausivel(['Faturamento'], [{ Faturamento: '10' }]), null);
-  // Nome curto com espaco, mas COM linhas de dados: e uma coluna de verdade.
-  // FIXTURE AJUSTADA (rodada 2): o valor agora carrega o delimitador dentro do
-  // proprio dado ("10,00" / "Silva, Ana"), igual dado real de uma coluna so
-  // costuma trazer (moeda com decimal em virgula, nome em formato "Sobrenome,
-  // Nome"). Sem isso, a linha nao tem NENHUM sinal de que aquilo e tabela: era
-  // exatamente esse buraco (header com espaco + corpo sem nenhum delimitador,
-  // igual uma anotacao solta) que o sinal novo do gate passou a cobrir.
+  // Nome curto com espaco: e uma coluna de verdade, MESMO que a celula nunca
+  // carregue delimitador nenhum (o sinal de conteudo foi removido na rodada 3).
   assert.equal(csvImplausivel(['Valor Gasto'], [{ 'Valor Gasto': '10,00' }]), null);
   assert.equal(csvImplausivel(['Nome do Cliente'], [{ 'Nome do Cliente': 'Silva, Ana' }]), null);
 });
 
-test('mais de uma coluna nunca e implausivel, mesmo com cabecalho longo', () => {
-  const longo = `${LINHA_LONGA}`;
-  assert.equal(csvImplausivel([longo, 'B'], [{ [longo]: '1', B: '2' }]), null);
+test('mais de uma coluna com cabecalhos NORMAIS nunca e implausivel', () => {
+  assert.equal(
+    csvImplausivel(['Data', 'Gasto'], [{ Data: '01/01', Gasto: '100' }]),
+    null,
+  );
+});
+
+test('mais de uma coluna com UM cabecalho de FORMATO suspeito tambem e implausivel (rodada 3: o sinal de formato vale pra qualquer coluna, nao so quando ha uma unica)', () => {
+  const msg = csvImplausivel([LINHA_LONGA, 'B'], [{ [LINHA_LONGA]: '1', B: '2' }]);
+  assert.match(msg, /n[aã]o parece um CSV/i, 'cabecalho absurdo deveria ser barrado mesmo com 2 colunas');
 });
 
 test('sem colunas -> nao e trabalho deste gate (o handler ja barra CSV vazio)', () => {
@@ -66,7 +72,7 @@ test('sem colunas -> nao e trabalho deste gate (o handler ja barra CSV vazio)', 
 });
 
 // ---------------------------------------------------------------------------
-// Logica pura: os 3 sinais NOVOS (rodada 2)
+// Logica pura: os sinais de FORMATO (rodada 2, preservados na rodada 3)
 // ---------------------------------------------------------------------------
 
 test('nome que comeca com caractere de outro formato (# { [ < - * aspas) -> implausivel mesmo com dados', () => {
@@ -83,7 +89,31 @@ test('nome com pontuacao de frase (. ! ? :) ou terminando em virgula -> implausi
   }
 });
 
-test('nome com espaco e dados, mas NENHUMA linha com delimitador comum -> implausivel (anotacao solta)', () => {
+// ---------------------------------------------------------------------------
+// REGRESSAO (rodada 2 -> rodada 3): o sinal de CONTEUDO foi removido.
+// ---------------------------------------------------------------------------
+
+test('REGRESSAO: "Nome do Cliente" e "Valor Gasto" SEM delimitador na celula NAO PODEM mais ser barrados', () => {
+  // Reproducao exata do defeito relatado pela auditoria: dado limpo, sem
+  // nenhuma virgula/ponto-e-virgula/tab na celula, tem que passar.
+  assert.equal(csvImplausivel(['Email'], [{ Email: 'ana@empresa.com.br' }]), null);
+  assert.equal(
+    csvImplausivel(['Nome do Cliente'], [{ 'Nome do Cliente': 'Ana Souza' }]),
+    null,
+    'aluno com CSV de uma coluna de nomes nao pode ser rejeitado',
+  );
+  assert.equal(
+    csvImplausivel(['Valor Gasto'], [{ 'Valor Gasto': '1500' }]),
+    null,
+    'aluno com CSV de uma coluna de valores nao pode ser rejeitado',
+  );
+});
+
+test('nome com espaco e dados, mas NENHUMA linha com delimitador comum -> PLAUSIVEL agora (sinal removido na rodada 3)', () => {
+  // Rodada 2 barrava isso ("anotacao solta"), mas o MESMO sinal barrava CSV
+  // legitimo de coluna unica sem virgula na celula, que e pior. Custo aceito:
+  // uma anotacao solta vira uma coluna de texto de N linhas (inofensiva),
+  // ganho: nunca mais rejeitar coluna legitima.
   const nome = 'Notas da reunião';
   const msg = csvImplausivel(
     [nome],
@@ -92,10 +122,10 @@ test('nome com espaco e dados, mas NENHUMA linha com delimitador comum -> implau
       { [nome]: 'Combinamos os prazos da próxima entrega' },
     ],
   );
-  assert.match(msg, /1 coluna/);
+  assert.equal(msg, null);
 });
 
-test('nome com espaco e UMA linha com delimitador comum -> plausivel (basta uma para descartar o sinal)', () => {
+test('nome com espaco e UMA linha com delimitador comum -> plausivel (o sinal de conteudo nao existe mais, resultado e o mesmo)', () => {
   const nome = 'Nome do Cliente';
   assert.equal(
     csvImplausivel(
@@ -103,12 +133,21 @@ test('nome com espaco e UMA linha com delimitador comum -> plausivel (basta uma 
       [{ [nome]: 'Ana Souza' }, { [nome]: 'Silva, Bruno' }, { [nome]: 'Carla Dias' }],
     ),
     null,
-    'so uma linha com virgula ja e sinal suficiente de coluna de verdade',
   );
 });
 
 // ---------------------------------------------------------------------------
-// Handler: os 3 casos reportados pela auditoria (md, anotacao solta, JSON)
+// BURACO (rodada 3): zero linhas de dado, independente do numero de colunas.
+// ---------------------------------------------------------------------------
+
+test('unidade: ZERO linhas de dado e implausivel mesmo com 2+ colunas (JSON minificado)', () => {
+  const msg = csvImplausivel(['{"campanha":"Janeiro"', '"investimento":1500', '"leads":32}'], []);
+  assert.match(msg, /nenhuma linha de dado/i);
+  assert.match(msg, /3 colunas/);
+});
+
+// ---------------------------------------------------------------------------
+// Handler: os casos reportados pela auditoria (md, JSON multi-linha, JSON minificado)
 // ---------------------------------------------------------------------------
 
 function ctx(method, body, contentType = 'text/csv') {
@@ -136,13 +175,18 @@ const ANOTACAO_SOLTA = [
   'Ficou pendente o valor final do orçamento',
 ].join('\n');
 
-const JSON_COLADO = [
+const JSON_MULTILINHA = [
   '{',
   '  "campanha": "Janeiro",',
   '  "investimento": 1500,',
   '  "leads": 32',
   '}',
 ].join('\n');
+
+// JSON colado numa linha SO (sem quebra de linha): vira 3 "colunas" (separadas
+// pela virgula) e ZERO linhas de dado. Reproducao exata do buraco relatado:
+// antes escapava com 200, rows:[], rowCount:0.
+const JSON_MINIFICADO = '{"campanha":"Janeiro","investimento":1500,"leads":32}';
 
 test('POST de arquivo .md colado (comeca com #) -> 400 com mensagem que ensina o que fazer', async () => {
   const res = await csv(ctx('POST', ARQUIVO_MD));
@@ -153,18 +197,27 @@ test('POST de arquivo .md colado (comeca com #) -> 400 com mensagem que ensina o
   assert.match(j.error, /v[íi]rgula|ponto e v[íi]rgula|tabula[çc][aã]o/i, 'mensagem ensina a separar por delimitador');
 });
 
-test('POST de anotacao solta (sem nenhum delimitador em nenhuma linha) -> 400', async () => {
+test('POST de anotacao solta (sem nenhum delimitador em nenhuma linha) -> 200 agora (sinal removido na rodada 3)', async () => {
   const res = await csv(ctx('POST', ANOTACAO_SOLTA));
+  assert.equal(res.status, 200);
+  const ds = await readJSON(res);
+  assert.deepEqual(ds.columns, ['Notas da reunião']);
+  assert.equal(ds.rows.length, 3);
+});
+
+test('POST de JSON colado em VARIAS linhas (cabecalho vira "{") -> 400 (pego pelo sinal de formato)', async () => {
+  const res = await csv(ctx('POST', JSON_MULTILINHA));
   assert.equal(res.status, 400);
   const j = await readJSON(res);
   assert.match(j.error, /n[aã]o parece um CSV/i);
 });
 
-test('POST de JSON colado no lugar do CSV (cabecalho vira "{") -> 400', async () => {
-  const res = await csv(ctx('POST', JSON_COLADO));
+test('POST de JSON MINIFICADO numa linha so (2+ colunas, ZERO linhas) -> 400 (antes escapava com 200 e rows:[])', async () => {
+  const res = await csv(ctx('POST', JSON_MINIFICADO));
   assert.equal(res.status, 400);
   const j = await readJSON(res);
   assert.match(j.error, /n[aã]o parece um CSV/i);
+  assert.match(j.error, /nenhuma linha de dado/i);
 });
 
 // ---------------------------------------------------------------------------
@@ -181,26 +234,33 @@ const CSV_EMAIL = [
   'elisa@empresa.com.br',
 ].join('\n');
 
-// Formato "Sobrenome, Nome" (comum em export de CRM/lista ordenada por
-// sobrenome): o proprio dado carrega uma virgula, sinal de coluna de verdade.
+// Valores PLANOS, de proposito: sem nenhuma virgula/ponto-e-virgula na celula,
+// exatamente a reproducao do CSV real de um aluno (e o caso que a rodada 2
+// barrava por engano).
 const CSV_NOME_CLIENTE = [
   'Nome do Cliente',
-  '"Silva, João"',
-  '"Souza, Ana"',
-  '"Lima, Bruno"',
-  '"Costa, Carla"',
-  '"Pereira, Diego"',
+  'Ana Souza',
+  'Bruno Lima',
+  'Carla Dias',
+  'Diego Alves',
+  'Elisa Rocha',
 ].join('\n');
 
-// Moeda em formato PT-BR (decimal em virgula), entre aspas porque o delimitador
-// escolhido e a virgula: o dado real de uma coluna de valores costuma vir assim.
 const CSV_VALOR_GASTO = [
   'Valor Gasto',
-  '"1.500,00"',
-  '"320,50"',
-  '"75,00"',
-  '"48,90"',
-  '"210,00"',
+  '1500',
+  '320',
+  '75',
+  '48',
+  '210',
+].join('\n');
+
+// Padrao Excel BR: separador ponto e virgula, decimal em virgula.
+const CSV_EXCEL_BR = [
+  'Data;Valor',
+  '01/01/2026;1.500,50',
+  '02/01/2026;320,00',
+  '03/01/2026;75,00',
 ].join('\n');
 
 test('POST de CSV legitimo "Email" (5 linhas, sem espaco no cabecalho) -> 200', async () => {
@@ -211,22 +271,31 @@ test('POST de CSV legitimo "Email" (5 linhas, sem espaco no cabecalho) -> 200', 
   assert.equal(ds.rows.length, 5);
 });
 
-test('POST de CSV legitimo "Nome do Cliente" (5 linhas, formato Sobrenome, Nome) -> 200', async () => {
+test('POST de CSV legitimo "Nome do Cliente" (5 linhas, valores planos sem delimitador) -> 200', async () => {
   const res = await csv(ctx('POST', CSV_NOME_CLIENTE));
   assert.equal(res.status, 200);
   const ds = await readJSON(res);
   assert.deepEqual(ds.columns, ['Nome do Cliente']);
   assert.equal(ds.rows.length, 5);
-  assert.equal(ds.rows[0]['Nome do Cliente'], 'Silva, João');
+  assert.equal(ds.rows[0]['Nome do Cliente'], 'Ana Souza');
 });
 
-test('POST de CSV legitimo "Valor Gasto" (5 linhas, moeda com decimal em virgula) -> 200', async () => {
+test('POST de CSV legitimo "Valor Gasto" (5 linhas, valores planos sem delimitador) -> 200', async () => {
   const res = await csv(ctx('POST', CSV_VALOR_GASTO));
   assert.equal(res.status, 200);
   const ds = await readJSON(res);
   assert.deepEqual(ds.columns, ['Valor Gasto']);
   assert.equal(ds.rows.length, 5);
-  assert.equal(ds.rows[0]['Valor Gasto'], '1.500,00');
+  assert.equal(ds.rows[0]['Valor Gasto'], '1500');
+});
+
+test('POST de CSV com decimal em virgula e separador ponto e virgula (padrao Excel BR) -> 200', async () => {
+  const res = await csv(ctx('POST', CSV_EXCEL_BR));
+  assert.equal(res.status, 200);
+  const ds = await readJSON(res);
+  assert.deepEqual(ds.columns, ['Data', 'Valor']);
+  assert.equal(ds.rows.length, 3);
+  assert.equal(ds.rows[0].Valor, '1.500,50');
 });
 
 // ---------------------------------------------------------------------------

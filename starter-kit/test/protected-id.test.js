@@ -198,11 +198,13 @@ test('POST: dashboard publico que ganha senha rotaciona o id, migra o KV e devol
   assert.equal(rGet.status, 200, 'com a senha certa o dashboard novo abre pelo id novo');
 });
 
-test('POST: proteger dashboard publico que ja existe SEM id explicito no corpo nao rotaciona (nao ha id pra migrar)', async () => {
-  // Sem `id` no corpo, o POST cria um dashboard NOVO (o wizard de "editar" sempre
-  // manda o id de volta); confirma que este caminho nao quebra e continua
-  // gerando um dashboard protegido novo e independente, sem tocar em nenhum
-  // registro anterior porque nao ha id pedido pra resolver contra o KV.
+test('POST: proteger com um NOME DIFERENTE (sem id explicito) nao mexe num dashboard publico de outro slug', async () => {
+  // Sem `id` no corpo, a rotacao por NOME (fix rodada 3, ver abaixo) so mexe no
+  // slug do PROPRIO nome recebido neste POST. Nomes diferentes -> slugs
+  // diferentes -> nenhuma relacao entre os dois dashboards. Isto NAO prova que
+  // "sem id sempre cria novo": a premissa antiga aqui era FALSA (o wizard real,
+  // config-wizard.js, NUNCA manda id de volta; e exatamente por isso que existe
+  // a rotacao por nome logo abaixo, pro caso REAL de "mesmo nome, sem id").
   const kv = fakeKV();
   const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
   await dashboards(ctx('POST', { body: makeConfig({ name: 'Outro Cliente' }), headers: adminHeaders(), env }));
@@ -212,8 +214,87 @@ test('POST: proteger dashboard publico que ja existe SEM id explicito no corpo n
   assert.equal(res.status, 200);
   const j = await readJSON(res);
   assert.match(j.id, /^dash-[0-9a-f]{32}$/);
-  assert.ok(kv._map.has('dash:outro-cliente'), 'o dashboard publico original nao foi tocado');
+  assert.ok(kv._map.has('dash:outro-cliente'), 'dashboard de NOME diferente nao e tocado (slug diferente)');
   assert.ok(kv._map.has(`dash:${j.id}`), 'o dashboard novo, protegido, foi criado');
+});
+
+// ---------------------------------------------------------------------------
+// P7 RODADA 3 (caminho real da UI, nao so a logica pura de resolverId): o
+// config-wizard.js NUNCA manda `id` de volta no POST (nem o botao
+// "Reconfigurar" fazia o wizard ler ?id= da URL antes deste fix). Ou seja, o
+// caso "dashboard publico ganha senha depois" quase sempre chega ao servidor
+// SEM id explicito, so com o MESMO nome de antes. Sem esta rotacao por nome, o
+// aluno ficava com DOIS registros: o novo protegido (id opaco) e o ANTIGO
+// publico, vivo, vazando o nome do cliente na listagem anonima.
+// ---------------------------------------------------------------------------
+
+test('POST: proteger dashboard publico que ja existe, MESMO nome e SEM id explicito, ROTACIONA pelo slug do nome (caminho real do wizard)', async () => {
+  const kv = fakeKV();
+  const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
+
+  // 1) cria PUBLICO, sem senha (exatamente como o wizard cria hoje).
+  const r1 = await dashboards(
+    ctx('POST', { body: makeConfig({ name: 'Sigiloso Cliente' }), headers: adminHeaders(), env })
+  );
+  assert.equal(r1.status, 200);
+  assert.ok(kv._map.has('dash:sigiloso-cliente'));
+
+  // 2) "Reconfigurar": MESMO nome, agora com senha, SEM id no corpo (o wizard
+  // real nunca manda id de volta hoje).
+  const r2 = await dashboards(
+    ctx('POST', {
+      body: makeConfig({ name: 'Sigiloso Cliente', auth: { hash: HASH_SENHA } }),
+      headers: adminHeaders(),
+      env,
+    })
+  );
+  assert.equal(r2.status, 200);
+  const j2 = await readJSON(r2);
+  assert.match(j2.id, /^dash-[0-9a-f]{32}$/, 'id novo no formato opaco');
+  assert.ok(!vazaNome(j2.id, 'Sigiloso Cliente'), `id novo "${j2.id}" vazou o nome`);
+
+  // 3) o registro ANTIGO (slug legivel) sumiu: sem isso, ficaria orfao, publico
+  // e vivo, vazando o nome do cliente na listagem anonima pra sempre.
+  assert.ok(!kv._map.has('dash:sigiloso-cliente'), 'o registro antigo (slug legivel) foi apagado');
+  assert.ok(kv._map.has(`dash:${j2.id}`), 'o registro novo (opaco) existe');
+  assert.equal([...kv._map.keys()].length, 1, 'nao pode sobrar registro orfao publico no KV');
+
+  // 4) listagem anonima: nenhum nome vaza, so o id novo (opaco) aparece.
+  const rList = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  const lista = await readJSON(rList);
+  assert.equal(lista.length, 1);
+  assert.equal(lista[0].id, j2.id);
+  assert.ok(!/sigiloso|cliente/i.test(JSON.stringify(lista)), 'listagem publica nao pode vazar o nome');
+});
+
+test('POST: proteger SEM id e SEM dashboard publico previo no slug do nome -> cria normalmente (nada pra migrar)', async () => {
+  const kv = fakeKV();
+  const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ name: 'Cliente Novo', auth: { hash: HASH_SENHA } }), headers: adminHeaders(), env })
+  );
+  assert.equal(res.status, 200);
+  const j = await readJSON(res);
+  assert.match(j.id, /^dash-[0-9a-f]{32}$/);
+  assert.equal([...kv._map.keys()].length, 1, 'so o dashboard novo existe, nada foi migrado');
+});
+
+test('POST: proteger SEM id quando o slug do nome ja e de um dashboard PROTEGIDO (nao mexe: nao ha o que migrar)', async () => {
+  // Um dashboard protegido nunca fica gravado no slug do nome (o id dele ja e
+  // opaco), entao este cenario so testa que a rotacao por nome nao encontra
+  // nada pra migrar e segue o fluxo normal de criacao.
+  const kv = fakeKV();
+  const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
+  await dashboards(
+    ctx('POST', { body: makeConfig({ name: 'Ja Protegido', auth: { hash: HASH_SENHA } }), headers: adminHeaders(), env })
+  );
+  assert.equal([...kv._map.keys()].length, 1);
+
+  const res = await dashboards(
+    ctx('POST', { body: makeConfig({ name: 'Ja Protegido', auth: { hash: HASH_SENHA } }), headers: adminHeaders(), env })
+  );
+  assert.equal(res.status, 200);
+  assert.equal([...kv._map.keys()].length, 2, 'segundo POST cria outro dashboard protegido independente');
 });
 
 test('resolverId: na CRIACAO de protegido, id escolhido pelo cliente nao vaza o nome', () => {

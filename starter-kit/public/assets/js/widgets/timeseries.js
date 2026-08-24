@@ -28,6 +28,30 @@ export function render(props = {}, points) {
     );
   }
 
+  // P3 (ponto solto escondido, nao corrigido): com 1 ponto so, niceScale recebe
+  // min===max e abre uma faixa artificial (min-1..max+1) so pra nao quebrar, o
+  // que gera ticks de eixo sem nenhum sentido pro dado real (passo fracionado,
+  // "meio centavo") e desenha um circulo sozinho flutuando no meio do card, sem
+  // eixo nenhum que sustente aquele numero. Trocar o CSV de exemplo so escondia
+  // o sintoma: qualquer aluno com planilha de um unico dia cai nisso de novo.
+  // Estado HONESTO em vez de eixo quebrado: mostra a data e o valor por extenso,
+  // sem fingir que existe uma escala de tempo pra desenhar.
+  if (list.length === 1) {
+    const p = list[0];
+    const valor = Number(p.value) || 0;
+    const dataCurta = shortDate(p.date);
+    const dataLabel = dataCurta || String(p.date == null ? '' : p.date).trim();
+    const msg = dataLabel
+      ? `Período com uma data só: ${dataLabel}, valor ${fmtNumber(valor)}. Adicione mais datas para ver a evolução no gráfico.`
+      : `Período com uma data só, valor ${fmtNumber(valor)}. Adicione mais datas para ver a evolução no gráfico.`;
+    return (
+      `<div class="chart chart--timeseries">` +
+        titleHtml +
+        `<div class="chart__empty">${esc(msg)}</div>` +
+      `</div>`
+    );
+  }
+
   const values = list.map((p) => Number(p.value) || 0);
   const dataMin = Math.min(...values);
   const dataMax = Math.max(...values);
@@ -43,7 +67,8 @@ export function render(props = {}, points) {
   const plotH = H - M.top - M.bottom;
   const n = list.length;
 
-  const xAt = (i) => (n === 1 ? plotX + plotW / 2 : plotX + (i / (n - 1)) * plotW);
+  // n >= 2 aqui sempre (0 e 1 ponto ja retornaram acima, com estado proprio).
+  const xAt = (i) => plotX + (i / (n - 1)) * plotW;
   const yAt = (v) => plotY + plotH - ((v - min) / (max - min)) * plotH;
 
   const coords = list.map((p, i) => ({
@@ -65,27 +90,21 @@ export function render(props = {}, points) {
   // Eixo X: rotulos de data no primeiro e no ultimo ponto (data curta DD/MM).
   const xLabelsHtml = renderXLabels(list, coords, plotY + plotH);
 
-  let series;
-  if (n === 1) {
-    const c = coords[0];
-    series = `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="4" />`;
-  } else {
-    const pts = coords.map((c) => `${c.x},${c.y}`).join(' ');
-    // Area preenchida sob a linha (do traço ate a base do plot): o grafico ganha
-    // corpo em vez de uma linha fina flutuando num card vazio (tell de "meio pronto"
-    // pego na auditoria). Fecha o poligono no rodape da area de plotagem.
-    const baseline = round(plotY + plotH);
-    const areaPts = `${coords[0].x},${baseline} ${pts} ${coords[coords.length - 1].x},${baseline}`;
-    const dots = coords
-      .map((c) => `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="3" />`)
-      .join('');
-    series = `<polygon class="chart__area" points="${areaPts}" />` +
-      `<polyline class="chart__line" fill="none" points="${pts}" />${dots}`;
-  }
+  const pts = coords.map((c) => `${c.x},${c.y}`).join(' ');
+  // Area preenchida sob a linha (do traço ate a base do plot): o grafico ganha
+  // corpo em vez de uma linha fina flutuando num card vazio (tell de "meio pronto"
+  // pego na auditoria). Fecha o poligono no rodape da area de plotagem.
+  const baseline = round(plotY + plotH);
+  const areaPts = `${coords[0].x},${baseline} ${pts} ${coords[coords.length - 1].x},${baseline}`;
+  const dots = coords
+    .map((c) => `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="3" />`)
+    .join('');
+  const series = `<polygon class="chart__area" points="${areaPts}" />` +
+    `<polyline class="chart__line" fill="none" points="${pts}" />${dots}`;
 
   // aria-label descritivo para leitores de tela (o SVG e role=img).
   // Inclui titulo, numero de pontos e a faixa de valores pra dar contexto sem depender do visual.
-  const pointsLabel = n === 1 ? '1 ponto' : `${n} pontos`;
+  const pointsLabel = `${n} pontos`;
   const rangeLabel = `de ${fmtNumber(dataMin)} a ${fmtNumber(dataMax)}`;
   const label = title
     ? `Grafico de linha: ${title}, ${pointsLabel}, ${rangeLabel}`
@@ -105,14 +124,14 @@ export function render(props = {}, points) {
   );
 }
 
-// Rotulos de data no eixo X: sempre o primeiro e o ultimo ponto (evita poluir com todos).
+// Rotulos de data no eixo X: sempre o primeiro e o ultimo ponto (evita poluir
+// com todos). So e chamada com 2+ pontos (1 ponto ou zero tem estado proprio).
 function renderXLabels(list, coords, baselineY) {
   const y = round(baselineY + 16);
-  const single = list.length === 1;
-  const idxs = single ? [0] : [0, list.length - 1];
+  const idxs = [0, list.length - 1];
   return idxs
     .map((i) => {
-      const anchor = single ? 'middle' : (i === 0 ? 'start' : 'end');
+      const anchor = i === 0 ? 'start' : 'end';
       const label = shortDate(list[i].date);
       if (!label) return '';
       return `<text class="chart__xtick" x="${coords[i].x}" y="${y}" text-anchor="${anchor}">${esc(label)}</text>`;

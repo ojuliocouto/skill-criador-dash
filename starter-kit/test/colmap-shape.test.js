@@ -15,7 +15,10 @@ import assert from 'node:assert/strict';
 
 import {
   REQUIRED_SLOTS,
+  ALL_SLOTS,
   slotsObrigatorios,
+  slotsValidos,
+  chavesDesconhecidas,
   slotsFaltando,
   colunasDaFonte,
   validarColMap,
@@ -53,6 +56,59 @@ test('paridade: os labels do servidor batem com os do template do browser', () =
 test('REQUIRED_SLOTS cobre TODOS os dominios canonicos e esta congelado', () => {
   assert.deepEqual(Object.keys(REQUIRED_SLOTS).sort(), [...DOMAINS].sort());
   assert.ok(Object.isFrozen(REQUIRED_SLOTS));
+});
+
+// ---------------------------------------------------------------------------
+// P5 RODADA 2: paridade de TODOS os slots (nao so os obrigatorios). Sem isso,
+// uma chave de colMap com o nome ERRADO de um slot OPCIONAL (ex: "saidas" no
+// lugar de "saida" no financeiro) nao era pega por nenhuma validacao: o
+// dashboard publicava com o slot real vazio e a MESMA cara de numero certo que
+// este arquivo inteiro existe pra evitar.
+// ---------------------------------------------------------------------------
+
+test('ALL_SLOTS cobre TODOS os dominios canonicos e esta congelado (objeto e cada lista)', () => {
+  assert.deepEqual(Object.keys(ALL_SLOTS).sort(), [...DOMAINS].sort());
+  assert.ok(Object.isFrozen(ALL_SLOTS));
+  for (const domain of DOMAINS) assert.ok(Object.isFrozen(ALL_SLOTS[domain]), `ALL_SLOTS.${domain} congelado`);
+});
+
+test('paridade ESTENDIDA: TODOS os slots do servidor (key, label, required) batem com TODOS os slots do template do browser, na mesma ordem', () => {
+  for (const domain of DOMAINS) {
+    const doBrowser = (templates[domain].slots || []).map((s) => ({
+      key: s.key,
+      label: s.label,
+      required: !!s.required,
+    }));
+    const doServidor = slotsValidos(domain).map((s) => ({ key: s.key, label: s.label, required: !!s.required }));
+    assert.deepEqual(doServidor, doBrowser, `domínio ${domain}`);
+  }
+});
+
+test('chavesDesconhecidas: pega o typo classico "saidas" no financeiro (o slot certo e "saida")', () => {
+  assert.deepEqual(
+    chavesDesconhecidas('financeiro', { data: 'Data', categoria: 'Categoria', entrada: 'Entrada', saidas: 'Saida' }),
+    ['saidas'],
+  );
+  // Com a chave certa ("saida"), nada de desconhecido.
+  assert.deepEqual(
+    chavesDesconhecidas('financeiro', { data: 'Data', categoria: 'Categoria', entrada: 'Entrada', saida: 'Saida' }),
+    [],
+  );
+});
+
+test('chavesDesconhecidas: dominio fora da lista canonica e permissivo (nao ha ALL_SLOTS pra checar)', () => {
+  assert.deepEqual(chavesDesconhecidas('inexistente', { qualquer: 'x' }), []);
+  assert.deepEqual(chavesDesconhecidas(null, { qualquer: 'x' }), []);
+});
+
+test('validarColMap: slot desconhecido -> mensagem cita a chave errada e lista os slots validos do dominio', () => {
+  const msg = validarColMap('financeiro', {
+    data: 'Data', categoria: 'Categoria', entrada: 'Entrada', saidas: 'Saida',
+  });
+  assert.match(msg, /desconhecido/i);
+  assert.match(msg, /"saidas"/);
+  assert.match(msg, /financeiro/);
+  assert.match(msg, /data, categoria, entrada, saida/, 'lista os 4 slots validos do financeiro, na ordem');
 });
 
 // ---------------------------------------------------------------------------
@@ -211,6 +267,35 @@ test('POST com colMap COMPLETO e colunas reais -> 200 e grava', async () => {
     domain: 'marketing',
     source: { type: 'csv', data: CSV_MARKETING },
     colMap: { data: 'Data', investimento: 'Gasto', leads: 'Leads' },
+  }, { DASHBOARDS_KV: kv }));
+  assert.equal(res.status, 200);
+  assert.equal(kv._map.size, 1);
+});
+
+const CSV_FINANCEIRO = 'Data;Categoria;Entrada;Saida\n01/01/2026;Vendas;1000;0\n02/01/2026;Fornecedor;0;500';
+
+test('P5 RODADA 2 (caminho real): POST financeiro com slot ERRADO "saidas" (falta o "a" no plural certo e "saida") -> 400, nada gravado, dinheiro nao publica errado', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(ctxPost({
+    name: 'Financeiro do Aluno',
+    domain: 'financeiro',
+    source: { type: 'csv', data: CSV_FINANCEIRO },
+    colMap: { data: 'Data', categoria: 'Categoria', entrada: 'Entrada', saidas: 'Saida' },
+  }, { DASHBOARDS_KV: kv }));
+  assert.equal(res.status, 400);
+  const j = await readJSON(res);
+  assert.match(j.error, /desconhecido/i);
+  assert.match(j.error, /saidas/);
+  assert.equal(kv._map.size, 0, 'colMap com slot desconhecido nao pode ser gravado (dinheiro errado no ar)');
+});
+
+test('P5 RODADA 2 (controle): POST financeiro com o slot CERTO "saida" -> 200 e grava', async () => {
+  const kv = fakeKV();
+  const res = await dashboards(ctxPost({
+    name: 'Financeiro do Aluno',
+    domain: 'financeiro',
+    source: { type: 'csv', data: CSV_FINANCEIRO },
+    colMap: { data: 'Data', categoria: 'Categoria', entrada: 'Entrada', saida: 'Saida' },
   }, { DASHBOARDS_KV: kv }));
   assert.equal(res.status, 200);
   assert.equal(kv._map.size, 1);
