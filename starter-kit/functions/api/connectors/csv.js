@@ -119,15 +119,22 @@ export function csvImplausivel(columns, rows) {
     );
   }
 
-  // Sinal 2: FORMATO do nome da coluna, agora pra QUALQUER coluna (nao so a
-  // primeira/unica). Nunca olha o conteudo das celulas.
-  for (const nome of nomes) {
-    if (!formatoDeCabecalhoSuspeito(nome)) continue;
-    const descricaoColuna = nomes.length === 1
-      ? `1 coluna só, de nome "${resumir(nome)}"`
-      : `a coluna "${resumir(nome)}" (entre ${nomes.length} colunas)`;
+  // Sinal 2: FORMATO do nome da coluna, SO quando ha UMA coluna.
+  //
+  // Historico que justifica esse escopo estreito, para ninguem "melhorar" de novo:
+  // este sinal ja foi aplicado a QUALQUER coluna e causou DUAS regressoes, cada uma
+  // pior que o defeito que tentava resolver. Barrou export de Google Forms ("Qual e o
+  // seu principal desafio hoje?"), de Meta Ads ("Custo por visualizacao da pagina de
+  // destino"), de Google Ads ("Custo / conv.", "CPM (custo por 1.000 impressoes)") e
+  // de ERP ("N.o Pedido", "Qtd.", "Total:"). Cabecalho de planilha de verdade tem
+  // ponto, dois pontos, barra, interrogacao e passa de 40 caracteres o tempo todo.
+  //
+  // Com UMA coluna so o sinal e seguro, porque ai o nome da coluna E a linha inteira
+  // do arquivo: e o sintoma literal de um texto que nao tem delimitador nenhum.
+  // O que pega lixo multi-coluna e o Sinal 1 (nenhuma linha de dado), que nao chuta.
+  if (nomes.length === 1 && formatoDeCabecalhoSuspeito(nomes[0])) {
     return (
-      `Esse arquivo não parece um CSV: detectei ${descricaoColuna}. ` +
+      `Esse arquivo não parece um CSV: detectei 1 coluna só, de nome "${resumir(nomes[0])}". ` +
       'Confira se o arquivo tem uma linha de cabeçalho e se as colunas estão separadas ' +
       'por vírgula, ponto e vírgula ou tabulação.'
     );

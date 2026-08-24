@@ -61,9 +61,45 @@ test('mais de uma coluna com cabecalhos NORMAIS nunca e implausivel', () => {
   );
 });
 
-test('mais de uma coluna com UM cabecalho de FORMATO suspeito tambem e implausivel (rodada 3: o sinal de formato vale pra qualquer coluna, nao so quando ha uma unica)', () => {
-  const msg = csvImplausivel([LINHA_LONGA, 'B'], [{ [LINHA_LONGA]: '1', B: '2' }]);
-  assert.match(msg, /n[aã]o parece um CSV/i, 'cabecalho absurdo deveria ser barrado mesmo com 2 colunas');
+// TRAVA DE REGRESSAO (rodada 4). O teste que existia aqui exigia o OPOSTO disto:
+// mandava barrar qualquer arquivo em que UMA coluna tivesse formato suspeito, mesmo
+// havendo varias colunas. Isso quebrou planilha de verdade duas vezes seguidas, e o
+// teste passava, porque ele canonizava o defeito. Cabecalho de export real tem ponto,
+// dois pontos, barra, interrogacao e passa de 40 caracteres o tempo todo.
+//
+// Se alguem for "endurecer o gate" de novo: o que separa lixo de planilha NAO e a
+// pontuacao do cabecalho, e a ausencia de linha de dado. Ver csv.js, Sinal 1.
+test('planilha REAL de varias colunas nunca e barrada, por mais estranho que seja o cabecalho', () => {
+  const reais = [
+    // export de respostas do Google Forms
+    ['Carimbo de data/hora', 'Qual é o seu principal desafio hoje?', 'E-mail'],
+    // export do Meta Ads em portugues
+    ['Dia', 'Custo por visualização da página de destino', 'Impressões'],
+    // export do Google Ads
+    ['Campanha', 'Custo / conv.', 'Conv.', 'CPM (custo por 1.000 impressões)'],
+    // export de ERP / nota fiscal
+    ['N.º Pedido', 'Qtd.', 'Total:'],
+    // cabecalho longo de verdade (mais de 40 caracteres)
+    ['Data', 'Custo por resultado da campanha de remarketing'],
+    // a propria linha longa que antes era usada pra "provar" o barramento
+    [LINHA_LONGA, 'B'],
+  ];
+  for (const cols of reais) {
+    const linha = Object.fromEntries(cols.map((c) => [c, '1']));
+    assert.equal(
+      csvImplausivel(cols, [linha, linha]),
+      null,
+      `planilha legitima foi barrada: ${cols.join(' | ')}`
+    );
+  }
+});
+
+test('o lixo multi-coluna e pego pela AUSENCIA de linha de dado, nao pelo formato do cabecalho', () => {
+  // JSON minificado colado no lugar do CSV: vira varias "colunas" e zero linhas
+  const msg = csvImplausivel(['{vendas: [{data: 01/07', ' valor: 1500}', ']}'], []);
+  assert.match(msg, /n[aã]o parece um CSV/i, 'JSON colado tem que ser barrado');
+  // e uma planilha de verdade so com cabecalho tambem nao vira dashboard
+  assert.ok(csvImplausivel(['Data', 'Canal'], []), 'cabecalho sem nenhuma linha tem que ser barrado');
 });
 
 test('sem colunas -> nao e trabalho deste gate (o handler ja barra CSV vazio)', () => {
