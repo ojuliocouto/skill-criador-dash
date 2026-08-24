@@ -2,6 +2,56 @@
 
 A guided builder for marketing, sales, and support dashboards on Cloudflare Pages + Functions + KV (and D1 in historical mode). It is meant to be run by an AI coding agent (Claude Code) that walks a person, step by step, through building and publishing THEIR OWN dashboard on THEIR OWN Cloudflare account. The agent composes from a library of tested pieces (connectors, widgets, templates, metrics engine) and customizes for the person, writing a bespoke connector when the data source is specific.
 
+## Prerequisites
+
+Required, before you run any command below:
+
+- **A Cloudflare account.** The free tier covers everything in this guide (Pages, Functions, KV; D1 also has a free tier if you use historical mode). Sign up at dash.cloudflare.com.
+- **Git**, to clone this repository.
+- **Node.js 22 or newer.** Wrangler (the Cloudflare CLI) requires Node 22+; check your version with `node -v`. An older Node (18, 20) is not enough. Install a current LTS from nodejs.org, or switch with `nvm use 22` if you use nvm.
+- **Wrangler**, the Cloudflare CLI: `npm i -g wrangler`, then authenticate with `wrangler login` (opens a browser). A global install is not mandatory: `npm run dev` already calls it through `npx wrangler`.
+- **Claude Code**, installed and signed in. This repository is a Claude Code skill: `SKILL.md` is the script an AI coding agent follows to walk you through the build. You can still read and run the starter-kit code without Claude Code, but the guided experience assumes it.
+- **Your data**, as a Google Sheet or a CSV file. If you use a Google Sheet, share it as "Anyone with the link" before pasting the link; without that sharing setting the connector cannot read it.
+
+Optional, only if you need it:
+
+- A **Meta Ads** access token (Business Manager System User) and ad account id, only for the native Meta Ads connector (Marketing domain).
+- Nothing extra for D1 / historical mode: it reuses the same Cloudflare account, it just adds one more `wrangler d1 create` step later (see Deploy below).
+
+Nothing above requires a paid plan or a company account: a personal Cloudflare account and a personal Google account are enough to follow this guide end to end.
+
+## Quickstart: from clone to your first dashboard
+
+These steps get a dashboard running on your own machine, reading your own data, in a few minutes. This is local only, no Cloudflare deploy yet (that is the "Deploy to Cloudflare Pages" section further down).
+
+1. Clone the repository and enter the starter kit:
+   ```
+   git clone <YOUR-REPO-URL> criador-dash
+   cd criador-dash/starter-kit
+   ```
+   Replace `<YOUR-REPO-URL>` with the URL you are cloning from. If you are installing this as a Claude Code skill instead of just trying the code, clone straight into `~/.claude/skills/criador-dash` (see "Install as a Claude Code skill" below); the code inside is the same.
+2. Confirm your environment is ready. There is no `npm install` step (zero runtime dependencies), so this alone proves your Node/npm setup works:
+   ```
+   npm test
+   ```
+   All 527 tests should print green.
+3. Create the local secret file. Mutations are fail-closed even on your own machine, so this step is not optional:
+   ```
+   echo "ADMIN_TOKEN=dev-local-token" > .dev.vars
+   ```
+   `dev-local-token` is a placeholder: pick any string you like, it only matters on your machine and is never committed (`.dev.vars` is gitignored).
+4. Start the local dev server:
+   ```
+   npm run dev
+   ```
+   Wrangler prints the local URL in the terminal, normally `http://localhost:8788`.
+5. Open `http://localhost:8788/config.html` in your browser and go through the 4-step wizard:
+   1. Pick a domain (Marketing, Sales, or Support).
+   2. Paste a Google Sheets link (shared "Anyone with the link") or upload one of the sample files in `examples/` (for example `examples/vendas-exemplo.csv`).
+   3. Check the auto-mapped columns; fix anything the automatic mapping missed.
+   4. Name the dashboard and pick a brand color.
+6. You land on your first dashboard, running locally against real data. From here, "Deploy to Cloudflare Pages" below takes the same dashboard to a public URL on your own Cloudflare account.
+
 ## What it is / What it is NOT
 
 It is:
@@ -75,17 +125,6 @@ Number and date normalization (Brazilian formats included) happens in the metric
 - D1 (historical mode): the `d1.js` connector reads the latest snapshot written by the cron Worker, so the dashboard shows data from the database instead of the live source.
 - Second-wave stubs (documented, not finished): CRM, Hotmart.
 
-## Prerequisites / Onboarding
-
-Before you start:
-- A Cloudflare account (the free tier already covers Pages + Functions + KV).
-- Node.js installed (to run the tests and the local dev server).
-- Wrangler installed and authenticated: `npm i -g wrangler` then `wrangler login`.
-- Your data as a Google Sheet or a CSV file.
-- If you use a Google Sheet, share it as "anyone with the link". Without that sharing the connector fetch fails.
-
-For the MVP data source (Google Sheets or CSV) you need no token, no OAuth, and no API key. (Managing dashboards still needs an `ADMIN_TOKEN` set at deploy time, since mutations are fail-closed: see Deploy and Access model below.)
-
 ## Install as a Claude Code skill
 
 The skill name in the frontmatter is `criador-dash`, so the install folder must match it (the repo
@@ -96,30 +135,22 @@ git clone <YOUR-REPO-URL> ~/.claude/skills/criador-dash
 ```
 
 Repo layout: `SKILL.md` (the agent playbook), `references/` (infra commands, security model, features,
-extension guides — loaded on demand), `scripts/preflight.py` (environment + wrangler.toml checks before
+extension guides, loaded on demand), `scripts/preflight.py` (environment + wrangler.toml checks before
 deploy), and `starter-kit/` (the deployable code library).
 
 ## Quick start
 
-```
-git clone <YOUR-REPO-URL>
-cd <REPO>/starter-kit
+See "Quickstart: from clone to your first dashboard" near the top of this file for the full numbered
+walkthrough. In short, once you are inside `starter-kit/`:
 
+```
 npm test                      # 527 unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
-For the full local flow (creating dashboards through the wizard or curl), first create
-`starter-kit/.dev.vars` with `ADMIN_TOKEN=<any-dev-value>` — mutations are fail-closed even in dev.
 Run `python3 scripts/preflight.py --starter-kit starter-kit` to check your environment at any time.
 
-Then open `config.html` and create your first dashboard through the 4-step wizard:
-
-1. Pick a domain (Marketing, Sales, or Support).
-2. Connect a source: paste the Google Sheets link or upload a CSV. The connector fetches it and previews the columns.
-3. Map columns: automatic mapping by header name pre-fills the slots; adjust what is missing. Required slots are validated.
-4. Name it and pick a brand accent color. The config is saved to KV and you are redirected to the dashboard.
-
-The dashboard (`dashboard.html`) reads `?id=`, loads the config from KV, fetches the data through the connector, runs `computeAll` plus the template layout, and renders the widgets.
+Behind the wizard: the dashboard (`dashboard.html`) reads `?id=`, loads the config from KV, fetches
+the data through the connector, runs `computeAll` plus the template layout, and renders the widgets.
 
 ## Deploy to Cloudflare Pages
 
@@ -149,6 +180,21 @@ The data source needs no secret for the MVP (a link-shared Google Sheet or a CSV
 Reading a published dashboard is public (it exists to be viewed). Mutations are not: creating, overwriting, and deleting (POST/DELETE) are fail-closed and require the `x-admin-token` header. If no `ADMIN_TOKEN` is configured on the server, the API rejects every mutation with `403 adminNotConfigured`, so nobody can create or delete anything anonymously. Setting `ADMIN_TOKEN` is part of setup, not optional:
 - Generate a strong random token (`openssl rand -base64 32`) and set it as a Pages secret: `wrangler pages secret put ADMIN_TOKEN --project-name=<YOUR-PROJECT>`. On first use the wizard asks for it once (the `needsAdmin` flow), stores it in the browser, and sends `x-admin-token` from then on.
 - Additionally set a per-dashboard password for anything whose DATA should not be read by link (it gates the config and the data, not just writes).
+
+## Troubleshooting
+
+The three errors a first run is most likely to hit:
+
+1. **`wrangler: command not found`, even after `npm i -g wrangler`.**
+   Cause: npm's global bin folder is not on your PATH. Fix: run `npm prefix -g` to find that folder and add it to your shell's PATH, or skip the global install entirely, since `npm run dev` already calls Wrangler through `npx wrangler`.
+
+2. **`npm i -g wrangler` fails, or Wrangler refuses to run with an "unsupported engine" / Node version error.**
+   Cause: Wrangler requires Node 22 or newer; an older Node (18, 20) is not enough. Fix: check `node -v`, then install a current LTS from nodejs.org, or `nvm use 22` if you use nvm.
+
+3. **Creating a dashboard in the wizard returns 403 / `adminNotConfigured`.**
+   Cause: mutations are fail-closed by design and no `ADMIN_TOKEN` is configured yet. Fix locally: create `starter-kit/.dev.vars` with `ADMIN_TOKEN=<any-value>` (Quickstart step 3) and restart `npm run dev`. Fix in production: run `wrangler pages secret put ADMIN_TOKEN --project-name=<YOUR-PROJECT-NAME>` (Deploy step 5), reload `config.html`, and paste the token when the wizard asks for it.
+
+A fourth one worth knowing even though it did not make the top three: the Google Sheets connector fails to read the sheet. Cause: the sheet is not shared as "Anyone with the link". Fix: Share > General access > Anyone with the link, then paste the link again.
 
 ## Project structure
 

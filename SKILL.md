@@ -59,13 +59,21 @@ python3 scripts/preflight.py --starter-kit starter-kit
 ```
 Checklist (um item por vez; se faltar algo, resolva antes de seguir):
 - [ ] Conta no Cloudflare? (plano grátis cobre Pages + Functions + KV; D1 tem free tier). Senão: dash.cloudflare.com.
-- [ ] Node instalado? (`node -v`). Sem Node não roda wrangler nem os testes.
-- [ ] wrangler disponível? `npm i -g wrangler` (3.60+ ou 4.x). Se `wrangler` não for achado depois de
-      instalar, o bin global do npm não está no PATH (`npm prefix -g` mostra a pasta; adicione ao PATH,
-      que é melhor do que apelar pra sudo). O `npm run dev` usa `npx wrangler`, então funciona mesmo sem global.
+- [ ] Node 22 ou mais novo instalado? (`node -v`). O wrangler atual exige Node 22+; com uma versão mais
+      velha (18, 20) ele nem roda os testes nem faz o deploy. Sem Node instalado, nada funciona.
+- [ ] wrangler disponível? `npm i -g wrangler` (a versão atual, 4.x, é a que exige Node 22+ acima). Se
+      `wrangler` não for achado depois de instalar, o bin global do npm não está no PATH (`npm prefix -g`
+      mostra a pasta; adicione ao PATH, que é melhor do que apelar pra sudo). O `npm run dev` usa
+      `npx wrangler`, então funciona mesmo sem global.
 - [ ] Login: `wrangler login`. ATENÇÃO: um `CLOUDFLARE_API_TOKEN` exportado no shell SOBREPÕE o login e
       pode apontar pra outra conta (o preflight avisa); se indevido, `unset CLOUDFLARE_API_TOKEN`.
 - [ ] Conta certa? `wrangler whoami` (mostra email e Account ID). Errada: `wrangler logout` e login de novo.
+
+Primeira vez da pessoa com isso? Antes de tocar na conta Cloudflare real, rode com ela o Quickstart
+do README (`git clone` -> `npm test` -> criar `.dev.vars` -> `npm run dev` -> abrir
+`http://localhost:8788/config.html`) pra ela ver um dashboard funcionando local, com dados dela, em
+minutos. Isso separa "ambiente funciona" de "infra provisionada": se algo falhar depois, você já sabe
+que não é o Node, o wrangler nem o wizard, é a parte de provisionamento real.
 
 ### 2. Descoberta da operação
 - Que área medir: Marketing, Vendas, Suporte, ou mais de uma (um dashboard por área; junte num grupo com abas).
