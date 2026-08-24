@@ -10,11 +10,13 @@ const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const DEFAULT_ACCENT = '#6d28d9';
 const SITE = 'Criador Dash';
 
-const DOMAIN_LABELS = { marketing: 'Marketing', vendas: 'Vendas', suporte: 'Suporte' };
+const DOMAIN_LABELS = { marketing: 'Marketing', vendas: 'Vendas', suporte: 'Suporte', financeiro: 'Financeiro', estoque: 'Estoque' };
 const DOMAIN_DESC = {
   marketing: 'Investimento, leads, CTR, CPL, CPA e ROAS.',
   vendas: 'Faturamento, negócios, ticket médio e taxa de conversão.',
   suporte: 'Atendimentos, taxa de resolução, tempo de resposta e CSAT.',
+  financeiro: 'Entradas, saídas, saldo e margem por categoria.',
+  estoque: 'Faturamento, itens vendidos, giro e produtos por categoria.',
 };
 
 export function domainLabel(domain) {

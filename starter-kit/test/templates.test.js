@@ -6,6 +6,8 @@ import { templates, getTemplate, DOMAINS } from '../public/assets/js/templates/i
 import { template as marketing } from '../public/assets/js/templates/marketing.js';
 import { template as vendas } from '../public/assets/js/templates/vendas.js';
 import { template as suporte } from '../public/assets/js/templates/suporte.js';
+import { template as financeiro } from '../public/assets/js/templates/financeiro.js';
+import { template as estoque } from '../public/assets/js/templates/estoque.js';
 import { resolveDateSlot } from '../public/assets/js/dashboard.js';
 import { DOMAINS as SERVER_DOMAINS, isDomain } from '../functions/lib/domains.mjs';
 
@@ -52,8 +54,10 @@ test('getTemplate retorna template por id', () => {
   assert.equal(getTemplate('marketing'), marketing);
   assert.equal(getTemplate('vendas'), vendas);
   assert.equal(getTemplate('suporte'), suporte);
+  assert.equal(getTemplate('financeiro'), financeiro);
+  assert.equal(getTemplate('estoque'), estoque);
   assert.equal(getTemplate('inexistente'), undefined);
-  assert.deepEqual(Object.keys(templates).sort(), ['marketing', 'suporte', 'vendas']);
+  assert.deepEqual(Object.keys(templates).sort(), ['estoque', 'financeiro', 'marketing', 'suporte', 'vendas']);
 });
 
 function validaTemplate(tpl) {
@@ -127,6 +131,56 @@ test('estrutura do template suporte', () => {
   assert.ok(keys.indexOf('atendimentos') < keys.indexOf('taxa_resolucao'));
 });
 
+test('autoMap financeiro: mapeia colunas reais', () => {
+  const columns = ['Data', 'Categoria', 'Entrada', 'Saída'];
+  const map = autoMap(financeiro.slots, columns);
+  assert.equal(map.data, 'Data');
+  assert.equal(map.categoria, 'Categoria');
+  assert.equal(map.entrada, 'Entrada');
+  assert.equal(map.saida, 'Saída');
+});
+
+test('autoMap financeiro: aceita sinonimos comuns (Recebido/Despesa)', () => {
+  const columns = ['Competência', 'Conta', 'Recebido', 'Despesa'];
+  const map = autoMap(financeiro.slots, columns);
+  assert.equal(map.data, 'Competência');
+  assert.equal(map.categoria, 'Conta');
+  assert.equal(map.entrada, 'Recebido');
+  assert.equal(map.saida, 'Despesa');
+});
+
+test('estrutura do template financeiro', () => {
+  validaTemplate(financeiro);
+  const req = financeiro.slots.filter((s) => s.required).map((s) => s.key).sort();
+  assert.deepEqual(req, ['data', 'entrada']);
+  // base antes das derivadas: saldo depende de entradas/saidas; margem depende de saldo
+  const keys = financeiro.metrics.map((m) => m.key);
+  assert.ok(keys.indexOf('entradas') < keys.indexOf('saldo'));
+  assert.ok(keys.indexOf('saidas') < keys.indexOf('saldo'));
+  assert.ok(keys.indexOf('saldo') < keys.indexOf('margem'));
+});
+
+test('autoMap estoque: mapeia colunas reais', () => {
+  const columns = ['Data', 'Produto', 'Categoria', 'Quantidade Vendida', 'Estoque Atual', 'Faturamento'];
+  const map = autoMap(estoque.slots, columns);
+  assert.equal(map.data, 'Data');
+  assert.equal(map.produto, 'Produto');
+  assert.equal(map.categoria, 'Categoria');
+  assert.equal(map.quantidade, 'Quantidade Vendida');
+  assert.equal(map.estoque, 'Estoque Atual');
+  assert.equal(map.valor, 'Faturamento');
+});
+
+test('estrutura do template estoque', () => {
+  validaTemplate(estoque);
+  const req = estoque.slots.filter((s) => s.required).map((s) => s.key).sort();
+  assert.deepEqual(req, ['produto', 'quantidade']);
+  // base antes da derivada: giro (ratio) depende de itens_vendidos e estoque_atual
+  const keys = estoque.metrics.map((m) => m.key);
+  assert.ok(keys.indexOf('itens_vendidos') < keys.indexOf('giro'));
+  assert.ok(keys.indexOf('estoque_atual') < keys.indexOf('giro'));
+});
+
 // ---------- HARDENING fix 3+4: dominios vem do registry (domains.mjs) ----------
 
 test('registry de templates casa EXATAMENTE com a lista canonica de dominios', () => {
@@ -142,7 +196,8 @@ test('isDomain aceita cada dominio do registry e rejeita o resto', () => {
     assert.equal(isDomain(id), true, `${id} valido`);
     assert.ok(getTemplate(id), `${id} tem template`);
   }
-  assert.equal(isDomain('financeiro'), false);
+  assert.equal(isDomain('rh'), false);
+  assert.equal(isDomain('inexistente'), false);
   assert.equal(isDomain(''), false);
   assert.equal(isDomain(null), false);
   assert.equal(isDomain(undefined), false);
@@ -151,7 +206,7 @@ test('isDomain aceita cada dominio do registry e rejeita o resto', () => {
 // ---------- HARDENING fix 2: dateSlot LIDO do template, nao hardcoded ----------
 
 test('cada template declara dateSlot, e ele casa com o widget timeseries', () => {
-  for (const tpl of [marketing, vendas, suporte]) {
+  for (const tpl of [marketing, vendas, suporte, financeiro, estoque]) {
     assert.equal(typeof tpl.dateSlot, 'string', `${tpl.id}: declara dateSlot`);
     assert.ok(tpl.slots.some((s) => s.key === tpl.dateSlot), `${tpl.id}: dateSlot e um slot real`);
     const ts = tpl.layout.find((l) => l.widget === 'timeseries');

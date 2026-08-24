@@ -13,7 +13,7 @@
 // domains.mjs) + criar o template; a validacao do servidor deriva daqui.
 
 /** @type {ReadonlyArray<string>} Chaves de dominio validas, em ordem estavel. */
-export const DOMAINS = Object.freeze(['marketing', 'vendas', 'suporte']);
+export const DOMAINS = Object.freeze(['marketing', 'vendas', 'suporte', 'financeiro', 'estoque']);
 
 /**
  * Diz se `id` e um dominio de dashboard valido.

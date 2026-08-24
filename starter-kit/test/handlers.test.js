@@ -204,7 +204,7 @@ test('dashboards POST valido -> 200 gera slug/createdAt, salga a senha e nao vaz
 //     nao de um enum literal no handler. Dominio fora da lista -> 400.
 test('dashboards POST com dominio invalido -> 400 (validado pela lista de domains.mjs)', async () => {
   const env = { DASHBOARDS_KV: fakeKV(), ADMIN_TOKEN: ADMIN };
-  const res = await dashboards(ctx('POST', { body: makeConfig({ domain: 'financeiro' }), headers: adminHeaders(), env }));
+  const res = await dashboards(ctx('POST', { body: makeConfig({ domain: 'inexistente' }), headers: adminHeaders(), env }));
   assert.equal(res.status, 400);
   const j = await readJSON(res);
   assert.match(j.error, /dom[ií]nio/i, 'erro cita o dominio invalido');

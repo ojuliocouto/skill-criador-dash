@@ -194,6 +194,8 @@ const DOMAIN_DESC = {
   marketing: 'Investimento, cliques, CTR, CPL, CPA e ROAS por canal e ao longo do tempo.',
   vendas: 'Faturamento, número de vendas, ticket médio e ranking por vendedor e produto.',
   suporte: 'Atendimentos, resolvidos, taxa de resolução, tempo de resposta e CSAT por canal e ao longo do tempo.',
+  financeiro: 'Entradas, saídas, saldo e margem por categoria e ao longo do tempo. Ideal para fluxo de caixa.',
+  estoque: 'Faturamento, itens vendidos, giro, produtos ativos e ranking por produto e categoria.',
 };
 
 function renderDomain(body) {

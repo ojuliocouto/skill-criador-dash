@@ -25,7 +25,7 @@ test('isDomain do browser e do servidor concordam para cada dominio e para inval
     assert.equal(browserIsDomain(id), true, `browser aceita ${id}`);
     assert.equal(serverIsDomain(id), true, `servidor aceita ${id}`);
   }
-  for (const invalido of ['financeiro', '', null, undefined, 42, {}]) {
+  for (const invalido of ['inexistente', '', null, undefined, 42, {}]) {
     assert.equal(browserIsDomain(invalido), false);
     assert.equal(serverIsDomain(invalido), false);
   }

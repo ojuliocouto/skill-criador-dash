@@ -13,7 +13,7 @@
 // test/domains-parity.test.js falha se divergirem, evitando drift silencioso.
 
 /** @type {ReadonlyArray<string>} Chaves de dominio validas, em ordem estavel. */
-export const DOMAINS = Object.freeze(['marketing', 'vendas', 'suporte']);
+export const DOMAINS = Object.freeze(['marketing', 'vendas', 'suporte', 'financeiro', 'estoque']);
 
 /**
  * Diz se `id` e um dominio de dashboard valido.

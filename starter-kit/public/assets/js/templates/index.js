@@ -3,9 +3,11 @@
 import { template as marketing } from './marketing.js';
 import { template as vendas } from './vendas.js';
 import { template as suporte } from './suporte.js';
+import { template as financeiro } from './financeiro.js';
+import { template as estoque } from './estoque.js';
 import { DOMAINS } from '../domains.mjs';
 
-const byId = { marketing, vendas, suporte };
+const byId = { marketing, vendas, suporte, financeiro, estoque };
 
 // Contrato: as chaves deste registry sao EXATAMENTE os dominios canonicos de
 // domains.mjs (a fonte da verdade que o servidor tambem valida). Montamos o
