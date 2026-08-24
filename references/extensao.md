@@ -2,10 +2,13 @@
 
 Sempre TDD: teste antes. Os contratos completos estão em `starter-kit/ARCHITECTURE.md`.
 
-## Adicionar um novo domínio (ex: Financeiro)
+## Adicionar um novo domínio (ex: RH)
 
-Marketing, Vendas e Suporte já vêm prontos. Para um novo (ex: Financeiro), siga o Contrato 5 do
-`ARCHITECTURE.md` e use `vendas.js`/`suporte.js` como molde.
+Marketing, Vendas, Suporte, Financeiro e Estoque já vêm prontos. Para um novo (ex: RH, Logística,
+Assinaturas), siga o Contrato 5 do `ARCHITECTURE.md` e use `vendas.js`/`suporte.js`/`financeiro.js`/
+`estoque.js` como molde (`public/assets/js/templates/`): são as referências prontas pra copiar,
+principalmente `financeiro.js` (métrica derivada simples, saldo = entrada menos saída) e `estoque.js`
+(métrica em razão de dois slots, giro = vendido sobre estoque).
 1. `public/assets/js/templates/<dominio>.js` exportando `template` com `id`, `label`, `primaryMetric`,
    `dateSlot` (qual slot é o eixo de tempo, ex `'data'`), `slots` (com `aliases` lowercase sem acento pro
    auto-mapeamento), `metrics` (base antes das derivadas; marque `betterWhen` nas que têm direção) e `layout`
@@ -14,8 +17,9 @@ Marketing, Vendas e Suporte já vêm prontos. Para um novo (ex: Financeiro), sig
    ex: `{ widget:'timeseries', col:8, ... }` ao lado de `{ widget:'funnel', col:4, ... }`. A ordem do array
    é a ordem do fluxo no grid. Slots categóricos (nem o `dateSlot`, nem coluna de métrica) viram filtro
    automático na barra, então nomeie-os com clareza.
-   Ex Financeiro: slots data, categoria, entrada, saida; métricas receita (sum entrada), despesa (sum saida),
-   saldo (derived entrada-saida), margem (ratio saldo/entrada).
+   Ex RH: slots data, departamento, contratacoes, desligamentos; métricas contratacoes (sum),
+   desligamentos (sum), headcount (derived contratacoes - desligamentos), turnover (ratio
+   desligamentos/headcount).
 2. Registre a CHAVE do domínio (ex `'financeiro'`) no array `DOMAINS`, em DOIS lugares que um teste de
    paridade mantém iguais: `public/assets/js/domains.mjs` (fonte do browser) E `functions/lib/domains.mjs`
    (fonte do servidor, que valida o POST). Esta é a fonte da verdade: `templates/index.js` monta o registry

@@ -1,7 +1,7 @@
 {
   "name": "criador-dash-starter-kit",
   "version": "3.0.0",
-  "description": "Construtor guiado de dashboards (Marketing, Vendas, Suporte) para Cloudflare Pages + Functions + KV/D1",
+  "description": "Construtor guiado de dashboards (Marketing, Vendas, Suporte, Financeiro, Estoque) para Cloudflare Pages + Functions + KV/D1",
   "type": "module",
   "scripts": {
     "test": "node --test \"test/*.test.js\"",

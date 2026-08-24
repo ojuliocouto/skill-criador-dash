@@ -1,11 +1,13 @@
 ---
 name: criador-dash
-description: "Construtor guiado de dashboards de marketing, vendas e suporte. NÃO entrega um app pronto: o agente conduz a pessoa, passo a passo, para construir e publicar o próprio dashboard na infra dela (conta Cloudflare, KV, Pages, domínio e, no modo histórico, D1 + Worker cron). Monta a partir de uma biblioteca de peças testadas (conectores, widgets, templates, motor de métricas) em starter-kit/, personalizando para a operação da pessoa, e escreve conectores sob medida quando a fonte é específica. Dois modos de dados: ao vivo (lê a fonte na hora) ou histórico (cron tira snapshots no D1). Use quando alguém quiser criar, personalizar e publicar um dashboard próprio no Cloudflare."
+description: "Construtor guiado de dashboards de marketing, vendas, suporte, financeiro e estoque. NÃO entrega um app pronto: o agente conduz a pessoa, passo a passo, para construir e publicar o próprio dashboard na infra dela (conta Cloudflare, KV, Pages, domínio e, no modo histórico, D1 + Worker cron). Monta a partir de uma biblioteca de peças testadas (conectores, widgets, templates, motor de métricas) em starter-kit/, personalizando para a operação da pessoa, e escreve conectores sob medida quando a fonte é específica. Dois modos de dados: ao vivo (lê a fonte na hora) ou histórico (cron tira snapshots no D1). Use quando alguém quiser criar, personalizar e publicar um dashboard próprio no Cloudflare."
 triggers:
   - criar dashboard
   - dashboard de marketing
   - dashboard de vendas
   - dashboard de suporte
+  - dashboard financeiro
+  - dashboard de estoque
   - painel de métricas
   - dashboard cloudflare
   - publicar dashboard
@@ -13,7 +15,7 @@ triggers:
 version: 3.1.0
 author: Julio Couto
 category: marketing-analytics
-tags: [dashboard, marketing, vendas, suporte, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio]
+tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
 ---
 
 # Criador Dash: Construtor Guiado de Dashboards
@@ -94,7 +96,7 @@ BLOQUEANTE: rode `python3 scripts/preflight.py --starter-kit starter-kit` antes 
 - `ADMIN_TOKEN` (OBRIGATÓRIO): mutação é fail-closed, sem o token ninguém cria/apaga dashboard.
 
 ### 5. Montar o dashboard
-- Escolha o domínio pronto (Marketing, Vendas, Suporte) ou crie um novo (`references/extensao.md`).
+- Escolha o domínio pronto (Marketing, Vendas, Suporte, Financeiro, Estoque) ou crie um novo (`references/extensao.md`).
 - Conecte a fonte: planilha (gviz CSV), upload CSV, Meta Ads (token; card só no domínio Marketing) ou
   conector sob medida.
 - Mapeie colunas (auto-mapeamento pré-preenche), defina branding (cor), meta opcional e senha opcional.
@@ -132,7 +134,9 @@ Domínios prontos (métricas e layout por domínio):
 - VENDAS: negócios, vendas ganhas, faturamento (só das ganhas; sem coluna de status, todas contam),
   ticket médio, taxa de conversão.
 - SUPORTE: atendimentos, resolvidos, taxa de resolução, tempo de resposta (média), CSAT (média).
-- Outro (ex: Financeiro)? Crie conforme a operação da pessoa: `references/extensao.md`.
+- FINANCEIRO: entradas, saídas, saldo (entradas menos saídas) e margem (saldo sobre entradas).
+- ESTOQUE: faturamento, itens vendidos, em estoque, produtos ativos e giro (itens vendidos sobre estoque).
+- Outro (ex: RH, Logística)? Crie conforme a operação da pessoa: `references/extensao.md`.
 
 Recursos inclusos (detalhes e código em `references/recursos.md`): tendência por período nos KPIs,
 meta vs realizado, grid 2D no desktop (`col` 3..8), filtros client-side por período e dimensão,

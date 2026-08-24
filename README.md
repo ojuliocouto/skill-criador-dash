@@ -1,6 +1,6 @@
 # Criador Dash
 
-A guided builder for marketing, sales, and support dashboards on Cloudflare Pages + Functions + KV (and D1 in historical mode). It is meant to be run by an AI coding agent (Claude Code) that walks a person, step by step, through building and publishing THEIR OWN dashboard on THEIR OWN Cloudflare account. The agent composes from a library of tested pieces (connectors, widgets, templates, metrics engine) and customizes for the person, writing a bespoke connector when the data source is specific.
+A guided builder for marketing, sales, support, finance, and inventory dashboards on Cloudflare Pages + Functions + KV (and D1 in historical mode). It is meant to be run by an AI coding agent (Claude Code) that walks a person, step by step, through building and publishing THEIR OWN dashboard on THEIR OWN Cloudflare account. The agent composes from a library of tested pieces (connectors, widgets, templates, metrics engine) and customizes for the person, writing a bespoke connector when the data source is specific.
 
 ## Prerequisites
 
@@ -34,7 +34,7 @@ These steps get a dashboard running on your own machine, reading your own data, 
    ```
    npm test
    ```
-   All 527 tests should print green.
+   All tests should print green (500+ tests; `npm test` shows the current count).
 3. Create the local secret file. Mutations are fail-closed even on your own machine, so this step is not optional:
    ```
    echo "ADMIN_TOKEN=dev-local-token" > .dev.vars
@@ -46,7 +46,7 @@ These steps get a dashboard running on your own machine, reading your own data, 
    ```
    Wrangler prints the local URL in the terminal, normally `http://localhost:8788`.
 5. Open `http://localhost:8788/config.html` in your browser and go through the 4-step wizard:
-   1. Pick a domain (Marketing, Sales, or Support).
+   1. Pick a domain (Marketing, Sales, Support, Finance, or Inventory).
    2. Paste a Google Sheets link (shared "Anyone with the link") or upload one of the sample files in `examples/` (for example `examples/vendas-exemplo.csv`).
    3. Check the auto-mapped columns; fix anything the automatic mapping missed.
    4. Name the dashboard and pick a brand color.
@@ -56,8 +56,8 @@ These steps get a dashboard running on your own machine, reading your own data, 
 
 It is:
 - A guided, personalized build: the agent provisions the person's infra (Cloudflare account, KV, Pages, domain, and in historical mode a D1 database + a cron Worker) and assembles the dashboard for them.
-- A library of real, tested code (527 passing unit tests, built with TDD) that the agent composes from instead of reinventing per person.
-- A generic creator with ready domains (Marketing, Sales, and Support) and an architecture for adding more.
+- A library of real, tested code (500+ passing unit tests, built with TDD; `npm test` shows the current count) that the agent composes from instead of reinventing per person.
+- A generic creator with ready domains (Marketing, Sales, Support, Finance, and Inventory) and an architecture for adding more.
 - Dependency-free at runtime: charts are hand-drawn SVG, everything is plain ESM.
 
 It is NOT:
@@ -73,10 +73,12 @@ The person chooses per dashboard:
 
 ## Features
 
-- Three ready domains out of the box: Marketing, Sales, and Support.
+- Five ready domains out of the box: Marketing, Sales, Support, Finance, and Inventory.
 - Marketing metrics: investment, impressions, clicks, leads, conversions, revenue, plus derived CTR, CPC, CPL, CPA, and ROAS. Conversion funnel (impressions to conversions) with step-to-step rates.
 - Sales metrics: number of deals, won deals, revenue (won only, with a fallback when there is no status column), average ticket, and win rate. Closing funnel plus ranking by seller and by product.
 - Support metrics: tickets handled, resolved, resolution rate, average response time, and CSAT. Resolution funnel plus ranking by channel.
+- Finance metrics: income, expenses, balance (income minus expenses), and margin (balance over income). Time series of income plus ranking of expenses and income by category.
+- Inventory metrics: revenue, units sold, units in stock, active products, and turnover (units sold over units in stock). Time series of revenue plus rankings by category and by product.
 - Period trend badges on KPIs: each KPI compares the second half of the period to the first (equal-sized halves) and colors the change green or red by whether higher or lower is better.
 - Optional goal tracking: set a target for the domain primary metric in the wizard and the main KPI shows a progress bar and percent of goal (green once reached).
 - Optional per-dashboard password: protect a published dashboard with a password. The client sends a SHA-256 of the password in the `x-dash-auth` header; the server stores only a salted PBKDF2-SHA256 verifier per dashboard (never the plain password, never a replayable hash), and the config API returns data only when the recomputed verifier matches.
@@ -97,7 +99,7 @@ The full contract lives in `starter-kit/ARCHITECTURE.md`. The three decoupled la
 
 1. Connectors: fetch data from a source and return a `DataSet` (a common tabular schema). They know nothing about metrics.
 2. Widgets: pure visual blocks (KPI, time series, funnel, table, ranking). They receive already-computed data and return HTML/DOM. They know nothing about templates or connectors.
-3. Domain templates: define the semantic slots, the metrics, and the widget layout for each domain (Marketing, Sales, Support).
+3. Domain templates: define the semantic slots, the metrics, and the widget layout for each domain (Marketing, Sales, Support, Finance, Inventory).
 
 Data flow:
 
@@ -144,10 +146,10 @@ See "Quickstart: from clone to your first dashboard" near the top of this file f
 walkthrough. In short, once you are inside `starter-kit/`:
 
 ```
-npm test                      # 527 unit tests: node --test 'test/*.test.js'
+npm test                      # 500+ unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
-Run `python3 scripts/preflight.py --starter-kit starter-kit` to check your environment at any time.
+Run `python3 ../scripts/preflight.py --starter-kit .` (from inside `starter-kit/`) to check your environment at any time.
 
 Behind the wizard: the dashboard (`dashboard.html`) reads `?id=`, loads the config from KV, fetches
 the data through the connector, runs `computeAll` plus the template layout, and renders the widgets.
@@ -269,7 +271,7 @@ starter-kit/
 
 ## Testing
 
-There are 527 tests, all green (`npm test`), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
+There are 500+ tests, all green (`npm test` shows the current count), written before the code (TDD). They cover the pure logic (CSV parsing, Brazilian number/date formatting, metric computation, templates and auto-mapping, widget rendering, trends/goal, snapshots SQL, accent contrast), the API handlers and the password/admin gates, worker/lib parity, and design guards (no decorative gradient, focus-visible, contrast).
 
 ```
 cd starter-kit

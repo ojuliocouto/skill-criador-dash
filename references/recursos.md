@@ -130,7 +130,7 @@ public/
     config-wizard.js  group-wizard.js  dashboard.js  index-page.js  domains.mjs (lista DOMAINS do browser: fonte da verdade dos dominios)
     sources/ index.js (registry de fontes: type, label, canHistory)
     lib/ api-client.js  automap.js  format.js  metrics.js  filters.js (filtro puro)  auth.js  theme.js  color.js  html.js
-    templates/ index.js  marketing.js  vendas.js  suporte.js
+    templates/ index.js  marketing.js  vendas.js  suporte.js  financeiro.js  estoque.js
     widgets/ index.js (registry)  _util.js  kpi.js  timeseries.js  funnel.js  table.js  ranking.js
 test/                           500+ testes (npm test  ->  node --test test/*.test.js)
 ```

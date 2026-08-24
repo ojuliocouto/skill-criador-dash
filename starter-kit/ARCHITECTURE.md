@@ -1,6 +1,6 @@
 # Starter Kit: Contratos de Arquitetura (criador-dash v3)
 
-Dashboard genérico para **Marketing**, **Vendas** e **Suporte**, rodando em
+Dashboard genérico para **Marketing**, **Vendas**, **Suporte**, **Financeiro** e **Estoque**, rodando em
 Cloudflare Pages + Functions (e D1 no modo histórico). O usuário conecta uma fonte
 de dados (planilha Google, CSV, Meta Ads ou um conector sob medida), escolhe um
 domínio, mapeia colunas e publica. Dois modos de dados: ao vivo (lê a fonte na
@@ -186,7 +186,7 @@ Os domínios válidos têm uma **única fonte da verdade**: `functions/lib/domai
 (`functions/api/dashboards.js`) valida `config.domain` com o mesmo módulo. Adicionar um domínio =
 criar o template + registrar a chave em `domains.mjs`; a validação do POST não precisa ser editada.
 
-Templates prontos: `marketing.js`, `vendas.js`, `suporte.js` (3 domínios).
+Templates prontos: `marketing.js`, `vendas.js`, `suporte.js`, `financeiro.js`, `estoque.js` (5 domínios).
 - **Marketing** slots: data, canal, investimento, impressoes, cliques, leads, conversoes, receita.
   Métricas: investimento (sum), impressoes (sum), cliques (sum), CTR (ratio cliques/impressoes),
   CPC (ratio invest/cliques), leads (sum), CPL (ratio invest/leads), conversoes (sum),
@@ -198,6 +198,11 @@ Templates prontos: `marketing.js`, `vendas.js`, `suporte.js` (3 domínios).
   Nota: um `derived.compute` PODE ser imperativo e usar `lib/format.js` (o vendas.js filtra as
   linhas ganhas e soma via `parseNumberBR`); marketing e suporte sao 100% declarativos. O contrato
   permite as duas formas: `sum/avg/count/ratio` declarativos, ou `derived` com `compute` proprio.
+- **Financeiro** slots: data, categoria, entrada, saida. Métricas: entradas (sum entrada),
+  saidas (sum saida), saldo (derived entradas - saidas), margem (ratio saldo/entradas).
+- **Estoque** slots: data, produto, categoria, quantidade, estoque, valor. Métricas:
+  itens_vendidos (sum quantidade), receita (sum valor), estoque_atual (sum estoque),
+  skus (countDistinct produto), giro (ratio itens_vendidos/estoque_atual).
 - **Suporte** slots: data, canal, atendimentos, resolvidos, tempo_resposta, csat.
   Métricas: atendimentos (sum), resolvidos (sum), tempo_resposta (avg), csat (avg),
   taxa_resolucao (ratio resolvidos/atendimentos).
@@ -238,7 +243,7 @@ nao o widget. Adicionar um widget = criar `widgets/<nome>.js` (render puro) + um
 {
   id: 'slug',
   name: 'Meu Dash de Marketing',
-  domain: 'marketing',                                // um dos dominios do registry (functions/lib/domains.mjs); hoje marketing, vendas, suporte
+  domain: 'marketing',                                // um dos dominios do registry (functions/lib/domains.mjs); hoje marketing, vendas, suporte, financeiro, estoque
   source: { type: 'sheets', url: '...', gid: '0' },   // ou { type:'csv', data:'...' }
                                                       // ou { type:'meta', meta:{ token, account, since, until } }
   colMap: { data:'Data', investimento:'Investimento', ... },

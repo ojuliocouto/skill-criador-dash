@@ -130,8 +130,11 @@ def run_tests(starter: Path, problemas: list) -> None:
 
 
 def main() -> int:
+    default_starter = Path(__file__).resolve().parent.parent / "starter-kit"
     parser = argparse.ArgumentParser(description="Preflight do criador-dash: ambiente + wrangler.toml antes do deploy.")
-    parser.add_argument("--starter-kit", default="starter-kit", help="caminho da pasta starter-kit (padrao: starter-kit)")
+    parser.add_argument("--starter-kit", default=str(default_starter),
+                         help="caminho da pasta starter-kit (padrao: resolvido a partir do proprio script, "
+                              "funciona chamado de qualquer lugar)")
     parser.add_argument("--history", action="store_true", help="inclui as checagens do modo historico (worker de snapshot)")
     parser.add_argument("--run-tests", action="store_true", help="roda npm test no final")
     args = parser.parse_args()
