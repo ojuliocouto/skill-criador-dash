@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "criador-dash-dev",
+      "autoPort": false,
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "pages", "dev", "public", "--compatibility-date=2026-01-01", "--port", "8788"],
+      "port": 8788
+    }
+  ]
+}
