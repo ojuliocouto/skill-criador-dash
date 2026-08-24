@@ -440,3 +440,43 @@ test('meta-ads GET protegido: brute force da senha estoura em 429', async () => 
     assert.equal(contador.chamadas, 0, 'brute force nunca toca a Graph API');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 14. FAIL-CLOSED do conector d1 (regressao de seguranca).
+//
+//     O gate de senha do d1 era `if (config && needsAuth(config))`: quando a
+//     config NAO carregava do KV, a condicao virava falsa e o gate era PULADO,
+//     servindo o snapshot de um painel protegido sem senha nenhuma. Tres
+//     caminhos levavam a isso: binding do KV ausente, chave apagada do KV
+//     (painel deletado, snapshots do D1 sobrevivem) e config corrompida.
+//     Nao conseguir verificar a protecao tem que NEGAR, nunca liberar.
+// ---------------------------------------------------------------------------
+const DATASET_SECRETO = JSON.stringify({ columns: ['x'], rows: [[42]], meta: {} });
+function d1ComSnapshot() {
+  return fakeD1([{ id: 1, dashboard_id: 'hist', captured_at: 'x', dataset_json: DATASET_SECRETO }]);
+}
+
+test('d1 fail-closed: sem binding DASHBOARDS_KV nao serve dado (nao da pra checar senha)', async () => {
+  const env = { DASHBOARD_DB: d1ComSnapshot(), DASHBOARD_CACHE: fakeCache() };
+  const res = await d1(ctx('GET', { path: 'connectors/d1', id: 'hist', env }));
+  assert.notEqual(res.status, 200, 'sem KV o handler nao pode devolver 200');
+  assert.ok(!(await res.text()).includes('42'), 'o dado do snapshot nao pode vazar');
+});
+
+test('d1 fail-closed: config ausente no KV -> 404, nunca o dado', async () => {
+  const env = { DASHBOARDS_KV: fakeKV(), DASHBOARD_DB: d1ComSnapshot(), DASHBOARD_CACHE: fakeCache() };
+  const res = await d1(ctx('GET', { path: 'connectors/d1', id: 'hist', env }));
+  assert.equal(res.status, 404, 'painel inexistente -> 404');
+  assert.ok(!(await res.text()).includes('42'), 'o dado do snapshot nao pode vazar');
+});
+
+test('d1 fail-closed: config corrompida no KV nao libera o dado', async () => {
+  const env = {
+    DASHBOARDS_KV: fakeKV({ 'dash:hist': '{ isto nao e json' }),
+    DASHBOARD_DB: d1ComSnapshot(),
+    DASHBOARD_CACHE: fakeCache(),
+  };
+  const res = await d1(ctx('GET', { path: 'connectors/d1', id: 'hist', env }));
+  assert.notEqual(res.status, 200, 'config corrompida nao pode virar acesso liberado');
+  assert.ok(!(await res.text()).includes('42'), 'o dado do snapshot nao pode vazar');
+});

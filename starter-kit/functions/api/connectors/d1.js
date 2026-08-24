@@ -20,12 +20,18 @@ function tooMany(retryAfter) {
 }
 
 // Carrega a config do dashboard no KV para checar protecao por senha.
+//
+// FAIL-CLOSED: devolve `{ erro }` em vez de null quando NAO deu pra ler a config.
+// Antes devolvia null nos tres casos, e quem chamava fazia `if (config && ...)`,
+// entao nao conseguir ler a config PULAVA o gate de senha e servia o snapshot de
+// um painel protegido. Nao poder verificar a protecao tem que NEGAR, nunca liberar.
 async function loadConfig(env, id) {
   const kv = env && env.DASHBOARDS_KV;
-  if (!kv) return null;
+  if (!kv) return { erro: { msg: 'Binding DASHBOARDS_KV nao configurado.', status: 500 } };
   const raw = await kv.get(`dash:${id}`);
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  if (!raw) return { erro: { msg: 'Dashboard nao encontrado.', status: 404 } };
+  try { return { config: JSON.parse(raw) }; }
+  catch { return { erro: { msg: 'Configuracao corrompida.', status: 500 } }; }
 }
 
 /**
@@ -56,8 +62,11 @@ export async function onRequest(context) {
 
   // Protecao por senha: se o dashboard e protegido, os DADOS tambem exigem a senha
   // (senao a senha protegeria so a config e nao o conteudo).
-  const config = await loadConfig(env, id);
-  if (config && needsAuth(config)) {
+  // Nao conseguiu ler a config? NEGA. Sem a config nao da pra saber se o painel e
+  // protegido, e na duvida o snapshot nao sai.
+  const { config, erro: erroConfig } = await loadConfig(env, id);
+  if (erroConfig) return json({ error: erroConfig.msg }, erroConfig.status);
+  if (needsAuth(config)) {
     const senhaOk = await authOk(config, request.headers.get('x-dash-auth') || '');
     if (!senhaOk) {
       // RATE LIMIT anti brute force: so conta as tentativas ERRADAS (senha certa
