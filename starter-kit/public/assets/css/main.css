@@ -222,6 +222,9 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 .kpi__goal-fill { height: 100%; background: var(--accent-fill-calc, var(--accent)); border-radius: 6px; min-width: 2px; }
 .kpi__goal-fill.is-done { background: var(--good); }
 .kpi__goal-text { font-family: var(--font-mono); color: var(--text-faint); font-size: 11px; margin-top: 5px; }
+/* KPI sem coluna mapeada (achado 1): valor em traco e apagado, pra nao competir
+   visualmente com os KPIs que TEM numero de verdade ao lado. */
+.kpi.is-unmapped .kpi__value { color: var(--text-faint); font-weight: 500; }
 
 /* Widget wrapper. Titulos de widget: FRASE normal (sentence-case), nao mais um
    "eyebrow" uppercase-tracked. Ferramenta de verdade (Linear/Vercel) reserva o

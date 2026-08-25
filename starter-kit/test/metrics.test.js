@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import {
   computeMetric,
   computeAll,
+  computeAllMapped,
+  isMetricMapped,
+  isSlotMapped,
   groupBy,
   timeSeries,
 } from '../public/assets/js/lib/metrics.js';
@@ -122,6 +125,61 @@ test('computeAll respeita dependências base -> ratio/derived', () => {
   assert.equal(out.ctr, 35 / 3500);
   assert.equal(out.cpc, 4000 / 35);
   assert.equal(out.roas, 2.25);
+});
+
+// ---------- isSlotMapped / isMetricMapped / computeAllMapped ----------
+// BUG REAL (achado 1): KPI e funil publicavam ZERO para slot SEM coluna
+// mapeada (ex: export da Meta sem "Leads" fazia CPL sair R$ 0,00, um numero
+// com cara de certo). O fix distingue "sem coluna" (mapped=false) de "coluna
+// mapeada e a soma deu zero de verdade" (mapped=true, valor 0 legitimo).
+test('isSlotMapped: true quando o slot esta no colMap, false quando falta', () => {
+  const colMap = { investimento: 'Investimento' };
+  assert.equal(isSlotMapped('investimento', colMap, rows), true);
+  assert.equal(isSlotMapped('leads', colMap, rows), false);
+});
+
+test('isMetricMapped: sum/avg/count/countDistinct dependem do slot em def.column', () => {
+  const colMap = { investimento: 'Investimento' };
+  const mapeada = { key: 'investimento', agg: 'sum', column: 'investimento' };
+  const semColuna = { key: 'leads', agg: 'sum', column: 'leads' };
+  assert.equal(isMetricMapped(mapeada, colMap, rows), true);
+  assert.equal(isMetricMapped(semColuna, colMap, rows), false);
+});
+
+test('isMetricMapped: ratio so e mapeada se AMBAS as pontas (numerador e denominador) forem', () => {
+  const cpl = { key: 'CPL', agg: 'ratio', ratioOf: ['investimento', 'leads'] };
+  // leads sem coluna -> CPL nao mapeada, mesmo com investimento mapeado.
+  assert.equal(isMetricMapped(cpl, {}, rows, { investimento: true, leads: false }), false);
+  assert.equal(isMetricMapped(cpl, {}, rows, { investimento: true, leads: true }), true);
+});
+
+test('isMetricMapped: derived fica mapeada por padrao (compute() e arbitrario, sem slot unico)', () => {
+  const derived = { key: 'ROAS', agg: 'derived', compute: () => 0 };
+  assert.equal(isMetricMapped(derived, {}, rows, {}), true);
+});
+
+test('computeAllMapped: distingue "sem coluna" (mapped=false) de "mapeada e zero de verdade"', () => {
+  const defs = [
+    { key: 'investimento', agg: 'sum', column: 'investimento' },
+    { key: 'leads', agg: 'sum', column: 'leads' }, // sem coluna no colMap abaixo
+    { key: 'CPL', agg: 'ratio', ratioOf: ['investimento', 'leads'] },
+  ];
+  const colMap = { investimento: 'Investimento' }; // leads NAO mapeada de proposito
+  const { computed, mapped } = computeAllMapped(defs, rows, colMap);
+  assert.equal(computed.leads, 0, 'sem coluna, o valor cru continua 0 (fallback de agregacao)');
+  assert.equal(mapped.leads, false, 'mas leads NAO esta mapeada: o 0 nao e "zero de verdade"');
+  assert.equal(mapped.CPL, false, 'CPL depende de leads, entao tambem fica nao-mapeada');
+  assert.equal(mapped.investimento, true, 'investimento tem coluna: mapeada normalmente');
+
+  // Controle: coluna mapeada cuja soma da 0 de verdade continua mapeada=true.
+  const semLinhasComCliques = [{ Investimento: '0', Cliques: '' }];
+  const colMapCliques = { investimento: 'Investimento', cliques: 'Cliques' };
+  const { mapped: mapped2 } = computeAllMapped(
+    [{ key: 'cliques', agg: 'sum', column: 'cliques' }],
+    semLinhasComCliques,
+    colMapCliques,
+  );
+  assert.equal(mapped2.cliques, true, 'coluna mapeada: zero de verdade continua mapeado=true');
 });
 
 test('groupBy rankeia por canal ordenado desc', () => {

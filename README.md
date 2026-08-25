@@ -50,6 +50,7 @@ These steps get a dashboard running on your own machine, reading your own data, 
    2. Paste a Google Sheets link (shared "Anyone with the link") or upload one of the sample files in `examples/` (for example `examples/vendas-exemplo.csv`).
    3. Check the auto-mapped columns; fix anything the automatic mapping missed.
    4. Name the dashboard and pick a brand color.
+   When you click to save, the wizard asks for an admin token: paste the same value you set for `ADMIN_TOKEN` in `.dev.vars` in step 3 (`dev-local-token` if you used the example above).
 6. You land on your first dashboard, running locally against real data. From here, "Deploy to Cloudflare Pages" below takes the same dashboard to a public URL on your own Cloudflare account.
 
 ## What it is / What it is NOT

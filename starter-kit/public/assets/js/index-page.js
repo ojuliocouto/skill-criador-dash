@@ -1,7 +1,8 @@
 // Landing/lista de dashboards. Busca as configs no KV via api-client e renderiza.
-import { listDashboards, deleteDashboard } from './lib/api-client.js';
+import { listDashboards, deleteDashboard, setDashboardAuth } from './lib/api-client.js';
 import { esc } from './lib/html.js';
 import { safeLogoSrc } from './lib/brand.js';
+import { sha256Hex } from './lib/auth.js';
 
 const lista = document.getElementById('lista');
 
@@ -70,6 +71,60 @@ function renderLista(dashboards) {
   });
 }
 
+// BECO SEM SAIDA (aula 24/08, bug 3): dashboard protegido por senha nunca
+// podia ser excluido pela interface. O DELETE devolvia 401 needsPassword e a
+// tela so tinha um `alert()` com a mensagem crua: nenhum jeito de digitar a
+// senha e tentar de novo. Mesmo modelo do "pede a senha e re-tenta" que
+// dashboard.js ja usa pra abrir um dashboard protegido (renderPasswordPrompt):
+// abre um campo de senha ao lado do item, calcula o hash, guarda com
+// setDashboardAuth e reenvia o MESMO delete (que a partir dai ja manda o
+// header x-dash-auth, ver api-client.js).
+function pedirSenhaExclusao(item, id) {
+  // Evita empilhar formularios se o aluno clicar em Excluir mais de uma vez.
+  const antigo = item.querySelector('.excluir-senha');
+  if (antigo) antigo.remove();
+
+  const box = document.createElement('div');
+  box.className = 'excluir-senha';
+  box.style.cssText = 'margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+  box.innerHTML = `
+    <input class="input" type="password" placeholder="Senha do dashboard" autocomplete="off" style="max-width:220px" />
+    <button class="btn" type="button" data-confirmar>Confirmar exclusão</button>
+    <button class="btn ghost" type="button" data-cancelar>Cancelar</button>
+    <p class="error" style="margin:0;width:100%;"></p>
+  `;
+  item.appendChild(box);
+
+  const input = box.querySelector('input');
+  const erroEl = box.querySelector('.error');
+  const confirmarBtn = box.querySelector('[data-confirmar]');
+  box.querySelector('[data-cancelar]').addEventListener('click', () => box.remove());
+
+  const tentar = async () => {
+    const pw = input.value;
+    if (!pw) { input.focus(); return; }
+    confirmarBtn.disabled = true;
+    erroEl.textContent = '';
+    try {
+      setDashboardAuth(id, await sha256Hex(pw));
+      await deleteDashboard(id);
+      await carregar();
+    } catch (err) {
+      confirmarBtn.disabled = false;
+      if (err && err.needsPassword) {
+        erroEl.textContent = 'Senha incorreta. Tente de novo.';
+        input.value = '';
+        input.focus();
+      } else {
+        erroEl.textContent = `Falha ao excluir: ${err.message}`;
+      }
+    }
+  };
+  confirmarBtn.addEventListener('click', tentar);
+  input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') tentar(); });
+  input.focus();
+}
+
 async function excluir(id, btn) {
   const item = lista.querySelector(`.list-item[data-id="${CSS.escape(id)}"]`);
   const nome = item ? item.querySelector('.js-name')?.textContent : id;
@@ -80,6 +135,10 @@ async function excluir(id, btn) {
     await carregar();
   } catch (err) {
     if (btn) { btn.disabled = false; btn.textContent = 'Excluir'; }
+    if (err && err.needsPassword && item) {
+      pedirSenhaExclusao(item, id);
+      return;
+    }
     alert(`Falha ao excluir: ${err.message}`);
   }
 }

@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import {
   fetchDataForSource,
   getDashboard,
+  saveDashboard,
+  deleteDashboard,
 } from '../public/assets/js/lib/api-client.js';
 
 // Cria um stub de fetch que captura a ultima chamada e devolve a Response dada.
@@ -196,6 +198,134 @@ test('getDashboard: sem hash na sessao nao manda x-dash-auth', async () => {
     await getDashboard('d1');
     const headers = f.calls[0].init.headers || {};
     assert.equal(headers['x-dash-auth'], undefined);
+  } finally {
+    ss.restore();
+    f.restore();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// REGRESSAO (aula 24/08, bug 2): reconfigurar um dashboard COM SENHA (so
+// mudar o nome, por exemplo) devolvia 401 SEMPRE. O GET (leitura, acima) ja
+// manda x-dash-auth a partir do hash guardado na sessao (setDashboardAuth em
+// renderPedidoSenhaEdicao). O POST de saveDashboard NUNCA mandava esse
+// header, so o x-admin-token: o servidor (functions/api/dashboards.js,
+// create()) exige o header certo pra sobrescrever um dashboard que ja tem
+// `auth`, e devolvia 401 needsPassword toda vez, sem chance de corrigir.
+//
+// FIX: saveDashboard manda x-dash-auth (a partir do hash guardado pro
+// config.id, o MESMO padrao de getDashboard) quando a config tem id (edicao).
+// Sem id (criacao nova), nao ha o que mandar: comportamento antigo intacto.
+// ---------------------------------------------------------------------------
+
+test('saveDashboard: dashboard existente com hash guardado na sessao manda x-dash-auth no POST', async () => {
+  const f = stubFetch(jsonResponse({ id: 'dash-protegido', name: 'X' }));
+  const ss = stubSessionStorage({ 'dashauth:dash-protegido': 'hash-do-dono' });
+  try {
+    await saveDashboard({ id: 'dash-protegido', name: 'X', domain: 'marketing', source: {}, colMap: {} });
+    assert.equal(f.calls.length, 1);
+    const headers = f.calls[0].init.headers || {};
+    assert.equal(headers['x-dash-auth'], 'hash-do-dono');
+    assert.equal(f.calls[0].init.method, 'POST');
+  } finally {
+    ss.restore();
+    f.restore();
+  }
+});
+
+test('CONTROLE: saveDashboard de dashboard existente SEM senha (publico) nao manda x-dash-auth', async () => {
+  const f = stubFetch(jsonResponse({ id: 'dash-publico', name: 'X' }));
+  const ss = stubSessionStorage(); // nada guardado: nunca foi protegido
+  try {
+    await saveDashboard({ id: 'dash-publico', name: 'X', domain: 'marketing', source: {}, colMap: {} });
+    const headers = f.calls[0].init.headers || {};
+    assert.equal(headers['x-dash-auth'], undefined, 'reconfigurar dashboard publico nao pode pedir nada');
+  } finally {
+    ss.restore();
+    f.restore();
+  }
+});
+
+test('CONTROLE: saveDashboard de dashboard NOVO (sem id) nao manda x-dash-auth', async () => {
+  const f = stubFetch(jsonResponse({ id: 'dash-novo-opaco', name: 'X' }));
+  const ss = stubSessionStorage({ 'dashauth:outro-id-qualquer': 'hash-de-outro-dashboard' });
+  try {
+    await saveDashboard({ name: 'X', domain: 'marketing', source: {}, colMap: {} });
+    const headers = f.calls[0].init.headers || {};
+    assert.equal(headers['x-dash-auth'], undefined, 'criacao nova nao tem id ainda: nada para mandar');
+  } finally {
+    ss.restore();
+    f.restore();
+  }
+});
+
+test('saveDashboard: 401 com needsPassword lanca Error com .needsPassword true', async () => {
+  const f = stubFetch(jsonResponse({ needsPassword: true, error: 'Dashboard protegido por senha.' }, 401));
+  const ss = stubSessionStorage();
+  try {
+    await assert.rejects(
+      () => saveDashboard({ id: 'dash-protegido', name: 'X', domain: 'marketing', source: {}, colMap: {} }),
+      (err) => {
+        assert.ok(err instanceof Error);
+        assert.equal(err.needsPassword, true);
+        return true;
+      },
+    );
+  } finally {
+    ss.restore();
+    f.restore();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// BECO SEM SAIDA (aula 24/08, bug 3): dashboard protegido nunca podia ser
+// excluido pela interface. O DELETE (index-page.js) tambem nao mandava
+// x-dash-auth, e o erro needsPassword nem chegava marcado no Error (a tela so
+// tinha o `alert()` generico). Mesmo fix de header aqui; a marcacao
+// .needsPassword e o que permite o index-page.js abrir o campo de senha em
+// vez do alerta sem saida.
+// ---------------------------------------------------------------------------
+
+test('deleteDashboard: dashboard protegido com hash guardado manda x-dash-auth no DELETE', async () => {
+  const f = stubFetch(jsonResponse({ ok: true }));
+  const ss = stubSessionStorage({ 'dashauth:dash-protegido': 'hash-do-dono' });
+  try {
+    await deleteDashboard('dash-protegido');
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls[0].init.method, 'DELETE');
+    const headers = f.calls[0].init.headers || {};
+    assert.equal(headers['x-dash-auth'], 'hash-do-dono');
+  } finally {
+    ss.restore();
+    f.restore();
+  }
+});
+
+test('CONTROLE: deleteDashboard de dashboard publico (sem hash guardado) nao manda x-dash-auth', async () => {
+  const f = stubFetch(jsonResponse({ ok: true }));
+  const ss = stubSessionStorage();
+  try {
+    await deleteDashboard('dash-publico');
+    const headers = f.calls[0].init.headers || {};
+    assert.equal(headers['x-dash-auth'], undefined, 'excluir dashboard publico continua sem pedir nada');
+  } finally {
+    ss.restore();
+    f.restore();
+  }
+});
+
+test('deleteDashboard: 401 com needsPassword lanca Error com .needsPassword true (nao fica so no alert)', async () => {
+  const f = stubFetch(jsonResponse({ needsPassword: true, error: 'Dashboard protegido por senha.' }, 401));
+  const ss = stubSessionStorage();
+  try {
+    await assert.rejects(
+      () => deleteDashboard('dash-protegido'),
+      (err) => {
+        assert.ok(err instanceof Error);
+        assert.equal(err.needsPassword, true);
+        return true;
+      },
+    );
   } finally {
     ss.restore();
     f.restore();

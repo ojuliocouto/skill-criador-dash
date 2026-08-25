@@ -453,6 +453,20 @@ async function create(kv, request, providedHash, env) {
     return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para sobrescrever.', needsPassword: true }, 401);
   }
 
+  // ACHADO durante a verificacao do bug 2 (aula 24/08): preserva a senha atual
+  // quando a edicao NAO mexeu nela. O wizard nunca reexibe a senha atual no
+  // campo (stripSecrets remove `auth` do GET, de proposito), entao um POST de
+  // edicao normal (so mudar o nome, por exemplo) chega SEM `config.auth`. Sem
+  // esta preservacao, gravar o `config` recebido tal como veio apagava o bloco
+  // `auth` do registro: o dashboard virava PUBLICO silenciosamente so por
+  // causa de uma edicao de nome, exatamente o vazamento que o id opaco e a
+  // senha existem pra evitar. So entra aqui quando o cliente NAO mandou auth
+  // nenhum nesta requisicao: mandar `auth` novo (definir ou TROCAR a senha)
+  // continua prevalecendo normalmente, sem passar por este ramo.
+  if (!config.auth && existente && needsAuth(existente)) {
+    config.auth = existente.auth;
+  }
+
   // SEGURANCA: nunca grava o hash cru que o cliente envia no header. Se a config
   // trouxe `auth.hash` (o sha256Hex que o header carrega), derivamos um bloco
   // salgado { salt, verifier, iterations } via PBKDF2 e guardamos SO ele. Assim um

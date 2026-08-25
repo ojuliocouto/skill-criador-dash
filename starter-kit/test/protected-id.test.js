@@ -413,3 +413,89 @@ test('dashboard sem senha com acento: slug legivel e sem acento (cobertura que s
   assert.equal((await readJSON(res)).id, 'cafe-da-manha');
   assert.ok(kv._map.has('dash:cafe-da-manha'));
 });
+
+// ---------------------------------------------------------------------------
+// ACHADO durante a verificacao do bug 2 (aula 24/08): depois de consertar o
+// 401 (o POST agora manda x-dash-auth certo), reconfigurar um dashboard
+// protegido de verdade pelo NAVEGADOR revelou que a senha SOME quando o campo
+// fica em branco. O wizard (config-wizard.js) NUNCA preenche o campo de senha
+// na edicao (por seguranca, a senha atual nunca volta do servidor: stripSecrets
+// remove `auth`), entao um POST de edicao normal (so mudar o nome, por
+// exemplo) chega com `config.auth` AUSENTE, nao com a senha antiga. O create()
+// gravava exatamente o `config` recebido: sem `auth` no payload, o JSON salvo
+// no KV tambem ficava sem `auth`, e o dashboard virava PUBLICO silenciosamente
+// so por causa de uma edicao de nome. Nao e um dos 3 bugs originais, mas e a
+// mesma familia (reconfigurar dashboard protegido) e o mesmo estrago (dado que
+// devia estar atras de senha passa a vazar pra qualquer um com o link).
+// FIX: create() preserva o `auth` existente quando o POST nao manda nenhum (e
+// so quando nao manda: se o cliente manda `auth` novo, seja pra TROCAR a senha
+// seja pra definir uma pela primeira vez, o valor novo continua prevalecendo).
+// ---------------------------------------------------------------------------
+
+test('ACHADO: reconfigurar um dashboard protegido SEM reenviar a senha (campo em branco no wizard) preserva a protecao', async () => {
+  const auth = await derivePasswordAuth(HASH_SENHA);
+  const id = 'dash-' + '1234567890abcdef'.repeat(2);
+  const antigo = makeConfig({ name: 'Sigiloso Cliente', id, auth, createdAt: '2026-01-01T00:00:00.000Z' });
+  const kv = fakeKV({ [`dash:${id}`]: JSON.stringify(antigo) });
+  // Payload REAL do wizard ao editar sem mexer na senha: nenhuma chave `auth`
+  // (nao e {hash: undefined}, e a chave simplesmente ausente, como onCreate()
+  // monta o objeto em config-wizard.js quando o campo de senha esta vazio).
+  const payloadSemAuth = makeConfig({ name: 'Sigiloso Cliente Renomeado', id });
+  assert.ok(!('auth' in payloadSemAuth), 'sanidade: o payload de teste tem que espelhar o wizard (sem a chave auth)');
+
+  const res = await dashboards(
+    ctx('POST', {
+      body: payloadSemAuth,
+      headers: adminHeaders({ 'x-dash-auth': HASH_SENHA }),
+      env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN },
+    })
+  );
+  assert.equal(res.status, 200);
+  const j = await readJSON(res);
+  assert.equal(j.id, id, 'o link nao pode mudar so por editar o nome');
+  assert.equal(j.protected, true, 'dashboard protegido nao pode virar publico so por editar o nome');
+
+  const gravado = JSON.parse(kv._map.get(`dash:${id}`));
+  assert.ok(gravado.auth && gravado.auth.verifier, 'o registro gravado no KV tem que manter o bloco auth (verifier) intacto');
+  assert.equal(gravado.auth.verifier, auth.verifier, 'a senha guardada nao pode mudar sozinha');
+});
+
+test('CONTROLE: reconfigurar dashboard protegido TROCANDO a senha ainda funciona (auth novo prevalece)', async () => {
+  const authAntigo = await derivePasswordAuth(HASH_SENHA);
+  const id = 'dash-' + 'fedcba9876543210'.repeat(2);
+  const antigo = makeConfig({ name: 'Sigiloso Cliente', id, auth: authAntigo, createdAt: '2026-01-01T00:00:00.000Z' });
+  const kv = fakeKV({ [`dash:${id}`]: JSON.stringify(antigo) });
+  const HASH_NOVA = 'b'.repeat(64);
+  const res = await dashboards(
+    ctx('POST', {
+      body: makeConfig({ name: 'Sigiloso Cliente', id, auth: { hash: HASH_NOVA } }),
+      headers: adminHeaders({ 'x-dash-auth': HASH_SENHA }),
+      env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN },
+    })
+  );
+  assert.equal(res.status, 200);
+  const gravado = JSON.parse(kv._map.get(`dash:${id}`));
+  assert.notEqual(gravado.auth.verifier, authAntigo.verifier, 'a senha nova tem que substituir a antiga quando o cliente manda auth explicito');
+});
+
+test('CONTROLE: dashboard PUBLICO editado sem auth continua publico (nada a preservar)', async () => {
+  const kv = fakeKV();
+  const criar = await dashboards(
+    ctx('POST', {
+      body: makeConfig({ name: 'Dashboard Aberto' }),
+      headers: adminHeaders(),
+      env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN },
+    })
+  );
+  const { id } = await readJSON(criar);
+  const editar = await dashboards(
+    ctx('POST', {
+      body: makeConfig({ name: 'Dashboard Aberto Renomeado', id }),
+      headers: adminHeaders(),
+      env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN },
+    })
+  );
+  assert.equal(editar.status, 200);
+  const j = await readJSON(editar);
+  assert.equal(j.protected, false, 'dashboard publico continua publico ao editar sem senha');
+});

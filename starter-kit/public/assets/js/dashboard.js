@@ -7,7 +7,7 @@
 
 import { getDashboard, fetchDataForSource, fetchD1, setDashboardAuth } from './lib/api-client.js';
 import { getTemplate } from './templates/index.js';
-import { computeAll } from './lib/metrics.js';
+import { computeAll, computeAllMapped } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
 import { sha256Hex } from './lib/auth.js';
 import { render as renderKpi } from './widgets/kpi.js';
@@ -115,10 +115,15 @@ export function resolveDateSlot(template) {
 /**
  * Monta o progresso da meta (meta vs realizado) para a metrica configurada.
  * config.goal = { metricKey, value }. Retorna { metricKey, pct, text } ou null.
+ * `mapped` (opcional, key->boolean vindo de computeAllMapped) evita montar a
+ * barra de progresso contra um valor que so e 0 por falta de coluna mapeada:
+ * chave ausente do mapa e tratada como mapeada (compatibilidade com chamadas
+ * antigas que nao passam `mapped`).
  */
-export function buildGoal(config, computed) {
+export function buildGoal(config, computed, mapped = {}) {
   const g = config && config.goal;
   if (!g || !g.metricKey) return null;
+  if (mapped[g.metricKey] === false) return null;
   const target = Number(g.value);
   if (!Number.isFinite(target) || target <= 0) return null;
   const val = computed[g.metricKey];
@@ -188,17 +193,30 @@ function findMetricDef(template, key) {
 }
 
 // Renderiza um bloco de kpis (.grid.kpis) a partir dos itens de layout.
-function renderKpiBlock(items, template, computed, trends = {}, goal = null) {
+// `mapped` (key->boolean, de computeAllMapped) diz se a metrica tem coluna/
+// dependencia mapeada: quando false, o card mostra "sem dado" (kpi.js resolve
+// o traco) em vez do valor calculado (que seria 0 so por falta de coluna, um
+// numero com cara de certo). Default {} preserva o comportamento antigo (tudo
+// mapeado) para quem ainda chama sem o 4o argumento.
+export function renderKpiBlock(items, template, computed, mapped = {}, trends = {}, goal = null) {
   const cards = items
     .map((item) => {
       const key = item.props && item.props.metricKey;
       const def = findMetricDef(template, key) || {};
       const label = def.label || key || '';
       const format = def.format || 'number';
+      const isMapped = mapped[key] !== false;
       const value = computed[key];
-      const goalForKpi = goal && goal.metricKey === key ? goal : undefined;
+      const goalForKpi = isMapped && goal && goal.metricKey === key ? goal : undefined;
       return renderKpi(
-        { label, format, hint: item.props && item.props.hint, trend: trends[key], goal: goalForKpi },
+        {
+          label,
+          format,
+          hint: item.props && item.props.hint,
+          trend: isMapped ? trends[key] : undefined,
+          goal: goalForKpi,
+          unmapped: !isMapped,
+        },
         value,
       );
     })
@@ -260,7 +278,7 @@ function buildBodyHtml(ctx) {
   for (const block of blocks) {
     if (block.type === 'kpis') {
       flush();
-      parts.push(`<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.trends, ctx.goal)}</section>`);
+      parts.push(`<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.mapped, ctx.trends, ctx.goal)}</section>`);
       continue;
     }
     const html = renderSingle(block.item, ctx);
@@ -358,13 +376,13 @@ function renderBody(baseCtx, state) {
   if (!bodyEl) return;
 
   const rows = applyFilters(dataset.rows, colMap, template, state);
-  const computed = computeAll(template.metrics, rows, colMap);
+  const { computed, mapped } = computeAllMapped(template.metrics, rows, colMap);
   const dateSlot = resolveDateSlot(template);
   const { current, previous } = splitByPeriod(rows, colMap, dateSlot);
   const trends = buildTrends(template.metrics, current, previous, colMap);
-  const goal = buildGoal(config, computed);
+  const goal = buildGoal(config, computed, mapped);
   const ds = { columns: dataset.columns, rows, meta: dataset.meta };
-  const ctx = { config, template, dataset: ds, colMap, computed, trends, goal };
+  const ctx = { config, template, dataset: ds, colMap, computed, mapped, trends, goal };
 
   bodyEl.innerHTML = buildBodyHtml(ctx) || '<div class="empty-state"><p>Nenhum dado para os filtros selecionados.</p></div>';
   if (metaEl) metaEl.textContent = buildMetaText(ds);

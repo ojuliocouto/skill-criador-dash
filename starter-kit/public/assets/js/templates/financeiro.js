@@ -37,8 +37,13 @@ export const template = {
     // ranking de saídas lista as categorias de receita zeradas e o de entradas
     // lista as de despesa zeradas, enchendo a tela de barra vazia. O flag manda
     // o widget descartar a linha cujo valor agregado deu zero.
-    { widget: 'ranking', col: 4, props: { dimensionSlot: 'categoria', valueSlot: 'saida', title: 'Saídas por categoria', hideZeros: true } },
-    { widget: 'ranking', col: 12, props: { dimensionSlot: 'categoria', valueSlot: 'entrada', title: 'Entradas por categoria', hideZeros: true } },
+    // format: 'currency' explicito: o registry herda formato da MetricDef que
+    // casa por KEY com o valueSlot, mas as chaves aqui sao 'saidas'/'entradas'
+    // (plural) e os slots 'saida'/'entrada' (singular) nunca casam. Sem isso o
+    // ranking caia no formato 'number' padrao, sem "R$" e com casa decimal
+    // cortada (ex "9.640,2" em vez de "R$ 9.640,20").
+    { widget: 'ranking', col: 4, props: { dimensionSlot: 'categoria', valueSlot: 'saida', title: 'Saídas por categoria', hideZeros: true, format: 'currency' } },
+    { widget: 'ranking', col: 12, props: { dimensionSlot: 'categoria', valueSlot: 'entrada', title: 'Entradas por categoria', hideZeros: true, format: 'currency' } },
     { widget: 'table', col: 12, props: {} },
   ],
 };

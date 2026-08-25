@@ -146,6 +146,15 @@ export async function authOk(config, providedHash) {
 const ADMIN_NOT_CONFIGURED_MSG =
   'ADMIN_TOKEN nao configurado no servidor. Defina o secret com: wrangler pages secret put ADMIN_TOKEN --project-name=<seu-projeto>. Sem ele, criar/gerenciar dashboards fica bloqueado (fail-closed).';
 
+// Mensagem do 401 needsAdmin (servidor JA tem ADMIN_TOKEN, falta o header certo).
+// Achado da auditoria pre-aula: o quickstart manda o aluno criar o .dev.vars com
+// ADMIN_TOKEN, mas ninguem avisa que o WIZARD vai PEDIR esse mesmo valor de volta
+// na tela (passo de salvar o dashboard). Sem essa ponte explicita, quem chega
+// nessa tela nao sabe o que colar. A mensagem agora diz exatamente onde achar o
+// valor, tanto local quanto em producao.
+const ADMIN_TOKEN_HINT =
+  'É o valor que você colocou em ADMIN_TOKEN no arquivo .dev.vars (ambiente local) ou no secret do projeto (produção).';
+
 /**
  * Trava global de mutacao, modelo FAIL-CLOSED. Chamada SO nas mutacoes (POST/DELETE
  * de dashboards e POST de preview do Meta); NUNCA na leitura (GET), que segue publica.
@@ -177,7 +186,10 @@ export function checkAdminToken(env, request) {
   const provided = request.headers.get('x-admin-token') || '';
   if (safeEqual(provided, adminToken)) return null;
   return new Response(
-    JSON.stringify({ error: 'Token de administrador necessário ou incorreto.', needsAdmin: true }),
+    JSON.stringify({
+      error: `Token de administrador necessário ou incorreto. ${ADMIN_TOKEN_HINT}`,
+      needsAdmin: true,
+    }),
     { status: 401, headers: { 'content-type': 'application/json' } }
   );
 }

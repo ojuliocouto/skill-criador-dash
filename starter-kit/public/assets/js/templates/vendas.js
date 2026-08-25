@@ -70,8 +70,12 @@ export const template = {
       { label: 'Negócios', metricKey: 'num_vendas' },
       { label: 'Ganhas', metricKey: 'vendas_ganhas' },
     ] } },
-    { widget: 'ranking', col: 6, props: { dimensionSlot: 'vendedor', valueSlot: 'valor', title: 'Ranking por vendedor' } },
-    { widget: 'ranking', col: 6, props: { dimensionSlot: 'produto', valueSlot: 'valor', title: 'Ranking por produto' } },
+    // format: 'currency' explicito porque nenhuma MetricDef daqui tem key
+    // 'valor' (o registry so herda formato da MetricDef que casa por KEY com o
+    // valueSlot; sem essa declaracao o ranking caia no formato 'number' padrao
+    // e mostrava o valor sem "R$" e com casa decimal cortada, ex "9.640,2").
+    { widget: 'ranking', col: 6, props: { dimensionSlot: 'vendedor', valueSlot: 'valor', title: 'Ranking por vendedor', format: 'currency' } },
+    { widget: 'ranking', col: 6, props: { dimensionSlot: 'produto', valueSlot: 'valor', title: 'Ranking por produto', format: 'currency' } },
     { widget: 'table', col: 12, props: {} },
   ],
 };

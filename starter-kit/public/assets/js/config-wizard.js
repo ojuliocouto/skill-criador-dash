@@ -40,6 +40,28 @@ export function validateRequired(slots, colMap) {
 }
 
 // ---------------------------------------------------------------------------
+// REGRESSAO (aula 24/08): trocar de dominio no passo 1 depois de ja ter
+// mapeado colunas virava 400 ao salvar. O passo 1 so fazia `state.domain = id`
+// e NUNCA limpava o colMap antigo; o passo 3 so roda autoMap quando o colMap
+// esta VAZIO, entao as chaves do dominio anterior sobreviviam e o select do
+// dominio novo ia so ACRESCENTANDO chaves por cima. O POST final saia com uma
+// mistura de chaves dos dois dominios, e o gate do servidor (functions/lib/
+// colmap-shape.mjs) rejeita CORRETAMENTE qualquer chave que nao seja slot do
+// dominio novo (o gate esta certo; quem errava era o wizard mandando slot
+// errado). Pura e exportada para ser testavel sem DOM (mesmo padrao de
+// validateRequired/prefillStateFromConfig acima).
+// @param {string|null|undefined} domainAtual  dominio antes da troca (state.domain)
+// @param {string} domainNovo  dominio escolhido agora
+// @param {object|null|undefined} colMapAtual  colMap antes da troca
+// @returns {object} colMap a usar depois da troca: intacto se o dominio nao
+//   mudou (fluxo normal), vazio se mudou (o passo 3 remapeia via autoMap).
+// ---------------------------------------------------------------------------
+export function colMapAoTrocarDominio(domainAtual, domainNovo, colMapAtual) {
+  if (domainAtual === domainNovo) return colMapAtual || {};
+  return {};
+}
+
+// ---------------------------------------------------------------------------
 // Estado em memória.
 // ---------------------------------------------------------------------------
 
@@ -172,7 +194,7 @@ function pedirAdminToken(feedback, retry) {
   const salvarBtn = el('button', { class: 'btn', type: 'button', text: 'Continuar com token' });
   const box = el('div', { class: 'card' }, [
     el('h3', { text: 'Este ambiente exige um token de administrador' }),
-    el('p', { class: 'hint', text: 'Esta operacao esta protegida por um token. Cole o token de administrador para continuar.' }),
+    el('p', { class: 'hint', text: 'Cole o valor que voce definiu em ADMIN_TOKEN. Rodando local, e a linha ADMIN_TOKEN=... do arquivo .dev.vars. Em producao, e o secret ADMIN_TOKEN do projeto.' }),
     el('label', { class: 'field' }, [
       el('span', { class: 'lbl', text: 'Token de administrador' }),
       tokenInput,
@@ -190,6 +212,47 @@ function pedirAdminToken(feedback, retry) {
   salvarBtn.addEventListener('click', reenviar);
   tokenInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') reenviar(); });
   tokenInput.focus();
+}
+
+/**
+ * REGRESSAO (bug 2), caso defensivo: o servidor recusou a mutacao com 401
+ * needsPassword mesmo depois do fluxo normal (renderPedidoSenhaEdicao) ja ter
+ * pedido a senha pra ENTRAR na edicao. So acontece se a sessao perdeu o hash
+ * guardado entre carregar e salvar (ex: sessionStorage limpo, aba duplicada).
+ * Mesmo modelo do pedirAdminToken: pede a senha, guarda com setDashboardAuth
+ * (o mesmo formato sha256Hex que o resto do wizard usa) e re-tenta a MESMA
+ * operacao, que a partir dai ja mandara o header x-dash-auth correto
+ * (api-client.js resolve o header sozinho a partir do que fica guardado).
+ * @param {HTMLElement} feedback  container onde o prompt é renderizado
+ * @param {string} id  id do dashboard protegido sendo salvo
+ * @param {() => (void|Promise<void>)} retry  operação a re-tentar após digitar a senha
+ */
+function pedirSenhaDashboard(feedback, id, retry) {
+  const senhaInput = el('input', {
+    class: 'input', id: 'dashAuthRetry', type: 'password',
+    placeholder: 'Senha do dashboard', autocomplete: 'off',
+  });
+  const salvarBtn = el('button', { class: 'btn', type: 'button', text: 'Continuar com a senha' });
+  const box = el('div', { class: 'card' }, [
+    el('h3', { text: 'Este dashboard é protegido por senha' }),
+    el('p', { class: 'hint', text: 'A sessão perdeu a senha guardada. Digite a senha atual para confirmar a alteração.' }),
+    el('label', { class: 'field' }, [
+      el('span', { class: 'lbl', text: 'Senha do dashboard' }),
+      senhaInput,
+    ]),
+    salvarBtn,
+  ]);
+  box.style.marginTop = '16px';
+  feedback.appendChild(box);
+  const reenviar = async () => {
+    const pw = senhaInput.value;
+    if (!pw) { senhaInput.focus(); return; }
+    setDashboardAuth(id, await sha256Hex(pw));
+    retry();
+  };
+  salvarBtn.addEventListener('click', reenviar);
+  senhaInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') reenviar(); });
+  senhaInput.focus();
 }
 
 /**
@@ -276,6 +339,11 @@ function renderDomain(body) {
       el('p', { text: DOMAIN_DESC[id] || '' }),
     ]);
     const pick = () => {
+      // Limpa o colMap antigo SO quando o dominio realmente muda (calcula com o
+      // domainAtual ANTES de reatribuir state.domain, senao a comparacao nunca
+      // detecta troca nenhuma). Mesmo dominio (fluxo normal, ex: reconfigurar
+      // sem mudar nada) preserva o colMap intacto.
+      state.colMap = colMapAoTrocarDominio(state.domain, id, state.colMap);
       state.domain = id;
       goTo(2);
     };
@@ -801,6 +869,14 @@ function renderFinish(body) {
         // Mesmo fluxo compartilhado do card Meta: pede o token e re-tenta o save.
         createBtn.disabled = false;
         pedirAdminToken(feedback, () => tentarSalvar(config));
+        return;
+      }
+      if (e && e.needsPassword) {
+        // REGRESSAO (bug 2), caso defensivo: sessao perdeu o hash da senha do
+        // dashboard entre carregar e salvar. Pede a senha (mesmo modelo do
+        // needsAdmin acima) e re-tenta o MESMO save.
+        createBtn.disabled = false;
+        pedirSenhaDashboard(feedback, state.id, () => tentarSalvar(config));
         return;
       }
       feedback.appendChild(errorBox(e && e.message ? e.message : 'Não foi possível salvar o dashboard.'));

@@ -84,31 +84,53 @@ async function mutationOrThrow(res) {
     e.needsAdmin = true;
     throw e;
   }
+  // REGRESSAO (aula 24/08, bugs 2 e 3): reconfigurar ou excluir um dashboard
+  // protegido por senha devolvia 401 needsPassword, mas o Error lancado aqui
+  // nao carregava a marca .needsPassword (so getDashboard, a leitura, tratava
+  // esse caso). Sem a marca, quem chama (config-wizard.js, index-page.js) nao
+  // tinha como diferenciar "senha errada/faltando" de qualquer outro erro, e
+  // so sobrava mostrar a mensagem crua (ou um alert sem saida nenhuma).
+  if (res.status === 401 && data && data.needsPassword) {
+    const e = new Error(data.error || 'Senha necessária ou incorreta.');
+    e.needsPassword = true;
+    throw e;
+  }
   if (!res.ok) throw new Error((data && (data.error || data.message)) || `Erro ${res.status}`);
   return data;
 }
 
+// Header de senha (se houver) para os endpoints de DADOS por id (D1, Meta) e
+// para as mutacoes (POST/DELETE) de um dashboard que ja existe e e protegido.
+// Mesma chave de sessao que getDashboard/setDashboardAuth usam (AUTH_KEY).
+function authHeader(id) {
+  if (!id) return {};
+  try {
+    const h = sessionStorage.getItem(AUTH_KEY(id));
+    if (h) return { 'x-dash-auth': h };
+  } catch { /* ignora */ }
+  return {};
+}
+
 export async function saveDashboard(config) {
+  // REGRESSAO (bug 2): reconfigurar um dashboard COM SENHA (so mudar o nome,
+  // por exemplo) devolvia 401 SEMPRE, porque o POST nunca mandava o header
+  // x-dash-auth que o servidor exige pra sobrescrever um dashboard protegido
+  // (a leitura, getDashboard, ja manda; a escrita nunca mandou). `config.id`
+  // so vem preenchido quando o wizard esta EDITANDO um dashboard existente
+  // (ver onCreate em config-wizard.js); dashboard novo nao tem id ainda, entao
+  // nao ha hash guardado pra mandar (e nao muda nada nesse caso).
+  const id = config && config.id ? String(config.id) : null;
   return mutationOrThrow(await fetch('/api/dashboards', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...adminHeader() },
+    headers: { 'content-type': 'application/json', ...adminHeader(), ...authHeader(id) },
     body: JSON.stringify(config),
   }));
 }
 export async function deleteDashboard(id) {
   return mutationOrThrow(await fetch(`/api/dashboards?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: { ...adminHeader() },
+    headers: { ...adminHeader(), ...authHeader(id) },
   }));
-}
-
-// Header de senha (se houver) para os endpoints de DADOS por id (D1, Meta).
-function authHeader(id) {
-  try {
-    const h = sessionStorage.getItem(AUTH_KEY(id));
-    if (h) return { 'x-dash-auth': h };
-  } catch { /* ignora */ }
-  return {};
 }
 
 // ---- Conectores (fontes de dados) -> devolvem DataSet {columns, rows, meta} ----

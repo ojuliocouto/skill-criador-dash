@@ -34,9 +34,14 @@ export const template = {
     { widget: 'kpi', props: { metricKey: 'skus' } },
     { widget: 'kpi', props: { metricKey: 'giro' } },
     { widget: 'timeseries', col: 8, props: { dateSlot: 'data', valueSlot: 'valor', title: 'Faturamento no tempo' } },
-    { widget: 'ranking', col: 4, props: { dimensionSlot: 'categoria', valueSlot: 'valor', title: 'Faturamento por categoria' } },
+    // format: 'currency' explicito nos dois rankings de 'valor' (dinheiro): a
+    // MetricDef que soma essa coluna tem key 'receita', que nunca casa por KEY
+    // com o slot 'valor', entao o registry caia no formato 'number' padrao (sem
+    // "R$" e com casa decimal cortada). 'Mais vendidos (qtd)' e quantidade, nao
+    // dinheiro, entao fica sem format (numero simples e o certo ali).
+    { widget: 'ranking', col: 4, props: { dimensionSlot: 'categoria', valueSlot: 'valor', title: 'Faturamento por categoria', format: 'currency' } },
     { widget: 'ranking', col: 6, props: { dimensionSlot: 'produto', valueSlot: 'quantidade', title: 'Mais vendidos (qtd)' } },
-    { widget: 'ranking', col: 6, props: { dimensionSlot: 'produto', valueSlot: 'valor', title: 'Top produtos por faturamento' } },
+    { widget: 'ranking', col: 6, props: { dimensionSlot: 'produto', valueSlot: 'valor', title: 'Top produtos por faturamento', format: 'currency' } },
     { widget: 'table', col: 12, props: {} },
   ],
 };

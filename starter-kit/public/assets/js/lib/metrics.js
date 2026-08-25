@@ -135,6 +135,71 @@ export function computeAll(defs, rows, colMap) {
   return computed;
 }
 
+// Indica se um SLOT semantico tem coluna resolvida (mapeada no colMap ou coluna
+// direta com esse nome no dataset). Reexpoe resolveColumn como um booleano, pra
+// quem so precisa saber "tem dado por tras ou nao" sem repetir a logica de
+// resolucao (colMap -> nome direto -> ausente).
+export function isSlotMapped(slot, colMap, rows) {
+  return resolveColumn(slot, colMap, rows) != null;
+}
+
+/**
+ * Indica se o VALOR computado de uma metrica reflete dado real ou e um "zero de
+ * ausencia de coluna" (a metrica caiu no fallback de sum/avg/count/ratio porque
+ * o slot nao esta mapeado, nao porque a soma deu zero de verdade). So sabemos
+ * responder com seguranca para:
+ *   - sum/avg/count/countDistinct: dependem de UM slot (def.column).
+ *   - ratio: depende de DUAS outras metricas (def.ratioOf); confia no `mappedByKey`
+ *     ja resolvido para essas chaves (computeAllMapped preenche na MESMA ordem de
+ *     computeAll, entao a metrica base sempre roda antes da ratio que a usa).
+ * Para 'derived' nao da pra inferir a dependencia so pela definicao (o compute()
+ * e uma funcao arbitraria, e algumas ja tem fallback proprio deliberado, como
+ * vendas_ganhas assumindo "todas ganhas" quando falta a coluna de status) -
+ * fica MAPEADA por padrao, preservando o comportamento historico.
+ * @param {MetricDef} def
+ * @param {Object} colMap
+ * @param {Object[]} rows
+ * @param {Object<string,boolean>} [mappedByKey]  mapa key->mapped ja resolvido
+ * @returns {boolean}
+ */
+export function isMetricMapped(def, colMap, rows, mappedByKey = {}) {
+  if (!def) return true;
+  switch (def.agg) {
+    case 'sum':
+    case 'avg':
+    case 'count':
+    case 'countDistinct':
+      return isSlotMapped(def.column, colMap, rows);
+    case 'ratio': {
+      const [numKey, denKey] = def.ratioOf || [];
+      // Chave ausente do mapa (nunca calculada) e tratada como mapeada: espelha
+      // o fallback de computeMetric('ratio'), que usa 0 pra chave inexistente.
+      const numMapped = mappedByKey[numKey] !== false;
+      const denMapped = mappedByKey[denKey] !== false;
+      return numMapped && denMapped;
+    }
+    default:
+      return true;
+  }
+}
+
+/**
+ * Como computeAll, mas tambem devolve `mapped`: key -> boolean indicando se a
+ * metrica tem coluna/dependencia mapeada (false = "sem dado", diferente de um
+ * zero calculado de verdade). Usado pelo KPI pra decidir entre mostrar o numero
+ * ou um traco de "sem dado".
+ * @returns {{computed:Object<string,number>, mapped:Object<string,boolean>}}
+ */
+export function computeAllMapped(defs, rows, colMap) {
+  const computed = {};
+  const mapped = {};
+  for (const def of (defs || [])) {
+    computed[def.key] = computeMetric(def, rows, colMap, computed);
+    mapped[def.key] = isMetricMapped(def, colMap, rows, mapped);
+  }
+  return { computed, mapped };
+}
+
 // Agrega um array de números conforme o agg pedido.
 function aggregate(values, agg) {
   if (agg === 'count') return values.length;

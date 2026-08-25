@@ -107,31 +107,60 @@ export const registry = {
   funnel: {
     render: renderFunnel,
     toHtml(item, ctx) {
-      const { dataset, colMap, computed, card } = ctx;
+      const { dataset, colMap, computed, template, findMetricDef, card } = ctx;
       const props = (item && item.props) || {};
       // Funil generico: props.steps = [{ label, metricKey }] ou [{ label, valueSlot }].
       // Cada etapa vira { label, value }, puxando de computed (metricKey) ou
       // somando o valueSlot via groupBy total. Sem dados o widget trata vazio.
+      //
+      // BUG REAL (achado 1b): uma etapa cujo SLOT nao esta mapeado (ex: "Leads"
+      // sem coluna) sempre calcula valor 0 (fallback de agregacao). Antes, so a
+      // ponta do funil era aparada quando dava zero; uma etapa zerada no MEIO
+      // (nao mapeada) ficava como uma barra 0%, e a etapa SEGUINTE comparava
+      // contra esse zero falso e saia marcada como 0% mesmo tendo volume real
+      // (ex: "926 conversoes" aparecendo como 0,00%). Agora a etapa sem slot
+      // mapeado e DESCARTADA (nao vira barra), entao a conversao da etapa
+      // seguinte compara com a etapa anterior de verdade.
       const defs = Array.isArray(props.steps) ? props.steps : [];
-      const steps = defs.map((s) => {
-        let value = 0;
-        if (s.metricKey != null && computed[s.metricKey] != null) {
-          value = Number(computed[s.metricKey]) || 0;
-        } else if (s.valueSlot != null) {
-          // Etapa de funil e sempre VOLUME TOTAL da coluna (nao deriva da
-          // MetricDef): um funil conta quanto passou por cada etapa, entao 'sum'
-          // e o unico agg coerente aqui. Aplicar 'avg' por bucket somaria medias,
-          // o que nao faz sentido para uma etapa de funil.
-          const rows = groupBy(dataset.rows, colMap, s.valueSlot, s.valueSlot, 'sum');
-          value = rows.reduce((a, b) => a + (Number(b.value) || 0), 0);
+      const stepSlotMapped = (s) => {
+        // valueSlot: o proprio slot precisa estar no colMap.
+        if (s.valueSlot != null) return !!(colMap && colMap[s.valueSlot]);
+        // metricKey: so sabemos o slot por tras quando a MetricDef agrega UMA
+        // coluna direta (sum/avg/count/countDistinct: def.column E o slot).
+        // ratio/derived podem ter fallback proprio (ex: vendas_ganhas assume
+        // "todas ganhas" sem status mapeado) e continuam confiando no valor
+        // computado, como antes.
+        if (s.metricKey != null && template && typeof findMetricDef === 'function') {
+          const def = findMetricDef(template, s.metricKey);
+          if (def && ['sum', 'avg', 'count', 'countDistinct'].includes(def.agg)) {
+            return !!(colMap && colMap[def.column]);
+          }
         }
-        return { label: s.label || s.metricKey || s.valueSlot || '', value };
-      });
-      // Apara etapas do TOPO com valor zero (ex: impressoes nao mapeada), pra o
-      // funil comecar na primeira etapa com dado, em vez de uma barra vazia.
+        return true;
+      };
+      const steps = defs
+        .filter(stepSlotMapped)
+        .map((s) => {
+          let value = 0;
+          if (s.metricKey != null && computed[s.metricKey] != null) {
+            value = Number(computed[s.metricKey]) || 0;
+          } else if (s.valueSlot != null) {
+            // Etapa de funil e sempre VOLUME TOTAL da coluna (nao deriva da
+            // MetricDef): um funil conta quanto passou por cada etapa, entao 'sum'
+            // e o unico agg coerente aqui. Aplicar 'avg' por bucket somaria medias,
+            // o que nao faz sentido para uma etapa de funil.
+            const rows = groupBy(dataset.rows, colMap, s.valueSlot, s.valueSlot, 'sum');
+            value = rows.reduce((a, b) => a + (Number(b.value) || 0), 0);
+          }
+          return { label: s.label || s.metricKey || s.valueSlot || '', value };
+        });
+      // Apara etapas do TOPO com valor zero DE VERDADE (coluna mapeada, soma deu
+      // 0), pra o funil comecar na primeira etapa com dado, em vez de uma barra
+      // vazia. Etapas nao mapeadas ja foram descartadas acima, entao esse zero
+      // aqui e sempre "mapeado e zerado", nunca "sem coluna".
       while (steps.length && Number(steps[0].value) === 0) steps.shift();
-      // Se nenhuma etapa tem valor (colunas nao mapeadas), pula o funil.
-      if (!steps.some((s) => Number(s.value) > 0)) return '';
+      // Sem nenhuma etapa restante (todas descartadas ou zeradas), pula o funil.
+      if (!steps.length) return '';
       const title = props.title || 'Funil';
       return card(title, renderFunnel({ title: '' }, steps));
     },

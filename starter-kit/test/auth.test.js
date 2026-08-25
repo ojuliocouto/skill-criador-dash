@@ -68,6 +68,17 @@ test('checkAdminToken: ADMIN_TOKEN setado + header ausente/errado -> 401 needsAd
   assert.equal(errado.body.needsAdmin, true);
 });
 
+// Achado 3 (auditoria pre-aula): o quickstart manda criar .dev.vars com
+// ADMIN_TOKEN, mas nao avisa que o wizard PEDE esse mesmo valor de volta na
+// tela (passo de salvar). A mensagem do 401 precisa dizer explicitamente onde
+// achar o valor, senao quem chega nessa tela nao sabe o que colar.
+test('checkAdminToken: 401 needsAdmin explica ONDE achar o valor (.dev.vars local / secret em producao)', async () => {
+  const { body } = await statusEBody(checkAdminToken({ ADMIN_TOKEN: 'segredo' }, reqComToken(null)));
+  assert.match(body.error, /\.dev\.vars/, 'menciona o arquivo .dev.vars (ambiente local)');
+  assert.match(body.error, /secret/i, 'menciona o secret do projeto (producao)');
+  assert.match(body.error, /ADMIN_TOKEN/, 'menciona o nome exato da variavel');
+});
+
 test('sha256Hex: vetor conhecido e determinismo', async () => {
   assert.equal(await sha256Hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   assert.equal(await sha256Hex('senha123'), await sha256Hex('senha123'));
