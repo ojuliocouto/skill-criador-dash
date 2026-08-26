@@ -39,6 +39,7 @@ tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pa
 Documentação de apoio (leia o arquivo certo na hora certa, não tudo de uma vez):
 - `references/infra.md`: comandos completos de provisionamento (KV, Pages, ADMIN_TOKEN, domínio, D1 + cron).
 - `references/seguranca.md`: modelo de acesso fail-closed, senha por dashboard, validação da fonte.
+- `references/direcao-de-arte.md`: as TRÊS fases do diretor de arte (concepção, construção, passe final), com o norte Linear/Vercel/Stripe.
 - `references/recursos.md`: filtros, grid 2D, grupos com abas, tema, estética anti-IA, OpenGraph, árvore de arquivos.
 - `references/extensao.md`: adicionar domínio, conector ou widget novo.
 - `starter-kit/ARCHITECTURE.md`: os 7 contratos das camadas (fonte da verdade do código).
@@ -141,6 +142,31 @@ que não é o Node, o wrangler nem o wizard, é a parte de provisionamento real.
 - Onde os dados vivem: planilha, CRM, Meta Ads, WhatsApp, sistema com API etc.
 - O que ela precisa DECIDIR olhando o dashboard (isso define quais métricas importam).
 
+### 2.5 DIREÇÃO DO PAINEL (antes de montar qualquer widget)
+
+O painel nasce feio quando ninguém decidiu o que ele responde. Esta é a fase de concepção do
+diretor de arte, e ela vem ANTES de escolher widget, cor ou layout.
+
+Leia `references/direcao-de-arte.md` (norte: Linear, Vercel e Stripe) e feche por escrito, com
+a pessoa, seis decisões:
+
+1. **Número herói**: se ela só pudesse ver UM número por dia, qual seria? Vira o
+   `primaryMetric` do template, e o layout transforma isso no card maior, com sparkline.
+2. **A pergunta do painel**: que decisão ela toma olhando isso? "Aumento a verba do Instagram?"
+   é pergunta. "Acompanhar o marketing" não é, e painel sem pergunta vira lista de números.
+3. **O que NÃO entra**: métrica que ninguém usa pra decidir rouba espaço da que importa.
+4. **Accent da marca**: a cor real do negócio dela. O roxo padrão é só pra quem não tem marca.
+5. **Densidade**: acompanhamento diário (denso) ou leitura semanal (menos widgets, mais respiro)?
+6. **Tema**: claro, escuro ou os dois. Se os dois, os dois são conferidos no gate.
+
+Com as respostas na mão, rode a skill **`frontend-design`**: ela fecha a direção estética.
+Registre o uso (`uso-ferramentas.py registrar "skill frontend-design" ...`, ver 6.1).
+
+**>>> GATE 2.5: as seis decisões estão escritas? Se NÃO, PARA AQUI. Montar widget sem direção
+é como escrever código sem briefing: sai alguma coisa, e ninguém sabe se é a certa. <<<**
+
+---
+
 ### 3. Escolher o modo de dados
 Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados"):
 - AO VIVO: lê a fonte na hora, só KV pra config, setup mínimo. Bom pra maioria.
@@ -161,9 +187,36 @@ BLOQUEANTE: rode `python3 scripts/preflight.py --starter-kit starter-kit` antes 
 - Mapeie colunas (auto-mapeamento pré-preenche), defina branding (cor), meta opcional e senha opcional.
 - No modo ao vivo a fonte fica na config; no histórico ela alimenta o cron e o dashboard lê o D1.
 
+
+**5.1 GATE DO PRIMEIRO RENDER (o diretor de arte durante a construção).**
+
+Monte a faixa de KPI e o PRIMEIRO widget. Pare. Renderize. Olhe. Só então monte o resto.
+
+```bash
+node scripts/prova-dash.js "<URL-local-ou-publicada>" --out prova-parcial
+```
+
+É o único momento em que corrigir é barato: a faixa define densidade, escala e ritmo, e todos
+os outros widgets copiam esse padrão. A tabela de conferência (hierarquia, grid, cor, números,
+densidade, estado vazio) está em `references/direcao-de-arte.md`, Fase 2.
+
+Use a **`magic` (21st.dev)** para os componentes de interface (card, tabela, filtro, aba) em vez
+de montar à mão, e a **`animate`** para microinteração DEPOIS que o layout estiver resolvido:
+movimento antes disso mascara layout ruim. Registre os dois usos (6.1).
+
+**>>> GATE 5.1: o primeiro render corresponde à direção do 2.5? Se NÃO, corrija AGORA, antes de
+montar o resto. Replicar padrão errado é o jeito mais caro de errar. <<<**
+
+
 ### 6. Deploy e verificação
 - Publique na conta DA PESSOA (`wrangler pages deploy public --project-name=<NOME>`).
 - Modo histórico: deploy do Worker cron e força uma primeira captura (`references/infra.md`).
+- **PASSE DE GOSTO (antes de dizer pronto).** Rode a skill **`design-taste-frontend`** sobre o
+  painel publicado, nos DOIS temas: é o gate anti-slop, e procura os tells de interface gerada
+  por IA (card tingido, barrinha colorida no topo do widget, gradiente atrás de número, ícone
+  colorido por métrica, sombra difusa sem hairline, "Sem dados" como único estado vazio). Depois
+  dela, a **`high-end-visual-design`** para o acabamento. Lista completa em
+  `references/direcao-de-arte.md`, Fase 3. Registre os usos (6.1).
 - **GATE de tela (bloqueia a entrega).** Rode contra o dashboard PUBLICADO, não contra o local:
 ```
 node scripts/prova-dash.js "<URL-DO-DASHBOARD>" [--senha <SENHA>]

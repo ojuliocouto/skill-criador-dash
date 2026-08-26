@@ -7,7 +7,7 @@
 // texto generico), igual a listagem publica.
 
 const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
-const DEFAULT_ACCENT = '#6d28d9';
+const DEFAULT_ACCENT = '#5b62d6'; // paridade com public/assets/js/lib/color.js (accent-parity.test.js)
 const SITE = 'Criador Dash';
 
 const DOMAIN_LABELS = { marketing: 'Marketing', vendas: 'Vendas', suporte: 'Suporte', financeiro: 'Financeiro', estoque: 'Estoque' };

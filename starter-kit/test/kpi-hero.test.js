@@ -206,3 +206,38 @@ test('kpi: variação neutra não pinta de verde nem de vermelho', () => {
   assert.ok(html.includes('is-neutral'), 'classe neutra presente');
   assert.ok(!html.includes('is-good') && !html.includes('is-bad'), 'sem cor de julgamento');
 });
+
+// ---------- gráfico largo não pode ficar apertado no meio ----------
+// O SVG tinha viewBox fixo 600x240 e escala uniforme (xMidYMid meet), decisão certa para não
+// deformar a curva. Só que num card de largura total ele centraliza e sobra vazio dos dois
+// lados: o gráfico ficava do tamanho de sempre no meio de um card de 1400px. A proporção passa
+// a acompanhar a largura da célula, sem mexer no preserveAspectRatio.
+import { render as renderTs } from '../public/assets/js/widgets/timeseries.js';
+
+const PONTOS = [
+  { date: '2026-07-01', value: 10 },
+  { date: '2026-07-02', value: 22 },
+  { date: '2026-07-03', value: 17 },
+];
+const viewBoxDe = (html) => (html.match(/viewBox="0 0 (\d+) (\d+)"/) || []).slice(1).map(Number);
+
+test('timeseries: célula larga (col 12) usa viewBox mais largo', () => {
+  const [w12, h12] = viewBoxDe(renderTs({ title: 'X', col: 12 }, PONTOS));
+  const [w6] = viewBoxDe(renderTs({ title: 'X', col: 6 }, PONTOS));
+  assert.ok(w12 > w6, `col 12 (${w12}) precisa ser mais largo que col 6 (${w6})`);
+  assert.ok(w12 / h12 > 3, 'card largo pede proporção panorâmica');
+});
+
+test('timeseries: sem col, mantém o comportamento antigo (não quebra template custom)', () => {
+  const [w, h] = viewBoxDe(renderTs({ title: 'X' }, PONTOS));
+  assert.equal(w, 600);
+  assert.equal(h, 240);
+});
+
+test('timeseries: col fora da faixa não gera viewBox absurdo', () => {
+  for (const col of [0, -5, 99, 'abc', null]) {
+    const [w, h] = viewBoxDe(renderTs({ title: 'X', col }, PONTOS));
+    assert.ok(w >= 600 && w <= 1400, `col ${col} gerou largura ${w}`);
+    assert.equal(h, 240, 'altura é sempre a mesma');
+  }
+});

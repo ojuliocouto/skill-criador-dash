@@ -75,7 +75,8 @@ export const registry = {
       const agg = bucketAggFor(template, findMetricDef, props.valueSlot);
       const points = timeSeries(dataset.rows, colMap, props.dateSlot, props.valueSlot, agg);
       const title = props.title || 'Evolução no tempo';
-      return card(null, renderTimeseries({ title }, points), 'chart');
+      // repassa o span da celula: a proporcao do grafico depende da largura que ele vai ocupar
+      return card(null, renderTimeseries({ title, col: item && item.col }, points), 'chart');
     },
   },
 

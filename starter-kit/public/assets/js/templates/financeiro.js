@@ -31,7 +31,7 @@ export const template = {
     { widget: 'kpi', props: { metricKey: 'saidas' } },
     { widget: 'kpi', props: { metricKey: 'saldo' } },
     { widget: 'kpi', props: { metricKey: 'margem' } },
-    { widget: 'timeseries', col: 8, props: { dateSlot: 'data', valueSlot: 'entrada', title: 'Entradas no tempo' } },
+    { widget: 'timeseries', col: 12, props: { dateSlot: 'data', valueSlot: 'entrada', title: 'Entradas no tempo' } },
     // hideZeros: no fluxo de caixa a MESMA coluna de categoria descreve os dois
     // lados (Fornecedor e despesa, Vendas balcão e receita). Sem o filtro, o
     // ranking de saídas lista as categorias de receita zeradas e o de entradas
@@ -42,8 +42,8 @@ export const template = {
     // (plural) e os slots 'saida'/'entrada' (singular) nunca casam. Sem isso o
     // ranking caia no formato 'number' padrao, sem "R$" e com casa decimal
     // cortada (ex "9.640,2" em vez de "R$ 9.640,20").
-    { widget: 'ranking', col: 4, props: { dimensionSlot: 'categoria', valueSlot: 'saida', title: 'Saídas por categoria', hideZeros: true, format: 'currency' } },
-    { widget: 'ranking', col: 12, props: { dimensionSlot: 'categoria', valueSlot: 'entrada', title: 'Entradas por categoria', hideZeros: true, format: 'currency' } },
+    { widget: 'ranking', col: 6, props: { dimensionSlot: 'categoria', valueSlot: 'saida', title: 'Saídas por categoria', hideZeros: true, format: 'currency' } },
+    { widget: 'ranking', col: 6, props: { dimensionSlot: 'categoria', valueSlot: 'entrada', title: 'Entradas por categoria', hideZeros: true, format: 'currency' } },
     { widget: 'table', col: 12, props: {} },
   ],
 };

@@ -101,7 +101,7 @@ function pedirAdminToken(feedback, retry) {
 
 function renderForm(app, cands) {
   const nomeInput = el('input', { class: 'input', type: 'text', placeholder: 'Ex: Minha Empresa' });
-  const accentInput = el('input', { class: 'input', type: 'color', value: (cands[0] && cands[0].accent) || '#6d28d9' });
+  const accentInput = el('input', { class: 'input', type: 'color', value: (cands[0] && cands[0].accent) || '#5b62d6' });
   accentInput.style.maxWidth = '80px';
   accentInput.style.padding = '4px';
   accentInput.style.height = '42px';

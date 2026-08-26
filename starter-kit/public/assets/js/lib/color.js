@@ -4,7 +4,11 @@
 // dashboard.js para um so lugar, pra o toggle de tema (theme.js) e o preview do
 // wizard (config-wizard.js) recalcularem as mesmas cores derivadas.
 
-export const DEFAULT_ACCENT = '#6d28d9';
+// Indigo azulado e dessaturado. NAO e 'fugir do roxo': Linear (#5E6AD2) e Stripe
+// (#635BFF) tambem sao roxo-azulados. O que tinha cara de template gerado era a
+// SATURACAO do violeta puro que estava aqui antes (#6d28d9, HSL 263/70%/50%).
+// So aparece quando a pessoa nao tem marca: o Passo 2.5 manda perguntar a cor dela.
+export const DEFAULT_ACCENT = '#5b62d6';
 
 // Fundo real de cada tema (mesmos valores de --bg no main.css). Usados para
 // medir a razao de contraste do texto de accent contra o fundo do tema.

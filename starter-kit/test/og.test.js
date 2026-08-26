@@ -20,7 +20,7 @@ test('escapeAttr: neutraliza aspas e angulares (anti-injecao no head)', () => {
 // ---------- faviconDataUri ----------
 test('faviconDataUri: usa o accent (hex URL-encoded) e cai no default se invalido', () => {
   assert.ok(faviconDataUri('#FA243C').includes('%23FA243C'), 'hex valido tingido');
-  assert.ok(faviconDataUri('rgb(1,2,3)').includes('%236d28d9'), 'invalido cai no default');
+  assert.ok(faviconDataUri('rgb(1,2,3)').includes('%235b62d6'), 'invalido cai no default');
   assert.ok(faviconDataUri('#FA243C').startsWith('data:image/svg+xml,'), 'data uri de imagem');
 });
 

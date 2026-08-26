@@ -19,7 +19,7 @@
 }
 
 :root {
-  --accent: #6d28d9;              /* cor de destaque (branding). Trocada por dashboard. */
+  --accent: #5b62d6;              /* cor de destaque (branding). Trocada por dashboard. */
   --accent-fg: #fff;              /* texto sobre o accent. Resolvido em runtime pela luminancia. */
   /* accent-soft segue a cor de destaque automaticamente (nao fica um roxo fixo generico) */
   --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
@@ -53,7 +53,7 @@
      Derivada do --accent em runtime, entao acompanha a marca. */
   --accent-text: color-mix(in srgb, var(--accent) 55%, white);
   /* Anel de foco (WCAG 2.4.7): precisa de >=3:1 contra o fundo. O accent cru
-     (#6d28d9) da so 2.72:1 no escuro e reprova; o --accent-text clareado passa
+     (#5b62d6) da so 2.72:1 no escuro e reprova; o --accent-text clareado passa
      folgado. Em runtime o dashboard.js sobrescreve com uma cor calibrada pro
      accent da marca; aqui fica o default seguro. */
   --focus-ring: var(--accent-text);
@@ -308,6 +308,13 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 
 /* Table */
 .tbl-wrap, .table__scroll { overflow-x: auto; }
+/* Altura maxima com scroll proprio: a tabela crescia sem limite, esticava a pagina e deixava
+   um buraco ao lado do widget vizinho (ranking de 3 barras contra tabela de 13 linhas). O
+   cabecalho fica grudado no topo pra nao perder a referencia da coluna no meio do scroll. */
+.table__scroll { max-height: 420px; overflow-y: auto; }
+.table__scroll thead th { position: sticky; top: 0; background: var(--bg-elev); z-index: 1; }
+/* Tela baixa: 420px viraria quase a tela toda so de tabela. */
+@media (max-height: 800px) { .table__scroll { max-height: 320px; } }
 .table__title, .chart__title { font-size: 13.5px; font-weight: 560; color: var(--text-dim); letter-spacing: -0.01em; margin: 0 0 16px; }
 .table__empty { color: var(--text-faint); text-align: center; padding: 30px 0; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }

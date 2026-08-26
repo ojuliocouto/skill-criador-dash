@@ -73,7 +73,7 @@ const state = {
   dataset: null, // DataSet { columns, rows, meta }
   colMap: {}, // { slotKey: columnName|null }
   name: '',
-  accent: '#6d28d9',
+  accent: '#5b62d6',
   logo: '', // URL do logo (opcional). Vazio = usa o .dot de hoje.
   accent2: '', // cor secundaria hex (opcional). Vazio = derivada da primaria.
   connecting: false, // trava o botão Conectar durante a chamada
@@ -640,7 +640,7 @@ function renderFinish(body) {
   const reaplicarAccent = () => {
     aplicarAccent(
       document.documentElement,
-      state.accent || '#6d28d9',
+      state.accent || '#5b62d6',
       temaEscuroAtual(),
       state.accent2 || undefined,
     );
@@ -713,7 +713,7 @@ function renderFinish(body) {
     el('label', { class: 'field' }, [
       el('span', { class: 'lbl', text: 'Cor de destaque' }),
       el('input', {
-        class: 'input', id: 'dashAccent', type: 'color', value: state.accent || '#6d28d9',
+        class: 'input', id: 'dashAccent', type: 'color', value: state.accent || '#5b62d6',
         // Ao escolher a cor, calibra --accent/--accent-fg/--accent-text/--focus-ring
         // (+ a secundaria atual) pro tema atual (contraste WCAG) e grava em
         // dataset.accent pra o theme.js achar no toggle. Assim o preview do wizard
@@ -788,7 +788,7 @@ function renderFinish(body) {
 
   async function onCreate() {
     const name = card.querySelector('#dashName').value.trim();
-    const accent = card.querySelector('#dashAccent').value || '#6d28d9';
+    const accent = card.querySelector('#dashAccent').value || '#5b62d6';
     const logo = card.querySelector('#dashLogo').value.trim();
     // Secundaria so entra se o checkbox "usar padrao" estiver DESMARCADO.
     const useDefault2 = card.querySelector('#dashAccent2Default').checked;

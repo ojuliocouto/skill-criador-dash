@@ -7,6 +7,20 @@ import { fmtNumber } from '../lib/format.js';
 // viewBox com margem reservada: esquerda pros ticks do eixo Y, base pros rotulos de data.
 const W = 600;
 const H = 240;
+
+// Largura do viewBox por largura da celula. O SVG escala uniformemente (xMidYMid meet), entao
+// num card de 12 colunas o desenho de 600x240 ficava do tamanho de sempre, centralizado, com
+// vazio dos dois lados. Mudar a PROPORCAO resolve sem tocar no preserveAspectRatio: a curva
+// continua fiel e os pontos continuam redondos.
+// Sem `col` devolve 600: template custom antigo nao muda de comportamento.
+function larguraPara(col) {
+  const n = Number(col);
+  if (!Number.isFinite(n) || n <= 0) return W;
+  if (n >= 12) return 1400;
+  if (n >= 10) return 1200;
+  if (n >= 8) return 900;
+  return W;
+}
 const M = { top: 12, right: 14, bottom: 26, left: 48 };
 
 /**
@@ -63,7 +77,8 @@ export function render(props = {}, points) {
   // area de plotagem (dentro das margens dos eixos).
   const plotX = M.left;
   const plotY = M.top;
-  const plotW = W - M.left - M.right;
+  const Wc = larguraPara(props && props.col);
+  const plotW = Wc - M.left - M.right;
   const plotH = H - M.top - M.bottom;
   const n = list.length;
 
@@ -115,7 +130,7 @@ export function render(props = {}, points) {
   return (
     `<div class="chart chart--timeseries">` +
       titleHtml +
-      `<svg class="chart__svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">` +
+      `<svg class="chart__svg" viewBox="0 0 ${Wc} ${H}" role="img" aria-label="${esc(label)}">` +
         gridHtml +
         series +
         xLabelsHtml +
