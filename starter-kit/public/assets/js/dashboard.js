@@ -7,7 +7,7 @@
 
 import { getDashboard, fetchDataForSource, fetchD1, setDashboardAuth } from './lib/api-client.js';
 import { getTemplate } from './templates/index.js';
-import { computeAll, computeAllMapped } from './lib/metrics.js';
+import { computeAll, computeAllMapped, timeSeries } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
 import { sha256Hex } from './lib/auth.js';
 import { render as renderKpi } from './widgets/kpi.js';
@@ -87,15 +87,24 @@ export function buildTrends(metrics, curRows, prevRows, colMap) {
   const prev = computeAll(metrics, prevRows, colMap);
   const trends = {};
   for (const m of (metrics || [])) {
-    if (!m.betterWhen) continue;
     const c = cur[m.key];
     const p = prev[m.key];
     if (!Number.isFinite(c) || !Number.isFinite(p) || p === 0) continue;
     const delta = (c - p) / Math.abs(p);
     if (Math.abs(delta) < 0.0005) continue; // praticamente estavel
     const up = c > p;
+    const text = `${up ? '▲' : '▼'} ${fmtPercent(Math.abs(delta))}`;
+    // Metrica SEM betterWhen (ex: Investimento: gastar mais nao e bom nem ruim por si, depende
+    // do retorno) antes nao mostrava variacao nenhuma, e o card ficava orfao no meio da faixa,
+    // uma linha mais curto que os vizinhos. Agora a variacao aparece em tom NEUTRO: a
+    // informacao existe, o julgamento de valor e que nao. Pintar de verde seria inventar uma
+    // opiniao que o template deliberadamente nao deu.
+    if (!m.betterWhen) {
+      trends[m.key] = { text, neutral: true };
+      continue;
+    }
     const good = m.betterWhen === 'higher' ? up : !up;
-    trends[m.key] = { text: `${up ? '▲' : '▼'} ${fmtPercent(Math.abs(delta))}`, good };
+    trends[m.key] = { text, good };
   }
   return trends;
 }
@@ -198,7 +207,23 @@ function findMetricDef(template, key) {
 // o traco) em vez do valor calculado (que seria 0 so por falta de coluna, um
 // numero com cara de certo). Default {} preserva o comportamento antigo (tudo
 // mapeado) para quem ainda chama sem o 4o argumento.
-export function renderKpiBlock(items, template, computed, mapped = {}, trends = {}, goal = null) {
+export function renderKpiBlock(items, template, computed, mapped = {}, trends = {}, goal = null, sparks = {}) {
+  // HIERARQUIA (26/08/2026): o template SEMPRE declarou `primaryMetric`, e o layout jogava
+  // esse dado fora: os 6 KPIs saiam com peso visual identico e o olho nao sabia onde pousar.
+  // Agora a metrica principal daquele dominio vira o card heroi (dobro de largura, valor maior,
+  // sparkline). E o que separa um painel de ferramenta de uma fileira de numeros.
+  //
+  // Tres recusas deliberadas, porque destaque errado e pior que destaque nenhum:
+  //   - primaryMetric fora deste bloco: NAO promove outro no lugar (nao inventa hierarquia);
+  //   - menos de 3 KPIs: faixa curta demais, o heroi so desequilibra;
+  //   - metrica sem coluna mapeada: seria dar o maior card do painel a um zero falso.
+  const heroKey = template && template.primaryMetric;
+  const temHero =
+    !!heroKey &&
+    items.length >= 3 &&
+    items.some((it) => it && it.props && it.props.metricKey === heroKey) &&
+    mapped[heroKey] !== false;
+
   const cards = items
     .map((item) => {
       const key = item.props && item.props.metricKey;
@@ -208,6 +233,7 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
       const isMapped = mapped[key] !== false;
       const value = computed[key];
       const goalForKpi = isMapped && goal && goal.metricKey === key ? goal : undefined;
+      const isHero = temHero && key === heroKey;
       return renderKpi(
         {
           label,
@@ -216,12 +242,19 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
           trend: isMapped ? trends[key] : undefined,
           goal: goalForKpi,
           unmapped: !isMapped,
+          hero: isHero,
+          spark: isHero ? sparks[key] : undefined,
         },
         value,
       );
     })
     .join('');
-  return `<div class="grid kpis">${cards}</div>`;
+  // O heroi ocupa 2 unidades da faixa. Com `auto-fit` o navegador escolhia o numero de
+  // colunas sem saber disso, e o ultimo card caia numa segunda linha com um buraco cinza ao
+  // lado. Regressao pega pelo SCREENSHOT: os testes e o gate automatico passaram os dois.
+  // Agora a contagem vai explicita e o CSS monta a faixa com o numero certo de colunas.
+  const unidades = items.length + (temHero ? 1 : 0);
+  return `<div class="grid kpis" style="--kpi-cols:${unidades}">${cards}</div>`;
 }
 
 // Renderiza um widget "single" (nao-kpi) ja embrulhado num .card, despachando
@@ -257,6 +290,25 @@ export function resolveActiveTab(tabs, requested) {
   return list[0].id;
 }
 
+// Serie temporal do KPI heroi, para a sparkline. Devolve {} sempre que desenhar seria mentir:
+//   - metrica DERIVADA (ROAS, CTR): a serie por dia nao e a agregacao da derivada, e a linha
+//     sairia com uma forma que nao corresponde ao numero do card;
+//   - coluna fora do colMap: viraria uma serie de zeros com cara de dado real;
+//   - menos de 2 dias: uma "tendencia" de um ponto so.
+// Pura e exportada de proposito: e a unica parte com regra de negocio aqui, entao e a que
+// precisa de teste.
+export function sparkForHero(template, rows, colMap) {
+  const key = template && template.primaryMetric;
+  const dateSlot = template && template.dateSlot;
+  if (!key || !dateSlot || !Array.isArray(rows) || rows.length < 2) return {};
+  const def = findMetricDef(template, key);
+  if (!def || !def.column) return {};              // derivada: sem coluna, sem serie
+  if (!colMap || !colMap[def.column]) return {};   // coluna nao mapeada
+  const pontos = timeSeries(rows, colMap, dateSlot, def.column, def.agg || 'sum');
+  if (!pontos || pontos.length < 2) return {};
+  return { [key]: pontos.map((p) => p.value) };
+}
+
 // Monta so o corpo de widgets (grid + sections de kpi) a partir de um ctx JA
 // calculado (computed/trends/goal/dataset ja refletem o filtro atual). Devolve
 // string HTML. Chamado a cada mudanca de filtro para repintar so o #dashbody.
@@ -278,7 +330,8 @@ function buildBodyHtml(ctx) {
   for (const block of blocks) {
     if (block.type === 'kpis') {
       flush();
-      parts.push(`<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.mapped, ctx.trends, ctx.goal)}</section>`);
+      parts.push(`<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.mapped, ctx.trends, ctx.goal,
+        sparkForHero(template, ctx.dataset && ctx.dataset.rows, ctx.colMap))}</section>`);
       continue;
     }
     const html = renderSingle(block.item, ctx);

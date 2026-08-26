@@ -153,8 +153,14 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
    da borda vira linha), em vez de N cards soltos com barrinha colorida (tell de IA
    e cara de template). Le como um bloco de metricas de ferramenta. Robusto na
    quebra: toda celula tem fundo, entao os gaps viram sempre linhas limpas. */
-.grid.kpis { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.grid.kpis { grid-template-columns: repeat(var(--kpi-cols, 4), minmax(0, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
 .grid.two { grid-template-columns: 1fr 1fr; }
+/* Faixa de KPI responsiva: a contagem explicita (--kpi-cols) so vale onde ela CABE. Abaixo
+   disso o card fica ilegivel, entao a faixa volta a se auto-organizar e o heroi perde o span
+   (a regra do span mora junto do .kpi--hero, no mesmo breakpoint). */
+@media (max-width: 1100px) { .grid.kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); } }
+@media (max-width: 560px) { .grid.kpis { grid-template-columns: 1fr; } }
+
 @media (max-width: 780px) { .grid.two { grid-template-columns: 1fr; } }
 
 /* Dashboard grid 2D: os widgets (nao-kpi) ocupam um grid de 12 colunas, cada um
@@ -206,17 +212,38 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 .tab:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: -2px; }
 
 /* KPI (celula do painel: sem borda/barra propria; a divisao vem do gap do painel) */
-.kpi { background: var(--bg-elev); border: 0; border-radius: 0; box-shadow: none; padding: 16px 18px 17px; position: relative; transition: background 0.15s; }
+.kpi { background: var(--bg-elev); border: 0; border-radius: 0; box-shadow: none; padding: 16px 18px 17px; position: relative; transition: background 0.15s; container-type: inline-size; }
 .kpi:hover { background: var(--bg-elev-2); }
 .kpi .kpi-label, .kpi__label { color: var(--text-faint); font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 9px; }
 /* Valor em Geist Mono tabular: numero de ferramenta, nao texto de site. */
-.kpi .kpi-value, .kpi__value { font-family: var(--font-mono); font-size: 22px; font-weight: 550; letter-spacing: -0.03em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.kpi .kpi-value, .kpi__value { font-family: var(--font-mono); font-size: clamp(15px, 12cqi, 22px); font-weight: 550; letter-spacing: -0.03em; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .kpi__value, .funnel__value, .ranking__value, .funnel__conv, td { font-variant-numeric: tabular-nums; }
 .kpi .kpi-hint, .kpi__hint { color: var(--text-faint); font-size: 12px; margin-top: 6px; }
 .kpi__trend { font-family: var(--font-mono); font-size: 12px; font-weight: 500; margin-top: 9px; letter-spacing: -0.01em; }
 .kpi__trend.is-good { color: var(--good); }
 .kpi__trend.is-bad { color: var(--bad); }
+/* Variacao sem julgamento: a metrica nao declara o que e melhor. Cinza de proposito. */
+.kpi__trend.is-neutral { color: var(--text-dim); }
 .kpi__trend .kpi__trend-cap { font-family: var(--font); color: var(--text-faint); font-weight: 400; letter-spacing: 0; }
+/* KPI HEROI: a metrica principal do dominio (template.primaryMetric). Hierarquia vem de
+   ESPACO e TAMANHO, nunca de fundo colorido nem borda de destaque: card tingido e o tell de
+   IA mais comum em dashboard, e some no tema escuro. Ocupa 2 colunas da faixa, valor maior,
+   e a sparkline mostra a direcao sem virar mais um grafico. */
+.kpi--hero { grid-column: span 2; }
+.kpi--hero .kpi__value { font-size: clamp(24px, 9cqi, 34px); letter-spacing: -0.035em; line-height: 1.05; }
+.kpi--hero .kpi__label { color: var(--text-dim); }
+/* Sparkline: pista de direcao, nao grafico. Sem eixo, sem ponto, sem area preenchida.
+   vector-effect no polyline mantem 1.5px reais mesmo com o viewBox esticado pelo
+   preserveAspectRatio="none" (senao a linha engorda junto com o card). */
+.kpi__spark { display: block; width: 100%; height: 30px; margin-top: 11px; overflow: visible; }
+.kpi__spark polyline { stroke: var(--accent-graph); stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round; }
+/* Faixa estreita: o span 2 do heroi espremeria os vizinhos abaixo do minimo legivel. */
+@media (max-width: 1100px) { .kpi--hero { grid-column: span 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .kpi--hero .kpi__spark polyline { stroke-dasharray: 200; stroke-dashoffset: 200; animation: spark-in 0.7s ease-out forwards; }
+  @keyframes spark-in { to { stroke-dashoffset: 0; } }
+}
+
 .kpi__goal { margin-top: 10px; }
 .kpi__goal-track { background: var(--bg-elev-2); border-radius: 6px; height: 6px; overflow: hidden; }
 .kpi__goal-fill { height: 100%; background: var(--accent-fill-calc, var(--accent)); border-radius: 6px; min-width: 2px; }

@@ -72,9 +72,17 @@ test('buildTrends: sem previous nao gera tendencia', () => {
   assert.deepEqual(buildTrends(metrics, [{ Invest: '20' }], null, colMap), {});
 });
 
-test('buildTrends: metrica sem betterWhen nao gera tendencia', () => {
+// MUDANCA DE CONTRATO (26/08/2026). Antes: metrica sem `betterWhen` nao gerava tendencia
+// nenhuma. O motivo era bom (nao inventar julgamento: gastar mais nao e bom nem ruim por si),
+// mas o efeito na tela era ruim: o card de Investimento ficava uma linha mais curto que os
+// vizinhos, orfao no meio da faixa de KPI. Agora a variacao APARECE, marcada `neutral`, e o
+// CSS pinta de cinza em vez de verde/vermelho. A informacao existe; o julgamento e que nao.
+test('buildTrends: metrica sem betterWhen gera tendencia NEUTRA (nao julga, mas informa)', () => {
   const metrics = [{ key: 'invest', agg: 'sum', column: 'invest' }];
-  assert.deepEqual(buildTrends(metrics, [{ Invest: '20' }], [{ Invest: '10' }], colMap), {});
+  const t = buildTrends(metrics, [{ Invest: '20' }], [{ Invest: '10' }], colMap);
+  assert.equal(t.invest.neutral, true, 'marcada como neutra');
+  assert.equal(t.invest.good, undefined, 'sem veredito de bom/ruim');
+  assert.ok(t.invest.text.includes('100'), 'a variacao real aparece');
 });
 
 test('buildTrends: denominador zero (previous soma 0) nao gera tendencia', () => {

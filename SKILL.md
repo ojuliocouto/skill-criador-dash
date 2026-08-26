@@ -180,6 +180,54 @@ node scripts/prova-dash.js "<URL-DO-DASHBOARD>" [--senha <SENHA>]
 - **Depois de verde, OLHE os dois PNG.** O script prova que há número na tela, não que o número está
   certo nem que a tela está boa. Cheque KPIs, funil, tendência, a cor de marca e os DOIS temas.
 
+### 6.1 GATE DE USO: ferramenta viva nao se pula
+
+```bash
+python3 scripts/uso-ferramentas.py --projeto <dir-do-projeto> checar
+```
+
+**A regra, e ela nao tem excecao:** toda ferramenta que o Passo 0 mediu como RESPONDENDO
+precisa aparecer no registro de uso, com evidencia. Ferramenta que nao respondeu nao e cobrada,
+porque ali a degradacao ja foi declarada. Nao existe terceira opcao. **"O 21st.dev eu pulei"
+com o 21st.dev vivo REPROVA a entrega.**
+
+**Por que este gate e diferente do 0.0-PRE:** o Passo 0 garante que a ferramenta RESPONDE. Este
+garante que ela foi USADA. Sao buracos distintos, e tapar so o primeiro nao resolve nada: da
+pra ter o 21st.dev conectado, verde no verificador, e o painel sair 100% feito a mao do mesmo
+jeito. O resultado e identico ao do MCP morto, so que agora sem nem a desculpa.
+
+**A evidencia nao e a sua palavra.** Cada registro aponta um artefato que o script confere de
+novo na hora do gate: arquivo que precisa existir e ter tamanho, ou trecho que precisa ser
+achado no codigo. Registro cujo artefato sumiu vale como nao registrado (o componente do
+21st.dev que voce trocou por um card a mao depois: o gate pega).
+
+Registre conforme for usando, nao no fim de memoria:
+
+```bash
+U="python3 scripts/uso-ferramentas.py --projeto <dir-do-projeto>"
+
+# componente que veio mesmo do MCP: o trecho tem que estar no codigo
+$U registrar magic --no-codigo "<classe-ou-nome-do-componente>" --em <dir> --detalhe "card de KPI do 21st.dev"
+# artefato no disco
+$U registrar Playwright --arquivo prova/dash-desktop.png --detalhe "prova de tela lida"
+$U registrar "skill design-taste-frontend" --arquivo public/dashboard.html --detalhe "passe de gosto, 3 tells removidos"
+```
+
+**Nao se aplica a esta pagina? DISPENSE, com motivo, e o motivo vai na entrega:**
+
+```bash
+$U dispensar "skill animate" --motivo "este painel nao tem serie temporal: o widget de tendencia nao entra"
+```
+
+Dispensa exige motivo de verdade (o script recusa "nao usei") e sai marcada no relatorio e no
+bloco de entrega. A diferenca entre dispensar e pular e essa: **dispensa e uma decisao assinada
+que o dono le; pulo e uma decisao escondida que ele descobre pelo resultado, meses depois.**
+
+**>>> GATE 6.1: `uso-ferramentas.py checar` saiu com codigo 0? Se NAO, volte e USE o que
+esta faltando. Nenhuma explicacao substitui rodar de novo verde. <<<**
+
+---
+
 ### 7. Encerramento
 Salve o contexto do projeto da pessoa em `projetos/YYYYMMDD-descricao.md` (crie a pasta com
 `mkdir -p projetos`; ela é gitignored de propósito, é contexto privado do cliente): projeto Pages,
