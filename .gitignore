@@ -8,3 +8,6 @@ projetos/
 .wrangler/
 dist/
 .vercel/
+
+# PNG da prova de tela (prova-dash.js): artefato local, nao versionado
+prova/

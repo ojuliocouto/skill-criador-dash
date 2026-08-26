@@ -45,6 +45,65 @@ Documentação de apoio (leia o arquivo certo na hora certa, não tudo de uma ve
 
 ## Passo a passo (o roteiro que você conduz)
 
+### 0. FERRAMENTAS: instalar e conectar TUDO antes de qualquer outra coisa
+
+**Este é o primeiro passo da skill. Ele BLOQUEIA: enquanto houver ferramenta crítica sem
+responder, não existe Passo 1.** Não é um checklist que você lê e segue mesmo assim: item de
+checklist é pulado, gate não.
+
+```
+python3 scripts/checar-ferramentas.py
+```
+
+O verificador não pergunta se a ferramenta está instalada: ele MANDA cada uma fazer alguma
+coisa e confere se voltou. Sai com código diferente de zero quando falta algo crítico.
+
+**Por que isso existe (26/08/2026, custou meses sem ninguém perceber):** na skill irmã
+(construtor-paginas) o MCP do 21st.dev estava configurado e MORTO havia tempo indeterminado
+(`Not authenticated: your API key is missing or was reset`). A skill mandava "usar componentes
+do 21st.dev OU fazer à mão", o MCP nunca respondia, e ela caía no "à mão" TODA VEZ. Ninguém viu,
+porque **fallback silencioso não reclama**: o sintoma chegou pelo RESULTADO ("o design não está
+interessante"), meses depois. O criador-dash estava pior: não mencionava nenhuma ferramenta
+visual e não tinha prova de tela nenhuma. Eram 654 testes passando, e nenhum olhava o dashboard.
+
+**"Está instalada" e "aparece na lista" não são verificação.** Verificação é mandar fazer e
+conferir o retorno.
+
+**O que fazer com o resultado:**
+
+| Resultado | Ação |
+|---|---|
+| Tudo respondendo | Segue pro Passo 1 |
+| **Crítico sem responder** | **PARA.** Conduza a pessoa pela instalação (tabela abaixo) e rode de novo. Não comece o dashboard. |
+| Só opcional degradado | Segue, e DECLARE a degradação na entrega |
+
+**CONDUZIR, não avisar.** Quem usa esta skill quase sempre não sabe o que é um MCP. Não diga
+"você precisa configurar o 21st.dev": abra a página, dê o comando pronto, espere a chave, cole
+e confirme que subiu. Uma ferramenta por vez, do jeito que o Passo 1 ensina cada palavra técnica
+antes de mandar comando.
+
+| Ferramenta | Para quê | Como conduzir |
+|---|---|---|
+| **Node 22+** | o wrangler 4.x não roda em versão mais velha; com Node 18/20 nem os testes nem o deploy funcionam | `nvm install 22` ou `brew install node`. Confira com `node -v`. |
+| **wrangler** | publicar no Cloudflare (Pages, KV, D1) | `npm i -g wrangler`. Se o comando não for achado depois de instalar, o bin global do npm não está no PATH (`npm prefix -g` mostra a pasta). |
+| **Login Cloudflare** | é a conta DA PESSOA que recebe o dashboard | `wrangler login`, depois `wrangler whoami` pra confirmar a conta. **Um `CLOUDFLARE_API_TOKEN` exportado no shell SOBREPÕE o login e pode publicar na conta errada:** o verificador denuncia; se for indevido, `unset CLOUDFLARE_API_TOKEN`. |
+| **Peças do starter-kit** | é a biblioteca testada de onde o dashboard é montado | `cd starter-kit && npm ci && npm test`. Peça quebrada não vira dashboard de ninguém: conserte antes. |
+| **Playwright** | prova de tela: abre o dashboard publicado e confere que ele mostra número | `npm i -g playwright && npx playwright install chromium` (~265 MB; a versão leve é `--only-shell`, ~94 MB). |
+| **magic (21st.dev)** | componentes de UI reais no lugar de card feito à mão | Pegue a chave em `https://21st.dev/mcp` e rode:<br>`claude mcp add magic --scope user -e API_KEY=<CHAVE> -- npx -y @21st-dev/magic@latest`<br>**Dois erros que custam tempo:** a chave vai por ENV `API_KEY`, NÃO pela flag `--api-key` (a flag conecta e devolve "not authenticated"); e o NOME vem ANTES do `-e`, senão o flag variádico engole o nome do servidor. As tools novas só aparecem na próxima sessão. |
+| **skill design-taste-frontend** | gate anti-slop antes de publicar | `npx skills add <fonte>/design-taste-frontend` |
+| **skills de design (opcionais)** | direção estética, acabamento e microinteração | `frontend-design`, `high-end-visual-design`, `animate` |
+
+**Regra que nasceu daqui, e vale pra qualquer ferramenta que esta skill venha a usar:** toda
+dependência nova entra no `checar-ferramentas.py` com um teste que a EXERCITA. Se você não
+conseguir escrever esse teste, a dependência não entra na skill: sem teste, ela morre em
+silêncio e degrada o resultado sem avisar ninguém.
+
+O `scripts/preflight.py` continua existindo e é complementar: ele valida o `wrangler.toml`, o
+`.dev.vars` e o projeto ANTES do deploy. O `checar-ferramentas.py` é antes de tudo; o
+`preflight.py` é antes de publicar.
+
+---
+
 ### 1. Onboarding e checklist
 Nunca presuma que a pessoa leu o README. Explique em 3 frases:
 - "Eu vou construir com você o seu dashboard, na sua conta Cloudflare, do jeito da sua operação."
@@ -105,8 +164,21 @@ BLOQUEANTE: rode `python3 scripts/preflight.py --starter-kit starter-kit` antes 
 ### 6. Deploy e verificação
 - Publique na conta DA PESSOA (`wrangler pages deploy public --project-name=<NOME>`).
 - Modo histórico: deploy do Worker cron e força uma primeira captura (`references/infra.md`).
-- Confirme com os próprios olhos: abra o dashboard publicado e cheque KPIs, funil, tendência e a cor
-  de marca, em desktop E mobile, nos DOIS temas, antes de dizer pronto.
+- **GATE de tela (bloqueia a entrega).** Rode contra o dashboard PUBLICADO, não contra o local:
+```
+node scripts/prova-dash.js "<URL-DO-DASHBOARD>" [--senha <SENHA>]
+```
+  Ele abre no navegador de verdade, autentica se precisar, espera os dados chegarem e reprova se o
+  painel abrir sem número, mostrar `NaN`/`undefined`/`Infinity` ou se algum request voltar 4xx/5xx.
+  Grava `prova/dash-desktop.png` e `prova/dash-mobile.png`. **Saída diferente de zero = não está
+  pronto**, e nenhuma explicação substitui rodar de novo verde.
+
+  Isto existe porque a suíte tem centenas de testes e NENHUM olhava o dashboard: teste de lógica não
+  vê painel publicado abrindo vazio, com "—" em todo card ou 500 no conector. Quem descobria era o
+  cliente.
+
+- **Depois de verde, OLHE os dois PNG.** O script prova que há número na tela, não que o número está
+  certo nem que a tela está boa. Cheque KPIs, funil, tendência, a cor de marca e os DOIS temas.
 
 ### 7. Encerramento
 Salve o contexto do projeto da pessoa em `projetos/YYYYMMDD-descricao.md` (crie a pasta com
