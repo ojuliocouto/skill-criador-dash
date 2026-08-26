@@ -276,6 +276,23 @@ Dispensa exige motivo de verdade (o script recusa "nao usei") e sai marcada no r
 bloco de entrega. A diferenca entre dispensar e pular e essa: **dispensa e uma decisao assinada
 que o dono le; pulo e uma decisao escondida que ele descobre pelo resultado, meses depois.**
 
+
+**O caminho muda o que e cobrado.** O mesmo vale aqui, e cobrar as mesmas
+ferramentas em todos seria o mesmo erro de cobrar direcao de arte pra corrigir o nome de uma coluna:
+
+```bash
+# CRIAR, CLONAR e MELHORAR: cobra tudo que estiver vivo
+python3 scripts/uso-ferramentas.py --projeto <dir> checar --caminho criar
+
+# EDITAR (mudanca pontual): cobra so a PROVA do ponto alterado
+python3 scripts/uso-ferramentas.py --projeto <dir> checar --caminho editar
+```
+
+Exigir passe de gosto pra trocar um rotulo nao melhora nada, e gate impossivel
+de passar honestamente empurra pra dispensar tudo, que e como um gate deixa de valer.
+**A regra que continua valendo na edicao:** se a MUDANCA pede a ferramenta (o pedido e "poe um
+video no hero"), ela volta a ser cobrada e voce registra o uso normalmente.
+
 **>>> GATE 6.1: `uso-ferramentas.py checar` saiu com codigo 0? Se NAO, volte e USE o que
 esta faltando. Nenhuma explicacao substitui rodar de novo verde. <<<**
 

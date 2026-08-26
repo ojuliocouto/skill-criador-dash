@@ -45,6 +45,25 @@ COBRADAS = {
 }
 
 
+# Escopo por CAMINHO. A skill roteia o trabalho em caminhos diferentes, e cobrar as mesmas
+# ferramentas em todos e o mesmo erro de cobrar ffmpeg numa pagina sem video: gate impossivel
+# de passar honestamente empurra pra dispensar tudo, e ai ele nao vale nada.
+#
+#   completo -> trabalho que produz ou refaz a peca inteira: cobra TUDO que estiver vivo.
+#   edicao   -> mudanca pontual (trocar texto, cor, preco, arrumar mobile). Cobra so a PROVA
+#               do ponto alterado. Exigir b-roll pra trocar um botao nao melhora nada.
+#
+# Regra que continua valendo na edicao: se a mudanca PEDE uma ferramenta (o pedido e "poe um
+# video no hero"), ela volta a ser cobrada, e voce registra o uso normalmente.
+CAMINHOS = {
+    "criar": "completo",
+    "clonar": "completo",
+    "melhorar": "completo",
+    "editar": "edicao",
+}
+COBRADAS_EDICAO = {"Playwright"}
+
+
 def caminho_registro(projeto):
     return Path(projeto) / REGISTRO
 
@@ -168,7 +187,10 @@ def cmd_checar(args):
         print("antes de entregar: um gate que nao consegue medir nao aprova por omissao.\n")
         return 1
 
-    vivas = {f: papel for f, papel in COBRADAS.items() if estados.get(f)}
+    modo = CAMINHOS.get(getattr(args, "caminho", "criar"), "completo")
+    cobraveis = COBRADAS if modo == "completo" else {
+        f: p for f, p in COBRADAS.items() if f in COBRADAS_EDICAO}
+    vivas = {f: papel for f, papel in cobraveis.items() if estados.get(f)}
     faltando, ok_list, dispensadas = [], [], []
     for f, papel in sorted(vivas.items()):
         reg = dados.get(f)
@@ -187,6 +209,8 @@ def cmd_checar(args):
     mortas = [f for f in COBRADAS if f in estados and not estados[f]]
 
     print("\nGATE DE USO DAS FERRAMENTAS\n" + "=" * 74)
+    print(f"  caminho: {getattr(args, 'caminho', 'criar')} "
+          f"({'cobra tudo que estiver vivo' if modo == 'completo' else 'edicao pontual: cobra so a prova'})")
     for f, motivo, detalhe in ok_list:
         print(f"  [USADA] {f}")
         print(f"          {detalhe or '(sem detalhe)'}  |  {motivo}")
@@ -244,6 +268,8 @@ def main():
     d.set_defaults(func=cmd_dispensar)
 
     c = sub.add_parser("checar", help="reprova se ferramenta viva nao foi usada")
+    c.add_argument("--caminho", default="criar", choices=sorted(CAMINHOS),
+                   help="criar/clonar/melhorar cobram tudo; editar cobra so a prova do ponto alterado")
     c.set_defaults(func=cmd_checar)
 
     args = ap.parse_args()
