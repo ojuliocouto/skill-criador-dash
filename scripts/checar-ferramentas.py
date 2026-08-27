@@ -122,20 +122,34 @@ def checagens(pular_testes=False):
            saida.splitlines()[0][:110] if saida else "",
            "npm i -g playwright && npx playwright install chromium")
 
-    est, det = estado_mcp("magic")
-    yield ("magic (21st.dev)", "componentes de UI reais no lugar de card feito a mao", True,
+    # O servidor do 21st.dev ja teve DOIS nomes: "magic" (stdio, via npx) e "21st" (HTTP).
+    # Procurar so pelo antigo reprova um servidor conectado com o nome novo, que foi
+    # exatamente o falso negativo de 27/08/2026. Basta UM dos dois responder.
+    # ESCOPO IMPORTA: sem `--scope user` o servidor fica preso ao projeto do diretorio
+    # atual e SOME quando o cwd muda (a pasta da skill tem git proprio, entao e outro
+    # projeto). Sempre `--scope user`.
+    for _n in ("21st", "magic"):
+        est, det = estado_mcp(_n)
+        if est == "conectado":
+            break
+    yield ("21st ou magic (21st.dev)", "componentes de UI reais no lugar de card feito a mao", True,
            est == "conectado", f"{est}: {det[:110]}",
            'chave em https://21st.dev/mcp, depois: claude mcp add magic --scope user '
            '-e API_KEY=<CHAVE> -- npx -y @21st-dev/magic@latest '
            '(a chave vai por ENV, NAO pela flag --api-key; e o nome vem ANTES do -e)')
 
-    for s, papel, critico in [
-        ("design-taste-frontend", "gate anti-slop antes de publicar", True),
-        ("frontend-design", "direcao estetica antes de montar as telas", False),
-        ("high-end-visual-design", "acabamento premium do painel", False),
-        ("animate", "microinteracao (hover, entrada de card, transicao de filtro)", False),
+    # O comando vai LITERAL: quem cai aqui esta com a ferramenta faltando e precisa copiar
+    # e colar. Placeholder do tipo "<fonte>" nao instala nada, so parece que instrui.
+    TASTE = "npx skills add Leonxlnx/taste-skill"
+    for s, papel, critico, fix in [
+        ("design-taste-frontend", "gate anti-slop antes de publicar", True, TASTE),
+        ("frontend-design", "direcao estetica antes de montar as telas", False,
+         "npx -y skills add anthropics/skills --skill frontend-design --agent claude-code"),
+        ("high-end-visual-design", "acabamento premium do painel", False, TASTE),
+        ("animate", "microinteracao (hover, entrada de card, transicao de filtro)", False,
+         "npx -y skills add https://github.com/delphi-ai/animate-skill --agent claude-code"),
     ]:
-        yield (f"skill {s}", papel, critico, skill_existe(s), "", f"npx skills add <fonte>/{s}")
+        yield (f"skill {s}", papel, critico, skill_existe(s), "", fix)
 
 
 def main():
