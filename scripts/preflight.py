@@ -45,6 +45,11 @@ def check_node(problemas: list) -> None:
         print(f"{BLOQUEIO} Node: nao encontrado")
         return
     versao = run(["node", "-v"])
+    major = re.fullmatch(r"v(\d+)\.\d+\.\d+", versao)
+    if not major or int(major[1]) < 22:
+        problemas.append("Node 22+ é requisito deste roteiro. Rode nvm install 22 ou instale em nodejs.org.")
+        print(f"{BLOQUEIO} Node: versão incompatível ou não verificável")
+        return
     print(f"{OK} Node: {versao}")
 
 
