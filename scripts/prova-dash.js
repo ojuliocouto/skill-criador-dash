@@ -104,9 +104,13 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
         avisos.push(`[${perfil.nome}] rede nao aquietou em 45s (polling? stream?)`);
       });
 
+      // Ano no título aprovava um painel com todos os KPIs vazios. O alvo é a métrica visível.
+      await page.waitForFunction(() => [...document.querySelectorAll('.kpi__value')].some(el =>
+        el.getClientRects().length && /\d/.test(el.innerText)), null, { timeout: 10000 }).catch(() => {});
+      const valores = await page.locator('.kpi__value:visible').allTextContents();
       const texto = (await page.locator('body').innerText().catch(() => '')) || '';
-      const temNumero = /\d/.test(texto.replace(/\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}/g, ''));
-      if (!temNumero) falhas.push(`[${perfil.nome}] nenhum numero na tela: o painel abriu vazio`);
+      const temNumero = valores.some(valor => /\d/.test(valor));
+      if (!temNumero) falhas.push(`[${perfil.nome}] nenhum KPI visível com número: o painel abriu vazio`);
 
       const placeholders = VAZIO.filter((p) => texto.includes(p));
       if (placeholders.length) {
