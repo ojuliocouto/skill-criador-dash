@@ -5,7 +5,8 @@
 import { parseNumberBR } from '../lib/format.js';
 
 // Valores de status que contam como venda ganha/fechada.
-const WON = /ganh|won|fechad|pago|aprovad|conclu/i;
+// Busca parcial contava "não pago" e "fechada perdida" como receita recebida.
+const WON = /^(?:ganh[ao]s?|won|closed won|fechad[ao](?: ganh[ao])?|pag[oa]s?|aprovad[ao]s?|concluid[ao]s?|faturad[ao]s?|finalizad[ao]s?)$/;
 
 // Separa as linhas ganhas. Se nao houver coluna de status mapeada, ou se
 // nenhuma linha tiver status preenchido, assume que todas sao vendas (fallback).
@@ -16,7 +17,11 @@ function ganhasRows(rows, colMap) {
   const won = [];
   for (const r of rows) {
     const v = String(r[col] == null ? '' : r[col]).trim();
-    if (v) { anyStatus = true; if (WON.test(v)) won.push(r); }
+    if (v) {
+      anyStatus = true;
+      const normalizado = v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      if (WON.test(normalizado)) won.push(r);
+    }
   }
   return anyStatus ? won : rows;
 }
