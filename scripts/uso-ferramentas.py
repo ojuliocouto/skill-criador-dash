@@ -36,7 +36,7 @@ REGISTRO = ".ferramentas-usadas.json"
 # Ferramentas que, ESTANDO VIVAS, precisam ter sido usadas. A chave casa com o rotulo do
 # checar-ferramentas.py; o valor explica o que se espera ver na pagina.
 COBRADAS = {
-    "magic (21st.dev)": "componente de UI vindo do 21st.dev (nao card feito a mao)",
+    "magic": "componente de UI vindo do 21st.dev (nao card feito a mao)",
     "Playwright": "prova de tela do dashboard publicado (PNG desktop e mobile)",
     "skill design-taste-frontend": "gate anti-slop rodado sobre o painel antes de publicar",
     "skill frontend-design": "direcao estetica do painel decidida antes de montar",
@@ -58,6 +58,8 @@ COBRADAS = {
 CAMINHOS = {
     "criar": "completo",
     "clonar": "completo",
+    "clonar-elevar": "completo",
+    "variante": "completo",
     "melhorar": "completo",
     "editar": "edicao",
 }
@@ -91,13 +93,17 @@ def evidencia_vale(ev, projeto):
         return False, "registro sem evidencia"
     tipo = ev.get("tipo")
     valor = ev.get("valor", "")
+    if tipo in ("arquivo", "codigo") and not str(valor).strip():
+        return False, "evidência vazia"
     if tipo == "arquivo":
         alvo = Path(valor)
         if not alvo.is_absolute():
             alvo = Path(projeto) / valor
         if not alvo.exists():
             return False, f"o arquivo apontado sumiu: {valor}"
-        if alvo.is_file() and alvo.stat().st_size == 0:
+        if not alvo.is_file():
+            return False, "a evidência precisa ser um arquivo, não uma pasta"
+        if alvo.stat().st_size == 0:
             return False, f"arquivo vazio: {valor}"
         return True, f"arquivo presente ({valor})"
     if tipo == "codigo":
@@ -116,7 +122,7 @@ def evidencia_vale(ev, projeto):
     if tipo == "declarado":
         # Ultimo recurso, para ferramenta que nao deixa artefato no disco. Nao e prova,
         # e declaracao assinada: aparece no relatorio como tal, para o dono cobrar.
-        return True, "DECLARADO sem artefato (nao verificavel por este script)"
+        return False, "declaração sem artefato não comprova uso; registre a evidência ou dispense com motivo"
     return False, f"tipo de evidencia desconhecido: {tipo}"
 
 
@@ -129,6 +135,8 @@ def estado_das_ferramentas():
         r = subprocess.run([sys.executable, str(checador), "--json"],
                            capture_output=True, text=True, timeout=600)
         linhas = json.loads(r.stdout)
+        if r.returncode != 0 or any(l.get("critico") and not l.get("ok") for l in linhas):
+            return None, "gate de entrada reprovado; resolva as ferramentas críticas antes da entrega"
         return {l["ferramenta"]: bool(l["ok"]) for l in linhas}, None
     except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError, OSError) as e:
         return None, f"nao consegui ler o estado das ferramentas: {e!r}"
@@ -187,6 +195,13 @@ def cmd_checar(args):
         print("antes de entregar: um gate que nao consegue medir nao aprova por omissao.\n")
         return 1
 
+    # O verificador usa nomes diferentes para o mesmo MCP; nenhum pode escapar da cobrança.
+    aliases = ("magic", "magic (21st.dev)", "21st", "21st ou magic (21st.dev)", "21st ou magic")
+    estados["magic"] = any(estados.get(n) for n in aliases)
+    for nome in aliases:
+        if nome in dados and "magic" not in dados:
+            dados["magic"] = dados[nome]
+
     modo = CAMINHOS.get(getattr(args, "caminho", "criar"), "completo")
     cobraveis = COBRADAS if modo == "completo" else {
         f: p for f, p in COBRADAS.items() if f in COBRADAS_EDICAO}
@@ -197,7 +212,7 @@ def cmd_checar(args):
         if not reg:
             faltando.append((f, papel, "nao aparece no registro de uso"))
             continue
-        if reg.get("dispensada"):
+        if reg.get("dispensada") and len(str(reg.get("motivo", "")).strip()) >= 15:
             dispensadas.append((f, reg.get("motivo", "")))
             continue
         ok, motivo = evidencia_vale(reg.get("evidencia"), projeto)
