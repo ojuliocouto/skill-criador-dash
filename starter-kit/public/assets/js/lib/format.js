@@ -86,14 +86,20 @@ export function parseNumberBR(v) {
  */
 export function parseDateBR(v) {
   if (v == null) return null;
-  const s = String(v).trim();
+  let s = String(v).trim();
   if (!s) return null;
+  // Exportações brasileiras trazem hora; validar o sufixo evita aceitar texto como data.
+  const partes = s.split(/[T ]/);
+  if (partes.length > 1) {
+    if (partes.length !== 2 || !/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)?$/.test(partes[1])) return null;
+    s = partes[0];
+  }
   // ja ISO (aceita hifen ou barra como separador: AAAA-MM-DD ou AAAA/MM/DD).
   // Mes e dia aceitam 1-2 digitos (ex '2026-2-1', '2026/1/1'), coerente com o ramo BR.
   // O fim so aceita: data pura, OU data seguida de um separador de hora RECONHECIDO
   // ('T' ou espaco, ex '2026-12-31T10:00', '2026-12-31 10:00'). Sufixo colado
   // nao reconhecido ('2026-01-01lixo', '2026-01-0110') e rejeitado -> cai pra null.
-  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T ].*)?$/);
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
   if (m) {
     const y = +m[1]; const mo = +m[2]; const d = +m[3];
     if (!isValidYMD(y, mo, d)) return null;
