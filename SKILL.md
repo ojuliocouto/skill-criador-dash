@@ -88,10 +88,10 @@ antes de mandar comando.
 | **Node 22+** | o wrangler 4.x não roda em versão mais velha; com Node 18/20 nem os testes nem o deploy funcionam | `nvm install 22` ou `brew install node`. Confira com `node -v`. |
 | **wrangler** | publicar no Cloudflare (Pages, KV, D1) | `npm i -g wrangler`. Se o comando não for achado depois de instalar, o bin global do npm não está no PATH (`npm prefix -g` mostra a pasta). |
 | **Login Cloudflare** | é a conta DA PESSOA que recebe o dashboard | `wrangler login`, depois `wrangler whoami` pra confirmar a conta. **Um `CLOUDFLARE_API_TOKEN` exportado no shell SOBREPÕE o login e pode publicar na conta errada:** o verificador denuncia; se for indevido, `unset CLOUDFLARE_API_TOKEN`. |
-| **Peças do starter-kit** | é a biblioteca testada de onde o dashboard é montado | `cd starter-kit && npm ci && npm test`. Peça quebrada não vira dashboard de ninguém: conserte antes. |
+| **Peças do starter-kit** | é a biblioteca testada de onde o dashboard é montado | `cd starter-kit && npm test`. Peça quebrada não vira dashboard de ninguém: conserte antes. |
 | **Playwright** | prova de tela: abre o dashboard publicado e confere que ele mostra número | `npm i -g playwright && npx playwright install chromium` (~265 MB; a versão leve é `--only-shell`, ~94 MB). |
 | **magic (21st.dev)** | componentes de UI reais no lugar de card feito à mão | Pegue a chave em `https://21st.dev/mcp` e rode:<br>`claude mcp add magic --scope user -e API_KEY=<CHAVE> -- npx -y @21st-dev/magic@latest`<br>**Dois erros que custam tempo:** a chave vai por ENV `API_KEY`, NÃO pela flag `--api-key` (a flag conecta e devolve "not authenticated"); e o NOME vem ANTES do `-e`, senão o flag variádico engole o nome do servidor. As tools novas só aparecem na próxima sessão. |
-| **skill design-taste-frontend** | gate anti-slop antes de publicar | `npx skills add <fonte>/design-taste-frontend` |
+| **skill design-taste-frontend** | gate anti-slop antes de publicar | `npx skills add Leonxlnx/taste-skill` |
 | **skills de design (opcionais)** | direção estética, acabamento e microinteração | `frontend-design`, `high-end-visual-design`, `animate` |
 
 **Regra que nasceu daqui, e vale pra qualquer ferramenta que esta skill venha a usar:** toda
@@ -106,6 +106,9 @@ O `scripts/preflight.py` continua existindo e é complementar: ele valida o `wra
 ---
 
 ### 1. Onboarding e checklist
+
+Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil dash --projeto <dir> registrar 1 --arquivo evidencias/etapa-1.json`.
+Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Nunca presuma que a pessoa leu o README. Explique em 3 frases:
 - "Eu vou construir com você o seu dashboard, na sua conta Cloudflare, do jeito da sua operação."
 - Não é um produto fechado de um nicho: adaptamos domínio, métricas e fonte a você.
@@ -138,11 +141,17 @@ minutos. Isso separa "ambiente funciona" de "infra provisionada": se algo falhar
 que não é o Node, o wrangler nem o wizard, é a parte de provisionamento real.
 
 ### 2. Descoberta da operação
+
+Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil dash --projeto <dir> registrar 2 --arquivo evidencias/etapa-2.json`.
+Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Que área medir: Marketing, Vendas, Suporte, ou mais de uma (um dashboard por área; junte num grupo com abas).
 - Onde os dados vivem: planilha, CRM, Meta Ads, WhatsApp, sistema com API etc.
 - O que ela precisa DECIDIR olhando o dashboard (isso define quais métricas importam).
 
 ### 2.5 DIREÇÃO DO PAINEL (antes de montar qualquer widget)
+
+Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil dash --projeto <dir> registrar 2.5 --arquivo evidencias/etapa-2.5.json`.
+Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 
 O painel nasce feio quando ninguém decidiu o que ele responde. Esta é a fase de concepção do
 diretor de arte, e ela vem ANTES de escolher widget, cor ou layout.
@@ -168,11 +177,17 @@ Registre o uso (`uso-ferramentas.py registrar "skill frontend-design" ...`, ver 
 ---
 
 ### 3. Escolher o modo de dados
+
+Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil dash --projeto <dir> registrar 3 --arquivo evidencias/etapa-3.json`.
+Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados"):
 - AO VIVO: lê a fonte na hora, só KV pra config, setup mínimo. Bom pra maioria.
 - HISTÓRICO: Worker cron tira snapshots no D1; dá histórico de verdade e não depende da fonte no ar. Mais setup.
 
 ### 4. Provisionar a infra DELA
+
+Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil dash --projeto <dir> registrar 4 --arquivo evidencias/etapa-4.json`.
+Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Pergunte qual conta Cloudflare usar e siga `references/infra.md` na ordem (o passo do wrangler.toml é
 BLOQUEANTE: rode `python3 scripts/preflight.py --starter-kit starter-kit` antes do deploy):
 - KV `DASHBOARDS_KV` (sempre) e `DASHBOARD_CACHE` (opcional).
@@ -181,6 +196,9 @@ BLOQUEANTE: rode `python3 scripts/preflight.py --starter-kit starter-kit` antes 
 - `ADMIN_TOKEN` (OBRIGATÓRIO): mutação é fail-closed, sem o token ninguém cria/apaga dashboard.
 
 ### 5. Montar o dashboard
+
+Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil dash --projeto <dir> registrar 5 --arquivo evidencias/etapa-5.json`.
+Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Escolha o domínio pronto (Marketing, Vendas, Suporte, Financeiro, Estoque) ou crie um novo (`references/extensao.md`).
 - Conecte a fonte: planilha (gviz CSV), upload CSV, Meta Ads (token; card só no domínio Marketing) ou
   conector sob medida.
@@ -209,6 +227,9 @@ montar o resto. Replicar padrão errado é o jeito mais caro de errar. <<<**
 
 
 ### 6. Deploy e verificação
+
+Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil dash --projeto <dir> registrar 6 --arquivo evidencias/etapa-6.json`.
+Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Publique na conta DA PESSOA (`wrangler pages deploy public --project-name=<NOME>`).
 - Modo histórico: deploy do Worker cron e força uma primeira captura (`references/infra.md`).
 - **PASSE DE GOSTO (antes de dizer pronto).** Rode a skill **`design-taste-frontend`** sobre o
@@ -299,6 +320,9 @@ esta faltando. Nenhuma explicacao substitui rodar de novo verde. <<<**
 ---
 
 ### 7. Encerramento
+
+Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil dash --projeto <dir> registrar 7 --arquivo evidencias/etapa-7.json`.
+Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Salve o contexto do projeto da pessoa em `projetos/YYYYMMDD-descricao.md` (crie a pasta com
 `mkdir -p projetos`; ela é gitignored de propósito, é contexto privado do cliente): projeto Pages,
 domínio, modo de dados, fontes, decisões. Nunca coloque token, Account ID ou id real: use placeholders.

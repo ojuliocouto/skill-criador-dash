@@ -26,10 +26,10 @@ These steps get a dashboard running on your own machine, reading your own data, 
 
 1. Clone the repository and enter the starter kit:
    ```
-   git clone <YOUR-REPO-URL> criador-dash
+   git clone https://github.com/ojuliocouto/skill-criador-dash.git criador-dash
    cd criador-dash/starter-kit
    ```
-   Replace `<YOUR-REPO-URL>` with the URL you are cloning from. If you are installing this as a Claude Code skill instead of just trying the code, clone straight into `~/.claude/skills/criador-dash` (see "Install as a Claude Code skill" below); the code inside is the same.
+   If you are installing this as a Claude Code skill instead of just trying the code, clone straight into `~/.claude/skills/criador-dash` (see "Install as a Claude Code skill" below); the code inside is the same.
 2. Confirm your environment is ready. There is no `npm install` step (zero runtime dependencies), so this alone proves your Node/npm setup works:
    ```
    npm test
@@ -134,7 +134,7 @@ The skill name in the frontmatter is `criador-dash`, so the install folder must 
 name has a `skill-` prefix; do not reuse it as the folder name):
 
 ```
-git clone <YOUR-REPO-URL> ~/.claude/skills/criador-dash
+git clone https://github.com/ojuliocouto/skill-criador-dash.git ~/.claude/skills/criador-dash
 ```
 
 Repo layout: `SKILL.md` (the agent playbook), `references/` (infra commands, security model, features,
@@ -295,3 +295,42 @@ The full browser flow (Marketing and Sales, including the brand accent color swa
 ## License
 
 MIT.
+
+## Ferramentas e gates do roteiro guiado
+
+Antes do Passo 1, execute `python3 scripts/checar-ferramentas.py` na raiz da skill.
+Além de Node 22+, wrangler e starter-kit, o roteiro exige Python 3.9+, Playwright,
+21st.dev e a skill design-taste-frontend. A biblioteca isolada pode ser testada sem
+esses MCPs; o roteiro guiado bloqueia se faltar uma ferramenta crítica.
+
+```bash
+npm install -g playwright && npx playwright install chromium
+npx skills add Leonxlnx/taste-skill
+claude mcp add --transport http 21st https://21st.dev/api/mcp --scope user --header "x-api-key: SUA_CHAVE"
+```
+
+Obtenha sua própria chave em https://21st.dev/mcp e substitua SUA_CHAVE localmente.
+Não publique a chave. Frontend-design, high-end-visual-design e animate são opcionais.
+Sem elas, declare a degradação. O starter-kit não tem dependências: use `npm test`,
+sem `npm ci`, pois não há arquivo de lock.
+
+Limites do verificador: `claude mcp list` comprova conexão, não uma operação útil;
+presença de uma skill não comprova que foi executada. Faça uma chamada de leitura
+antes de usar o MCP e confira o retorno. Essa prova ainda não está automatizada.
+
+Cada etapa registra evidências com `scripts/gate-etapas.py --perfil dash`.
+Consulte [campos e comandos](references/gate-etapas.md). Na entrega, confira a etapa 6.
+O gate de tela exige número em `.kpi__value` visível; um ano no título não é um KPI.
+Dashboards personalizados precisam preservar esse marcador nos valores de métricas.
+
+```bash
+node scripts/test-prova-dash.cjs
+python3 scripts/test-preflight.py
+python3 scripts/test-uso-ferramentas.py
+python3 scripts/test-gate-etapas.py
+```
+
+Datas brasileiras com hora preservam o dia informado. Status de venda são reconhecidos
+por termos explícitos de conclusão, incluindo pago, concluído, faturado e finalizado.
+Estados como "não pago" e "fechada perdida" não contam como receita. Vocabulário específico
+de ERP deve ser confirmado com o aluno antes de ampliar esse mapeamento.

@@ -11,3 +11,7 @@ dist/
 
 # PNG da prova de tela (prova-dash.js): artefato local, nao versionado
 prova/
+
+# Evidências de cliente ficam fora do repositório público.
+.etapas-verificadas.json
+evidencias/

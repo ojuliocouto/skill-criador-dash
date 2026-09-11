@@ -114,7 +114,7 @@ def checagens(pular_testes=False):
         n = re.search(r"# pass (\d+)", saida)
         yield ("Pecas do starter-kit", "a biblioteca testada de onde o dash e montado", True, ok,
                f"{n.group(1)} testes passando" if (ok and n) else saida.splitlines()[-1][:110] if saida else "",
-               "cd starter-kit && npm ci && npm test (peca quebrada nao vira dashboard de ninguem)")
+               "cd starter-kit && npm test (peca quebrada nao vira dashboard de ninguem)")
 
     ok, saida = roda(
         f'NODE_PATH="$HOME/.npm-global/lib/node_modules" node "{RAIZ}/scripts/prova-dash.js" --check')
