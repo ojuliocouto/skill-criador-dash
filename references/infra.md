@@ -2,12 +2,13 @@
 
 Pergunte SEMPRE qual conta Cloudflare antes de operar. Confirme com `wrangler whoami`.
 Não há passo de build: o `wrangler.toml` já tem `pages_build_output_dir = "public"`, então os comandos
-usam a pasta `public/` direto. Todos os comandos abaixo rodam a partir da pasta `starter-kit/` (é onde
-mora o `wrangler.toml`, o `db/schema.sql` e o `package.json`).
+usam a pasta `public/` direto. Todos os comandos abaixo rodam a partir da pasta do projeto, `~/meu-dash` (a cópia do
+starter-kit feita no passo 1 do SKILL.md; é onde mora o `wrangler.toml`, o `db/schema.sql` e o
+`package.json`). Nunca rode deploy de dentro da pasta da skill.
 
 Antes de começar, rode o preflight (checa Node, wrangler, login, placeholders e token de ambiente):
 ```
-python3 ../scripts/preflight.py --starter-kit .
+python3 ~/.claude/skills/criador-dash/scripts/preflight.py --starter-kit ~/meu-dash
 ```
 
 ## Base (os dois modos)
@@ -30,7 +31,7 @@ deploy TÊM que ser iguais). Nunca commite id real em repo público. Confirme qu
 placeholder ANTES de seguir:
 ```
 grep -n "<SEU_KV\|<NOME-DO-PROJETO\|meu-dashboard" wrangler.toml   # tem que voltar VAZIO. Se achar algo, ainda falta trocar.
-# ou: python3 ../scripts/preflight.py --starter-kit .  (faz esta checagem e as demais)
+# ou: python3 ~/.claude/skills/criador-dash/scripts/preflight.py --starter-kit ~/meu-dash  (faz esta checagem e as demais)
 ```
 Se você deployar com um placeholder de id ainda no toml, o deploy COMPILA e passa, mas a API responde 500
 "Binding DASHBOARDS_KV não configurado" em runtime. Por isso o grep acima é obrigatório antes do passo 3.
@@ -50,7 +51,7 @@ O agente FAZ isso; a pessoa não precisa inventar nem decorar token:
 ```
 # 1) gere um token aleatorio forte (o agente roda isto e GUARDA o valor pra passar pra pessoa):
 openssl rand -base64 32
-# 2) defina como secret do Pages (a partir de starter-kit/; cole o valor gerado quando ele pedir):
+# 2) defina como secret do Pages (a partir de ~/meu-dash; cole o valor gerado quando ele pedir):
 wrangler pages secret put ADMIN_TOKEN --project-name=<NOME-DO-PROJETO>
 ```
 Ou pelo painel: Cloudflare Pages > seu projeto > Settings > Variables and Secrets > adicionar `ADMIN_TOKEN`
@@ -73,7 +74,7 @@ CNAME pra você criar lá. Antes do domínio propagar, valide tudo pela URL nati
 
 ## Modo histórico (adiciona, só se a pessoa escolheu Histórico)
 
-Sempre a partir de `starter-kit/`:
+Sempre a partir de `~/meu-dash`:
 ```
 wrangler d1 create dashboard-db
 # imprime database_id = "..."; cole em workers/snapshot/wrangler.toml (DASHBOARD_DB) e no binding D1 do Pages

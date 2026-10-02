@@ -15,6 +15,7 @@ RAIZ = pathlib.Path(__file__).resolve().parent.parent
 SKILL = (RAIZ / "SKILL.md").read_text(encoding="utf-8")
 ARTE = (RAIZ / "references" / "direcao-de-arte.md").read_text(encoding="utf-8")
 README = (RAIZ / "README.md").read_text(encoding="utf-8")
+GATE_ETAPAS = (RAIZ / "references" / "gate-etapas.md").read_text(encoding="utf-8")
 
 
 def linhas_com(texto, padrao):
@@ -48,6 +49,20 @@ class Roteiro(unittest.TestCase):
         self.assertTrue("tells" in SKILL, "falta " + "tells")
         self.assertTrue(re.search(r"`frontend-design`[^\n]*obrigat", SKILL), "frontend-design precisa constar como obrigatória")
         self.assertTrue("pré-voo anti-slop" in ARTE, "falta " + "pré-voo anti-slop")
+
+    def test_t5_pasta_do_projeto_e_explicita(self):
+        # "<dir>", "<dir-da-skill>" e "projeto do aluno" nunca eram definidos, e o Quickstart
+        # mandava trabalhar dentro da pasta da skill.
+        self.assertTrue("cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash" in SKILL,
+                        "falta o passo de copiar o starter-kit pra pasta do aluno")
+        sobra = sorted(set(re.findall(r"<dir[^>]*>", SKILL)))
+        self.assertFalse(sobra, f"placeholder de pasta sem definição: {sobra}")
+        self.assertFalse(re.search(r"cd starter-kit\b", SKILL), "SKILL.md ainda manda trabalhar dentro da pasta da skill")
+        for etapa in ("1", "2", "2.5", "3", "4", "5", "6", "7"):
+            with self.subTest(etapa=etapa):
+                self.assertTrue(f"evidencias/etapa-{etapa}.json" in GATE_ETAPAS,
+                                f"gate-etapas.md sem exemplo da etapa {etapa} do perfil dash")
+        self.assertFalse(re.search(r"<dir[^>]*>", GATE_ETAPAS), "gate-etapas.md com placeholder de pasta")
 
 
 if __name__ == "__main__":
