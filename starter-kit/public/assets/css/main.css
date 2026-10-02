@@ -317,13 +317,12 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 
 /* Table */
 .tbl-wrap, .table__scroll { overflow-x: auto; }
-/* Altura maxima com scroll proprio: a tabela crescia sem limite, esticava a pagina e deixava
-   um buraco ao lado do widget vizinho (ranking de 3 barras contra tabela de 13 linhas). O
-   cabecalho fica grudado no topo pra nao perder a referencia da coluna no meio do scroll. */
-.table__scroll { max-height: 420px; overflow-y: auto; }
-.table__scroll thead th { position: sticky; top: 0; background: var(--bg-elev); z-index: 1; }
-/* Tela baixa: 420px viraria quase a tela toda so de tabela. */
-@media (max-height: 800px) { .table__scroll { max-height: 320px; } }
+/* Sem rolagem vertical propria (print real de 02/10/2026): a altura maxima cortava a 11a linha
+   no meio, sem aviso. A tabela mostra as linhas inteiras (ate pageSize) e o rodape diz quantas;
+   a rolagem que sobra e so a lateral, avisada no celular. */
+.table__rodape { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-top: 12px; color: var(--text-faint); font-size: 12.5px; }
+.table__arrasta { display: none; }
+@media (max-width: 720px) { .table__arrasta { display: inline; } }
 .table__title, .chart__title { font-size: 13.5px; font-weight: 560; color: var(--text-dim); letter-spacing: -0.01em; margin: 0 0 16px; }
 .table__empty { color: var(--text-faint); text-align: center; padding: 30px 0; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }

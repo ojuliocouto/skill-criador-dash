@@ -19,6 +19,12 @@ export function render(props = {}, data = {}) {
   }
 
   const head = columns.map((c) => `<th scope="col">${esc(c)}</th>`).join('');
+  // Print real (02/10/2026): a rolagem vertical interna cortava a linha no meio sem aviso.
+  // Agora a tabela mostra as linhas inteiras e diz quantas são; o excesso se vê pelo filtro.
+  const mostradas = Math.min(rows.length, pageSize);
+  const resumo = mostradas === rows.length
+    ? `Mostrando ${rows.length === 1 ? 'a única linha' : `as ${rows.length} linhas`}.`
+    : `Mostrando ${mostradas} de ${rows.length} linhas. Use o filtro de período para ver as outras.`;
   const body = rows
     .slice(0, pageSize)
     .map((row) => {
@@ -35,6 +41,10 @@ export function render(props = {}, data = {}) {
           `<thead><tr>${head}</tr></thead>` +
           `<tbody>${body}</tbody>` +
         `</table>` +
+      `</div>` +
+      `<div class="table__rodape">` +
+        `<span class="table__resumo">${esc(resumo)}</span>` +
+        `<span class="table__arrasta">Arraste para o lado para ver todas as colunas.</span>` +
       `</div>` +
     `</div>`
   );
