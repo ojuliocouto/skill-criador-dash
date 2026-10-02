@@ -6,7 +6,8 @@ Automatiza o checklist do SKILL.md (passo 1) e o passo BLOQUEANTE do provisionam
 passa mas a API responde 500 "Binding DASHBOARDS_KV nao configurado" em runtime).
 
 Uso:
-  python3 scripts/preflight.py --starter-kit starter-kit
+  python3 scripts/preflight.py --starter-kit ~/meu-dash                     # passo 1: ambiente
+  python3 scripts/preflight.py --starter-kit ~/meu-dash --antes-do-deploy   # passo 4: bloqueia placeholder
   python3 scripts/preflight.py --starter-kit starter-kit --history   # inclui checks do modo historico
   python3 scripts/preflight.py --starter-kit starter-kit --run-tests # roda a suite npm test no final
 
@@ -78,7 +79,8 @@ def check_api_token(avisos: list) -> None:
         print(f"{OK} CLOUDFLARE_API_TOKEN: nao exportado (deploy usa o OAuth do wrangler login)")
 
 
-def check_toml(path: Path, problemas: list, nome: str, exigir_projeto: bool) -> None:
+def check_toml(path: Path, problemas: list, nome: str, exigir_projeto: bool,
+               avisos: list = None, bloquear: bool = True) -> None:
     if not path.exists():
         problemas.append(f"{nome} nao encontrado em {path}. Rode a partir da raiz do repo (--starter-kit).")
         print(f"{BLOQUEIO} {nome}: nao encontrado ({path})")
@@ -91,7 +93,15 @@ def check_toml(path: Path, problemas: list, nome: str, exigir_projeto: bool) -> 
     sobrando = [p for p in PLACEHOLDERS if p in texto_ativo]
     if exigir_projeto and re.search(rf'^name\s*=\s*"{DEFAULT_PROJECT_NAME}"', texto_ativo, re.MULTILINE):
         sobrando.append(f'name = "{DEFAULT_PROJECT_NAME}" (troque pelo nome real do projeto Pages)')
-    if sobrando:
+    if sobrando and not bloquear:
+        # T6 (teste com aluno, 02/10/2026): no passo 1 ninguem tem KV ainda, e o BLOQUEIO
+        # aqui fazia o aluno achar que nao podia seguir. So bloqueia com --antes-do-deploy.
+        if avisos is not None:
+            avisos.append(
+                f"{nome} ainda tem placeholder ({', '.join(sobrando)}). É esperado até o passo 4: "
+                "antes do deploy, rode de novo com --antes-do-deploy.")
+        print(f"{AVISO} {nome}: placeholders pendentes, esperado até o passo 4 -> {', '.join(sobrando)}")
+    elif sobrando:
         problemas.append(
             f"{nome} ainda tem placeholder: {', '.join(sobrando)}. "
             "Se deployar assim, o deploy passa mas a API responde 500 'Binding DASHBOARDS_KV nao configurado'."
@@ -142,6 +152,8 @@ def main() -> int:
                               "funciona chamado de qualquer lugar)")
     parser.add_argument("--history", action="store_true", help="inclui as checagens do modo historico (worker de snapshot)")
     parser.add_argument("--run-tests", action="store_true", help="roda npm test no final")
+    parser.add_argument("--antes-do-deploy", action="store_true",
+                        help="passo 4: placeholder no wrangler.toml vira BLOQUEIO (sem a flag, é só aviso)")
     args = parser.parse_args()
 
     starter = Path(args.starter_kit).resolve()
@@ -152,10 +164,12 @@ def main() -> int:
     check_node(problemas)
     check_wrangler(problemas, avisos)
     check_api_token(avisos)
-    check_toml(starter / "wrangler.toml", problemas, "wrangler.toml", exigir_projeto=True)
+    check_toml(starter / "wrangler.toml", problemas, "wrangler.toml", exigir_projeto=True,
+               avisos=avisos, bloquear=args.antes_do_deploy)
     if args.history:
         check_toml(starter / "workers" / "snapshot" / "wrangler.toml", problemas,
-                   "workers/snapshot/wrangler.toml", exigir_projeto=False)
+                   "workers/snapshot/wrangler.toml", exigir_projeto=False,
+                   avisos=avisos, bloquear=args.antes_do_deploy)
     check_dev_vars(starter, avisos)
     if args.run_tests:
         run_tests(starter, problemas)
@@ -170,7 +184,10 @@ def main() -> int:
         for p in problemas:
             print(f"  - {p}")
         return 1
-    print("Tudo pronto: pode seguir pro deploy (references/infra.md, passo 3).")
+    if args.antes_do_deploy:
+        print("Tudo pronto: pode seguir pro deploy (references/infra.md, passo 3).")
+    else:
+        print("Ambiente pronto: pode seguir o roteiro. Antes do deploy (passo 4), rode de novo com --antes-do-deploy.")
     return 0
 
 

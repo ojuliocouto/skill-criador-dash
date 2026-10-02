@@ -35,6 +35,30 @@ class Preflight(unittest.TestCase):
                     pre.check_toml(arquivo, problemas, 'wrangler.toml', False)
                 self.assertEqual(bool(problemas), bloqueia)
 
+    def rodar_main(self, *flags):
+        # T6: no passo 1 o aluno não tem KV nenhum; o placeholder do wrangler.toml é esperado.
+        with tempfile.TemporaryDirectory() as pasta:
+            (pathlib.Path(pasta) / 'wrangler.toml').write_text('name = "meu-dashboard"\nid = "<SEU_KV_NAMESPACE_ID>"\n')
+            (pathlib.Path(pasta) / '.dev.vars').write_text('ADMIN_TOKEN=teste\n')
+            saida = io.StringIO()
+            with patch.object(pre, 'check_node', lambda problemas: None), \
+                 patch.object(pre, 'check_wrangler', lambda problemas, avisos: None), \
+                 patch.object(pre.sys, 'argv', ['preflight.py', '--starter-kit', pasta, *flags]), \
+                 contextlib.redirect_stdout(saida):
+                codigo = pre.main()
+            return codigo, saida.getvalue()
+
+    def test_passo_1_placeholder_do_toml_nao_bloqueia(self):
+        codigo, saida = self.rodar_main()
+        self.assertEqual(codigo, 0, saida)
+        self.assertNotIn('[BLOQUEIO]', saida)
+        self.assertIn('passo 4', saida)
+
+    def test_antes_do_deploy_placeholder_bloqueia(self):
+        codigo, saida = self.rodar_main('--antes-do-deploy')
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn('[BLOQUEIO]', saida)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

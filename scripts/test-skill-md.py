@@ -64,6 +64,13 @@ class Roteiro(unittest.TestCase):
                                 f"gate-etapas.md sem exemplo da etapa {etapa} do perfil dash")
         self.assertFalse(re.search(r"<dir[^>]*>", GATE_ETAPAS), "gate-etapas.md com placeholder de pasta")
 
+    def test_t6_preflight_do_passo_1_nao_assusta_e_o_do_deploy_bloqueia(self):
+        # Passo 1 gritava BLOQUEIO por placeholder do wrangler.toml, que só vale no passo 4.
+        self.assertTrue(re.search(r"preflight\.py --starter-kit ~/meu-dash --antes-do-deploy", SKILL),
+                        "o passo 4 precisa rodar o preflight com --antes-do-deploy")
+        self.assertTrue(re.search(r"esperado[^\n]*passo 4", SKILL),
+                        "o passo 1 precisa dizer que o aviso do wrangler.toml é esperado até o passo 4")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

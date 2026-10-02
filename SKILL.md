@@ -120,8 +120,8 @@ dependência nova entra no `checar-ferramentas.py` com um teste que a EXERCITA. 
 conseguir escrever esse teste, a dependência não entra na skill: sem teste, ela morre em
 silêncio e degrada o resultado sem avisar ninguém.
 
-O `scripts/preflight.py` continua existindo e é complementar: ele valida o `wrangler.toml`, o
-`.dev.vars` e o projeto ANTES do deploy. O `checar-ferramentas.py` é antes de tudo; o
+O `scripts/preflight.py` continua existindo e é complementar: ele valida o ambiente no passo 1 e,
+com `--antes-do-deploy`, o `wrangler.toml`, o `.dev.vars` e o projeto ANTES do deploy. O `checar-ferramentas.py` é antes de tudo; o
 `preflight.py` é antes de publicar.
 
 ---
@@ -143,6 +143,9 @@ Rode o preflight, que checa o ambiente de uma vez e diz o que falta:
 ```
 python3 ~/.claude/skills/criador-dash/scripts/preflight.py --starter-kit ~/meu-dash
 ```
+Neste passo, o aviso de placeholder no `wrangler.toml` é esperado até o passo 4
+(`<SEU_KV_NAMESPACE_ID>`): a pessoa ainda não criou KV nenhum. Ele não bloqueia agora; vira bloqueio só quando o
+preflight roda com `--antes-do-deploy`, no passo 4.
 Checklist (um item por vez; se faltar algo, resolva antes de seguir):
 - [ ] Conta no Cloudflare? (plano grátis cobre Pages + Functions + KV; D1 tem free tier). Senão: dash.cloudflare.com.
 - [ ] Node 22 ou mais novo instalado? (`node -v`). O wrangler atual exige Node 22+; com uma versão mais
@@ -227,7 +230,7 @@ Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados")
 Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 4 --arquivo evidencias/etapa-4.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Pergunte qual conta Cloudflare usar e siga `references/infra.md` na ordem (o passo do wrangler.toml é
-BLOQUEANTE: rode `python3 ~/.claude/skills/criador-dash/scripts/preflight.py --starter-kit ~/meu-dash` antes do deploy):
+BLOQUEANTE: rode `python3 ~/.claude/skills/criador-dash/scripts/preflight.py --starter-kit ~/meu-dash --antes-do-deploy` antes do deploy):
 - KV `DASHBOARDS_KV` (sempre) e `DASHBOARD_CACHE` (opcional).
 - Modo histórico: D1 + `db/schema.sql` + Worker cron (`workers/snapshot/`).
 - Projeto Pages + domínio customizado.
