@@ -42,6 +42,7 @@ Documentação de apoio (leia o arquivo certo na hora certa, não tudo de uma ve
 - `references/direcao-de-arte.md`: as TRÊS fases do diretor de arte (concepção, construção, passe final), com o norte Linear/Vercel/Stripe.
 - `references/recursos.md`: filtros, grid 2D, grupos com abas, tema, estética anti-IA, OpenGraph, árvore de arquivos.
 - `references/extensao.md`: adicionar domínio, conector ou widget novo.
+- `references/token-meta-ads.md`: passo a passo pra pessoa gerar o próprio token do Meta Ads (usuário do sistema), com a tabela de erros.
 - `starter-kit/ARCHITECTURE.md`: os 7 contratos das camadas (fonte da verdade do código).
 
 ## Passo a passo (o roteiro que você conduz)
@@ -157,7 +158,16 @@ O painel nasce feio quando ninguém decidiu o que ele responde. Esta é a fase d
 diretor de arte, e ela vem ANTES de escolher widget, cor ou layout.
 
 Leia `references/direcao-de-arte.md` (norte: Linear, Vercel e Stripe) e feche por escrito, com
-a pessoa, seis decisões:
+a pessoa, seis decisões. **Junto com elas, acione duas skills de design** (se a pessoa não tiver,
+instale antes de seguir; não monte a tela sem elas):
+
+- `frontend-design`: direção visual do painel (tipografia, paleta, hierarquia) escrita como plano
+  ANTES do código, a partir das seis decisões abaixo.
+- `design-taste-frontend` (anti-slop): o pré-voo dela roda sobre o plano e de novo sobre a tela
+  pronta, e o que ela reprovar se corrige antes do deploy. Painel com cara de template (roxo
+  genérico, card igual a card, número sem hierarquia) não passa.
+
+As seis decisões:
 
 1. **Número herói**: se ela só pudesse ver UM número por dia, qual seria? Vira o
    `primaryMetric` do template, e o layout transforma isso no card maior, com sparkline.
@@ -202,6 +212,11 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
 - Escolha o domínio pronto (Marketing, Vendas, Suporte, Financeiro, Estoque) ou crie um novo (`references/extensao.md`).
 - Conecte a fonte: planilha (gviz CSV), upload CSV, Meta Ads (token; card só no domínio Marketing) ou
   conector sob medida.
+- **Meta Ads: a pessoa gera o token DELA.** Antes de pedir o token, leia `references/token-meta-ads.md`
+  e conduza a pessoa por ele, um passo por vez, esperando ela confirmar cada um (app, usuário do sistema
+  com só leitura, atribuir a conta, gerar token com validade Nunca e `ads_read` + `read_insights`, pegar o
+  ID da conta). Nunca use token seu, do operador ou de outra conta: o dash é da pessoa. Se der erro,
+  a tabela "Se der erro" do mesmo arquivo diz o que é cada mensagem da Meta.
 - Mapeie colunas (auto-mapeamento pré-preenche), defina branding (cor), meta opcional e senha opcional.
 - No modo ao vivo a fonte fica na config; no histórico ela alimenta o cron e o dashboard lê o D1.
 

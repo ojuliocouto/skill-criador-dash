@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 
 import { buildInsightsUrl, mapInsightsToDataSet } from '../functions/lib/meta.mjs';
 
-test('buildInsightsUrl: monta URL base da Graph API v20.0 com act_ correto', () => {
+test('buildInsightsUrl: monta URL base da Graph API v25.0 com act_ correto', () => {
   const url = buildInsightsUrl({ token: 'TK', accountId: '123' });
   assert.ok(
-    url.startsWith('https://graph.facebook.com/v20.0/act_123/insights?'),
+    url.startsWith('https://graph.facebook.com/v25.0/act_123/insights?'),
     'deve começar com o endpoint act_123/insights'
   );
 });
@@ -56,7 +56,7 @@ test('buildInsightsUrl: sem since/until omite o time_range', () => {
 test('buildInsightsUrl: aceita o alias account (nome gravado pelo wizard)', () => {
   const url = buildInsightsUrl({ token: 'TK', account: '456' });
   assert.ok(
-    url.startsWith('https://graph.facebook.com/v20.0/act_456/insights?'),
+    url.startsWith('https://graph.facebook.com/v25.0/act_456/insights?'),
     'deve montar act_456 a partir de account'
   );
 });

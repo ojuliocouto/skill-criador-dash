@@ -15,7 +15,7 @@ Required, before you run any command below:
 
 Optional, only if you need it:
 
-- A **Meta Ads** access token (Business Manager System User) and ad account id, only for the native Meta Ads connector (Marketing domain).
+- A **Meta Ads** access token (Business Manager System User, never expires, `ads_read` + `read_insights`) and ad account id, only for the native Meta Ads connector (Marketing domain). Step-by-step guide (Portuguese): `references/token-meta-ads.md`.
 - Nothing extra for D1 / historical mode: it reuses the same Cloudflare account, it just adds one more `wrangler d1 create` step later (see Deploy below).
 
 Nothing above requires a paid plan or a company account: a personal Cloudflare account and a personal Google account are enough to follow this guide end to end.

@@ -32,7 +32,7 @@ const SPECIFIC_PURCHASE_ACTION_TYPES = [
 ];
 
 /**
- * Monta a URL da Graph API v20.0 para buscar insights de anúncios.
+ * Monta a URL da Graph API v25.0 para buscar insights de anúncios.
  * @param {Object} params
  * @param {string} params.token       access token do usuário
  * @param {string} [params.accountId] id da conta de anúncios (com ou sem prefixo act_)
@@ -54,7 +54,7 @@ export function buildInsightsUrl({ token, accountId, account, since, until, leve
 
   // Remove o prefixo act_ se vier junto, para não duplicar ao remontar.
   const digits = String(acc).replace(/^act_/, '');
-  const base = `https://graph.facebook.com/v20.0/act_${digits}/insights`;
+  const base = `https://graph.facebook.com/v25.0/act_${digits}/insights`;
 
   const params = new URLSearchParams();
   params.set('access_token', token);

@@ -399,13 +399,13 @@ function renderSource(body) {
   if (state.domain === 'marketing') {
     metaCard = el('div', { class: 'card' }, [
       el('h3', { text: 'Meta Ads (avançado)' }),
-      el('p', { class: 'hint', text: 'Puxa insights de campanha direto da Graph API. Precisa de um access token (System User do Business Manager) e do ID da conta de anuncios. O token fica so no servidor, nunca aparece no dashboard.' }),
+      el('p', { class: 'hint', text: 'Puxa os números das campanhas direto da Meta. Você precisa de um token de usuário do sistema (validade Nunca, permissões ads_read e read_insights) e do ID da conta de anúncios, o número depois de act= no endereço do Gerenciador de Anúncios. O token fica só no servidor e nunca aparece no dashboard.' }),
       el('label', { class: 'field' }, [
         el('span', { class: 'lbl', text: 'Access token' }),
         el('input', { class: 'input', id: 'metaToken', type: 'password', placeholder: 'EAAB...', autocomplete: 'off' }),
       ]),
       el('label', { class: 'field' }, [
-        el('span', { class: 'lbl', text: 'ID da conta de anuncios' }),
+        el('span', { class: 'lbl', text: 'ID da conta de anúncios' }),
         el('input', { class: 'input', id: 'metaAccount', type: 'text', placeholder: 'act_1234567890 ou 1234567890' }),
       ]),
       el('label', { class: 'field' }, [
