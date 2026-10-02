@@ -249,6 +249,8 @@ nao o widget. Adicionar um widget = criar `widgets/<nome>.js` (render puro) + um
   colMap: { data:'Data', investimento:'Investimento', ... },
   accent: '#6d28d9',        // cor de destaque (branding)
   goal: { metricKey:'investimento', value: 10000 },   // opcional: meta vs realizado na métrica principal
+  heroMetric: 'CPA',                                  // opcional: número herói DESTE dashboard
+  hiddenMetrics: ['CTR'],                             // opcional: métricas que não entram neste dashboard
   auth: { salt, verifier, iterations, algo },         // opcional: senha (verifier PBKDF2-SHA256 salgado; ver abaixo)
   storage: 'd1',                                      // opcional: modo histórico (cron grava snapshots no D1)
   createdAt: ISO
@@ -259,6 +261,9 @@ Campos opcionais da config (o código só os grava quando o usuário os preenche
 - `source.meta`: presente quando `source.type === 'meta'`. Guarda `{ token, account, since, until }`.
   O `token` fica **só no servidor** (KV): nunca é devolvido ao browser (ver `meta-ads.js` e Contrato 2).
 - `goal`: `{ metricKey, value }`. Habilita a comparação meta vs realizado na métrica principal do domínio.
+- `heroMetric` e `hiddenMetrics` (opcionais): a personalização do passo 2.5 (número herói e o que não
+  entra). Aplicada por `public/assets/js/lib/personalizacao.js` sobre uma CÓPIA do template; o template
+  do domínio não muda. O servidor valida só a forma (`functions/lib/personalizacao-shape.mjs`).
 - `auth`: o cliente manda um SHA-256 da senha no header `x-dash-auth`; o servidor NUNCA grava esse hash
   (seria reenviável): deriva e grava só um verifier PBKDF2-SHA256 salgado por dashboard
   (`{ salt, verifier, iterations, algo }`, ver `functions/lib/auth-config.mjs`), recomputa a cada

@@ -11,6 +11,7 @@ import { authRateLimit } from '../lib/rate-limit.mjs';
 import { DOMAINS, isDomain } from '../lib/domains.mjs';
 import { validarFonte } from '../lib/source-shape.mjs';
 import { validarColMap, colunasDaFonte } from '../lib/colmap-shape.mjs';
+import { validarPersonalizacao } from '../lib/personalizacao-shape.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -364,6 +365,12 @@ async function create(kv, request, providedHash, env) {
     const colunas = colunasDaFonte(config.source);
     const colMapInvalido = validarColMap(config.domain, config.colMap, colunas);
     if (colMapInvalido) return erro(colMapInvalido, 400);
+  }
+
+  // Personalizacao (T7): numero heroi e metricas que nao entram. So a forma e validada aqui.
+  if (!isGroup) {
+    const persInvalida = validarPersonalizacao(config);
+    if (persInvalida) return erro(persInvalida, 400);
   }
 
   // Valida a cor de destaque no servidor: se vier e nao for hex (#rgb/#rrggbb),

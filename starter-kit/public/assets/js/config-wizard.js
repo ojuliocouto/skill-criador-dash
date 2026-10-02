@@ -11,6 +11,7 @@ import { getSource } from './sources/index.js';
 import { sha256Hex } from './lib/auth.js';
 import { aplicarAccent } from './lib/color.js';
 import { safeLogoSrc } from './lib/brand.js';
+import { metricasDoPainel } from './lib/personalizacao.js';
 
 // Le o tema atual do documento (o theme.js grava dataset.theme). Serve pra
 // calibrar o accent do preview com o contraste certo do tema em uso.
@@ -76,6 +77,8 @@ const state = {
   accent: '#5b62d6',
   logo: '', // URL do logo (opcional). Vazio = usa o .dot de hoje.
   accent2: '', // cor secundaria hex (opcional). Vazio = derivada da primaria.
+  heroMetric: '', // numero heroi escolhido (T7). Vazio = o padrao do dominio.
+  hiddenMetrics: [], // metricas que nao entram no painel (T7).
   connecting: false, // trava o botão Conectar durante a chamada
 };
 
@@ -134,7 +137,27 @@ export function prefillStateFromConfig(state, cfg) {
     logo: typeof c.logo === 'string' ? c.logo : '',
     colMap: (c.colMap && typeof c.colMap === 'object') ? { ...c.colMap } : {},
     source: (c.source && typeof c.source === 'object') ? c.source : state.source,
+    heroMetric: typeof c.heroMetric === 'string' ? c.heroMetric : '',
+    hiddenMetrics: Array.isArray(c.hiddenMetrics) ? c.hiddenMetrics.filter((k) => typeof k === 'string') : [],
   };
+}
+
+/**
+ * T7 (teste com aluno, 02/10/2026): número herói e métricas que não entram, escolhidos no
+ * passo Finalizar. Devolve só o que difere do padrão do domínio (config limpa), e ignora
+ * chave que não existe no template. Pura, testável sem DOM.
+ * @param {object} tpl template do domínio
+ * @param {string} heroi chave escolhida no seletor
+ * @param {string[]} ocultas chaves marcadas como "não entra"
+ * @returns {{heroMetric?:string, hiddenMetrics?:string[]}}
+ */
+export function montarPersonalizacao(tpl, heroi, ocultas) {
+  const chaves = new Set(((tpl && tpl.metrics) || []).map((m) => m.key));
+  const out = {};
+  if (heroi && chaves.has(heroi) && heroi !== (tpl && tpl.primaryMetric)) out.heroMetric = heroi;
+  const lista = (Array.isArray(ocultas) ? ocultas : []).filter((k) => chaves.has(k) && k !== (heroi || (tpl && tpl.primaryMetric)));
+  if (lista.length) out.hiddenMetrics = [...new Set(lista)];
+  return out;
 }
 
 // Cor secundaria default do input color quando o usuario liga o toggle. So um
@@ -629,11 +652,13 @@ function renderMap(body) {
 function renderFinish(body) {
   body.appendChild(el('h2', { text: 'Finalize o dashboard' }));
 
-  // Metrica principal do dominio, para a meta opcional (meta vs realizado).
+  // Metrica principal: a escolhida no seletor de numero heroi (T7) ou a padrao do dominio.
+  // A meta opcional (meta vs realizado) segue o heroi.
   const tpl = getTemplate(state.domain) || {};
-  const primaryKey = tpl.primaryMetric;
-  const primaryDef = (tpl.metrics || []).find((m) => m.key === primaryKey);
-  const primaryLabel = primaryDef ? primaryDef.label : 'meta';
+  const metricas = metricasDoPainel(tpl);
+  const heroiInicial = metricas.some((m) => m.key === state.heroMetric) ? state.heroMetric : tpl.primaryMetric;
+  let primaryKey = heroiInicial;
+  const labelDe = (k) => { const d = metricas.find((m) => m.key === k); return d ? d.label : 'meta'; };
 
   // Reaplica todo o accent (primaria + secundaria) pro preview do wizard refletir
   // o estado atual, calibrado pro tema. Centraliza pra os handlers reusarem.
@@ -740,9 +765,35 @@ function renderFinish(body) {
   ];
   // Sincroniza o preview do logo com o estado inicial ao montar o passo.
   atualizarLogoPreview(state.logo || '');
+  // --- T7: numero heroi e o que NAO entra (as decisoes do passo 2.5) ---
+  const heroSelect = el('select', { class: 'input', id: 'dashHero' },
+    metricas.map((m) => el('option', { value: m.key, text: m.label })));
+  heroSelect.value = heroiInicial || '';
+  const ocultasBox = el('div', { class: 'ocultas', style: 'display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:4px' });
+  for (const m of metricas.filter((x) => x.naFaixa)) {
+    const chk = el('input', { value: m.key, type: 'checkbox', 'data-oculta': m.key });
+    chk.checked = (state.hiddenMetrics || []).includes(m.key);
+    ocultasBox.appendChild(el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:13.5px' }, [chk, el('span', { text: m.label })]));
+  }
+  fields.push(el('label', { class: 'field' }, [
+    el('span', { class: 'lbl', text: 'Número herói (o card maior)' }),
+    heroSelect,
+    el('span', { class: 'hint', text: 'O número que a pessoa olharia se só pudesse ver um por dia. Vale só para este dashboard.' }),
+  ]));
+  fields.push(el('div', { class: 'field' }, [
+    el('span', { class: 'lbl', text: 'Métricas que não entram (opcional)' }),
+    ocultasBox,
+    el('span', { class: 'hint', text: 'Marque o que ninguém usa para decidir. Some da faixa de números e do funil deste dashboard.' }),
+  ]));
+
   if (primaryKey) {
+    const goalLbl = el('span', { class: 'lbl', text: `Meta de ${labelDe(primaryKey)} (opcional)` });
+    heroSelect.addEventListener('change', () => {
+      primaryKey = heroSelect.value;
+      goalLbl.textContent = `Meta de ${labelDe(primaryKey)} (opcional)`;
+    });
     fields.push(el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: `Meta de ${primaryLabel} (opcional)` }),
+      goalLbl,
       el('input', { class: 'input', id: 'dashGoal', type: 'number', min: '0', placeholder: 'Deixe em branco se nao tiver meta' }),
       el('span', { class: 'hint', text: 'Mostra o progresso (percentual da meta) no card principal.' }),
     ]));
@@ -821,7 +872,13 @@ function renderFinish(body) {
     // Cor secundaria (opcional): so envia quando NAO esta no modo padrao.
     if (accent2) config.accent2 = accent2;
 
-    // Meta opcional (meta vs realizado) na metrica principal do dominio.
+    // Numero heroi e metricas que nao entram (T7): so grava o que difere do padrao.
+    const ocultasMarcadas = [...card.querySelectorAll('[data-oculta]')].filter((c) => c.checked).map((c) => c.value);
+    Object.assign(config, montarPersonalizacao(tpl, heroSelect.value, ocultasMarcadas));
+    state.heroMetric = heroSelect.value;
+    state.hiddenMetrics = ocultasMarcadas;
+
+    // Meta opcional (meta vs realizado) na metrica principal (o heroi escolhido).
     const goalInput = card.querySelector('#dashGoal');
     const goalVal = goalInput ? Number(goalInput.value) : NaN;
     if (primaryKey && Number.isFinite(goalVal) && goalVal > 0) {

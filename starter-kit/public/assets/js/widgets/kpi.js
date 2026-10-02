@@ -40,7 +40,7 @@ function sparkSvg(serie) {
 }
 
 export function render(props = {}, value) {
-  const { label = '', format = 'number', hint, trend, goal, unmapped = false, hero = false, spark } = props;
+  const { label = '', format = 'number', hint, trend, goal, unmapped = false, hero = false, spark, heroCompacto = false } = props;
   // unmapped: a metrica depende de um slot SEM coluna mapeada (ex: export sem
   // "Leads" faz CPL depender de leads). O valor calculado nessa hora e sempre 0
   // pelo fallback de agregacao, mas 0 e um numero: mostrar "R$ 0,00" tem cara de
@@ -76,7 +76,7 @@ export function render(props = {}, value) {
   // grafico de dado que nao existe. Mesma regra que ja vale pra trend e goal.
   const sparkHtml = !unmapped && hero ? sparkSvg(spark) : '';
   return (
-    `<div class="kpi${hero ? ' kpi--hero' : ''}${unmapped ? ' is-unmapped' : ''}"${unmapped ? ' data-estado="nao-mapeada"' : ''}>` +
+    `<div class="kpi${hero ? ' kpi--hero' : ''}${hero && heroCompacto ? ' kpi--hero-compacto' : ''}${unmapped ? ' is-unmapped' : ''}"${unmapped ? ' data-estado="nao-mapeada"' : ''}>` +
       `<div class="kpi__label">${esc(label)}</div>` +
       `<div class="kpi__value">${esc(valor)}</div>` +
       sparkHtml +

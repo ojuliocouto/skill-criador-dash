@@ -81,7 +81,7 @@ const VALORES = { investimento: 13990.5, leads: 1001, CPL: 13.98 };
 
 test('bloco de kpi: o primaryMetric do template vira o herói', () => {
   const html = renderKpiBlock(ITENS, TPL, VALORES);
-  assert.equal((html.match(/kpi--hero/g) || []).length, 1, 'exatamente um herói');
+  assert.equal((html.match(/kpi--hero(?!-)/g) || []).length, 1, 'exatamente um herói');
   // o herói tem que ser o card de Leads, não o primeiro da lista
   const heroi = html.slice(html.indexOf('kpi--hero'));
   assert.ok(heroi.slice(0, 200).includes('Leads'), 'o herói é a métrica declarada, não a primeira');
@@ -166,7 +166,9 @@ test('sparkForHero: um único dia não vira série (linha de 1 ponto não é ten
 // último KPI para uma segunda linha, com um bloco cinza vazio do lado. Os testes passaram e o
 // gate automático também: só o screenshot mostrou. Agora a contagem de colunas é explícita.
 test('bloco de kpi: com herói, declara quantas colunas a faixa precisa (n+1)', () => {
-  const html = renderKpiBlock(ITENS, TPL, VALORES);
+  // Herói com sparkline ocupa 2 unidades. Sem série ele fica com 1 (T7: nada de metade vazia,
+  // ver personalizacao.test.js).
+  const html = renderKpiBlock(ITENS, TPL, VALORES, {}, {}, null, { leads: [10, 20, 15] });
   assert.match(html, /--kpi-cols:\s*4/, '3 KPIs + herói ocupando 2 = 4 unidades');
 });
 

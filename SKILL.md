@@ -200,11 +200,15 @@ a pessoa, seis decisões. Junto com elas:
 
 As seis decisões:
 
-1. **Número herói**: se ela só pudesse ver UM número por dia, qual seria? Vira o
-   `primaryMetric` do template, e o layout transforma isso no card maior, com sparkline.
+1. **Número herói**: se ela só pudesse ver UM número por dia, qual seria? Entra no wizard, passo
+   Finalizar, no seletor "Número herói", e fica gravado na config DESTE dashboard como
+   `heroMetric` (ex: `"CPA"`). O layout transforma isso no card maior, com sparkline, inclusive
+   quando o herói é derivado (CPA, ROAS: a série é a mesma conta feita dia a dia).
 2. **A pergunta do painel**: que decisão ela toma olhando isso? "Aumento a verba do Instagram?"
    é pergunta. "Acompanhar o marketing" não é, e painel sem pergunta vira lista de números.
-3. **O que NÃO entra**: métrica que ninguém usa pra decidir rouba espaço da que importa.
+3. **O que NÃO entra**: métrica que ninguém usa pra decidir rouba espaço da que importa. Entra
+   no wizard, passo Finalizar, em "Métricas que não entram", e fica na config como
+   `hiddenMetrics` (ex: `["CTR"]`): some da faixa de números e do funil deste dashboard.
 4. **Accent da marca**: a cor real do negócio dela. O roxo padrão é só pra quem não tem marca.
 5. **Densidade**: acompanhamento diário (denso) ou leitura semanal (menos widgets, mais respiro)?
 6. **Tema**: claro, escuro ou os dois. Se os dois, os dois são conferidos no gate.
@@ -248,13 +252,21 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
   com só leitura, atribuir a conta, gerar token com validade Nunca e `ads_read` + `read_insights`, pegar o
   ID da conta). Nunca use token seu, do operador ou de outra conta: o dash é da pessoa. Se der erro,
   a tabela "Se der erro" do mesmo arquivo diz o que é cada mensagem da Meta.
-- Mapeie colunas (auto-mapeamento pré-preenche), defina branding (cor), meta opcional e senha opcional.
+- Mapeie colunas (auto-mapeamento pré-preenche), defina branding (cor), o número herói e as métricas
+  que não entram (as decisões 1 e 3 do 2.5), meta opcional e senha opcional.
 - No modo ao vivo a fonte fica na config; no histórico ela alimenta o cron e o dashboard lê o D1.
 
 
 **5.1 GATE DO PRIMEIRO RENDER (o diretor de arte durante a construção).**
 
-Monte a faixa de KPI e o PRIMEIRO widget. Pare. Renderize. Olhe. Só então monte o resto.
+Crie o dashboard pelo wizard (ele monta o painel inteiro de uma vez), renderize e compare com as
+seis decisões do 2.5 antes de qualquer outra coisa.
+
+**Personalizar NÃO é editar o template.** O herói e as métricas que não entram vão na config do
+dashboard (`heroMetric` e `hiddenMetrics`, pelo wizard ou no JSON do POST). O arquivo
+`public/assets/js/templates/<dominio>.js` é a biblioteca, compartilhada por todo dashboard daquele
+domínio: editar ele à mão muda o painel de todo mundo e quebra os testes do layout padrão.
+Pra corrigir na hora, clique em "Reconfigurar", ajuste no passo Finalizar e salve.
 
 ```bash
 node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-local-ou-publicada>" --out prova-parcial
@@ -435,7 +447,8 @@ Para o fluxo completo local (criar dashboard pelo wizard ou curl), crie `~/meu-d
 gitignored, nunca o commite). O preflight avisa se faltar.
 
 Seed de um dashboard por API (formato de `source` por tipo no Contrato 7 do `ARCHITECTURE.md`;
-atenção: csv usa `data`, sheets usa `url`, meta usa `meta:{token,account}`):
+atenção: csv usa `data`, sheets usa `url`, meta usa `meta:{token,account}`; `heroMetric` e
+`hiddenMetrics` são opcionais):
 ```
 curl -X POST "$BASE/api/dashboards" -H "content-type: application/json" -H "x-admin-token: $ADMIN" \
   -d '{"name":"Meu Marketing","domain":"marketing","accent":"#0ea5e9",

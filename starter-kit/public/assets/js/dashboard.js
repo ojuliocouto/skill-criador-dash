@@ -16,6 +16,7 @@ import { getSource } from './sources/index.js';
 import { DEFAULT_ACCENT, aplicarAccent } from './lib/color.js';
 import { esc } from './lib/html.js';
 import { brandInnerHtml } from './lib/brand.js';
+import { aplicarPersonalizacao } from './lib/personalizacao.js';
 import {
   dimensionSlots, distinctValues, dateBounds, emptyFilterState, applyFilters,
 } from './lib/filters.js';
@@ -129,7 +130,7 @@ export function resolveDateSlot(template) {
  * chave ausente do mapa e tratada como mapeada (compatibilidade com chamadas
  * antigas que nao passam `mapped`).
  */
-export function buildGoal(config, computed, mapped = {}) {
+export function buildGoal(config, computed, mapped = {}, template = null) {
   const g = config && config.goal;
   if (!g || !g.metricKey) return null;
   if (mapped[g.metricKey] === false) return null;
@@ -137,7 +138,13 @@ export function buildGoal(config, computed, mapped = {}) {
   if (!Number.isFinite(target) || target <= 0) return null;
   const val = computed[g.metricKey];
   if (!Number.isFinite(val)) return null;
-  const pct = val / target;
+  // Metrica "menor e melhor" (CPA, CPL): bater a meta e ficar ABAIXO dela. Com o heroi
+  // escolhido pela config (T7) a meta passou a poder cair num CPA, e val/target dizia
+  // "95% da meta" pra um CPA que ja estava melhor que o alvo.
+  const def = template && findMetricDef(template, g.metricKey);
+  const menorMelhor = def && def.betterWhen === 'lower';
+  if (menorMelhor && val <= 0) return null;
+  const pct = menorMelhor ? target / val : val / target;
   return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} da meta` };
 }
 
@@ -223,6 +230,11 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
     items.length >= 3 &&
     items.some((it) => it && it.props && it.props.metricKey === heroKey) &&
     mapped[heroKey] !== false;
+  // Herói sem série (T7, teste com aluno): ocupava 2 colunas com metade do card vazia. Agora
+  // só ganha a largura dupla quando tem sparkline pra preencher; sem ela, fica com 1 coluna e
+  // continua herói pelo tamanho do número.
+  const serieHeroi = temHero ? (sparks && sparks[heroKey]) : null;
+  const heroLargo = temHero && Array.isArray(serieHeroi) && serieHeroi.filter((v) => Number.isFinite(Number(v))).length >= 2;
 
   const cards = items
     .map((item) => {
@@ -244,6 +256,7 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
           unmapped: !isMapped,
           hero: isHero,
           spark: isHero ? sparks[key] : undefined,
+          heroCompacto: isHero && !heroLargo,
         },
         value,
       );
@@ -253,7 +266,7 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
   // colunas sem saber disso, e o ultimo card caia numa segunda linha com um buraco cinza ao
   // lado. Regressao pega pelo SCREENSHOT: os testes e o gate automatico passaram os dois.
   // Agora a contagem vai explicita e o CSS monta a faixa com o numero certo de colunas.
-  const unidades = items.length + (temHero ? 1 : 0);
+  const unidades = items.length + (heroLargo ? 1 : 0);
   return `<div class="grid kpis" style="--kpi-cols:${unidades}">${cards}</div>`;
 }
 
@@ -302,11 +315,38 @@ export function sparkForHero(template, rows, colMap) {
   const dateSlot = template && template.dateSlot;
   if (!key || !dateSlot || !Array.isArray(rows) || rows.length < 2) return {};
   const def = findMetricDef(template, key);
-  if (!def || !def.column) return {};              // derivada: sem coluna, sem serie
-  if (!colMap || !colMap[def.column]) return {};   // coluna nao mapeada
-  const pontos = timeSeries(rows, colMap, dateSlot, def.column, def.agg || 'sum');
-  if (!pontos || pontos.length < 2) return {};
-  return { [key]: pontos.map((p) => p.value) };
+  if (!def) return {};
+  if (def.column) {
+    if (!colMap || !colMap[def.column]) return {};   // coluna nao mapeada
+    const pontos = timeSeries(rows, colMap, dateSlot, def.column, def.agg || 'sum');
+    if (!pontos || pontos.length < 2) return {};
+    return { [key]: pontos.map((p) => p.value) };
+  }
+  // Derivada (T7): CPA ou ROAS como heroi ficavam sem sparkline e com metade do card vazia.
+  // A serie honesta e a MESMA conta feita dia a dia (CPA de cada dia), so quando a gente
+  // sabe do que ela depende: ratio (ratioOf) ou derived com dependsOn. Dia sem denominador
+  // fica de fora: um zero ali seria dado inventado.
+  const deps = def.agg === 'ratio' ? def.ratioOf : (def.agg === 'derived' ? def.dependsOn : null);
+  if (!Array.isArray(deps) || !deps.length) return {};
+  const metrics = Array.isArray(template.metrics) ? template.metrics : [];
+  const col = colMap && colMap[dateSlot];
+  if (!col) return {};
+  const porDia = new Map();
+  for (const r of rows) {
+    const iso = parseDateBR(r[col]);
+    if (!iso) continue;
+    if (!porDia.has(iso)) porDia.set(iso, []);
+    porDia.get(iso).push(r);
+  }
+  const serie = [];
+  for (const iso of [...porDia.keys()].sort()) {
+    const { computed, mapped } = computeAllMapped(metrics, porDia.get(iso), colMap);
+    if (mapped[key] === false) return {};
+    if (def.agg === 'ratio' && !Number(computed[def.ratioOf[1]])) continue;
+    const v = computed[key];
+    if (Number.isFinite(v)) serie.push(v);
+  }
+  return serie.length >= 2 ? { [key]: serie } : {};
 }
 
 // Monta so o corpo de widgets (grid + sections de kpi) a partir de um ctx JA
@@ -433,7 +473,7 @@ function renderBody(baseCtx, state) {
   const dateSlot = resolveDateSlot(template);
   const { current, previous } = splitByPeriod(rows, colMap, dateSlot);
   const trends = buildTrends(template.metrics, current, previous, colMap);
-  const goal = buildGoal(config, computed, mapped);
+  const goal = buildGoal(config, computed, mapped, template);
   const ds = { columns: dataset.columns, rows, meta: dataset.meta };
   const ctx = { config, template, dataset: ds, colMap, computed, mapped, trends, goal };
 
@@ -519,7 +559,8 @@ async function loadDashboardInto(container, config, id, opts = {}) {
   // Titulo da aba do navegador reflete o dashboard (ou a aba ativa de um grupo).
   // O preview de LINK ja vem do servidor (middleware); isto e so a aba aberta.
   if (config && config.name) document.title = config.name;
-  const template = getTemplate(config.domain);
+  // A personalizacao (heroi e metricas ocultas) vem da config DESTE dashboard (T7).
+  const template = aplicarPersonalizacao(getTemplate(config.domain), config);
   if (!template) {
     showError(container, `Dominio desconhecido: ${config.domain}.`, {
       href: `/config.html?id=${encodeURIComponent(id)}`, label: 'Reconfigurar',

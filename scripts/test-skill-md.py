@@ -71,6 +71,13 @@ class Roteiro(unittest.TestCase):
         self.assertTrue(re.search(r"esperado[^\n]*passo 4", SKILL),
                         "o passo 1 precisa dizer que o aviso do wrangler.toml é esperado até o passo 4")
 
+    def test_t7_decisoes_do_2_5_entram_pela_config(self):
+        # O wizard não deixava escolher herói nem tirar métrica; o aluno editou o template.
+        self.assertTrue("heroMetric" in SKILL and "hiddenMetrics" in SKILL,
+                        "o SKILL.md precisa dizer onde o herói e as ocultas entram")
+        self.assertFalse("Monte a faixa de KPI e o PRIMEIRO widget" in SKILL,
+                         "o wizard cria o painel inteiro; o 5.1 precisa dizer crie, renderize, compare")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

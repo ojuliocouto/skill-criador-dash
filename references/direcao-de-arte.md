@@ -13,7 +13,8 @@ serve. O objetivo é o que responde E parece ferramenta séria.
 
 **1. Existe UM número herói.** Nunca seis números do mesmo tamanho. O olho pousa em um lugar,
 e os outros são contexto. Sem hierarquia, quem abre o painel não sabe se está indo bem.
-No código: `template.primaryMetric` é o que define isso, e o card herói sai maior, com sparkline.
+No dashboard: o `heroMetric` da config (seletor "Número herói" no wizard) define isso; sem ele,
+vale o `primaryMetric` do template. O card herói sai maior, com sparkline.
 
 **2. Densidade alta, sem aperto.** Painel de ferramenta mostra MUITO dado por tela, com
 respiro suficiente para não sufocar. O erro comum na direção oposta: card gigante com um
@@ -46,9 +47,9 @@ Saída obrigatória, por escrito, antes de qualquer widget:
 
 | Decisão | Pergunta que ela responde |
 |---|---|
-| **Número herói** | Se essa pessoa só pudesse ver UM número por dia, qual seria? Vira o `primaryMetric`. |
+| **Número herói** | Se essa pessoa só pudesse ver UM número por dia, qual seria? Vira o `heroMetric` da config (wizard, passo Finalizar). |
 | **A pergunta do painel** | Que decisão ela toma olhando isso? "Aumento a verba do Instagram?" é pergunta; "acompanhar marketing" não é. |
-| **O que NÃO entra** | Métrica que ninguém usa para decidir é ruído que rouba espaço da que importa. |
+| **O que NÃO entra** | Métrica que ninguém usa para decidir é ruído que rouba espaço da que importa. Vira o `hiddenMetrics` da config. |
 | **Accent da marca** | A cor real do negócio dela. O roxo padrão só fica se ela não tiver marca. |
 | **Densidade** | Painel de acompanhamento diário (denso, muitos números) ou de leitura semanal (menos widgets, mais respiro)? |
 | **Tema** | Claro, escuro, ou os dois. Se os dois, os dois precisam ser conferidos no gate. |
@@ -73,7 +74,7 @@ Abra o PNG e confira contra o que foi decidido na Fase 1:
 
 | Conferir | Reprova quando |
 |---|---|
-| Hierarquia | os números saíram todos do mesmo tamanho: o `primaryMetric` não chegou no layout |
+| Hierarquia | os números saíram todos do mesmo tamanho: o `heroMetric` não chegou no layout |
 | Grid | sobrou buraco vazio ao lado de um widget, ou um card caiu sozinho numa segunda linha |
 | Cor | apareceu cor fora do accent e dos estados (bom/ruim/neutro) |
 | Números | algum valor quebrou em duas linhas, ou a coluna dança entre as linhas da tabela |

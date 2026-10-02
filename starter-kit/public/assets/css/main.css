@@ -230,6 +230,8 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
    IA mais comum em dashboard, e some no tema escuro. Ocupa 2 colunas da faixa, valor maior,
    e a sparkline mostra a direcao sem virar mais um grafico. */
 .kpi--hero { grid-column: span 2; }
+/* Herói sem sparkline (T7): 2 colunas deixavam metade do card vazia. Fica com 1. */
+.kpi--hero.kpi--hero-compacto { grid-column: span 1; }
 .kpi--hero .kpi__value { font-size: clamp(24px, 9cqi, 34px); letter-spacing: -0.035em; line-height: 1.05; }
 .kpi--hero .kpi__label { color: var(--text-dim); }
 /* Sparkline: pista de direcao, nao grafico. Sem eixo, sem ponto, sem area preenchida.
