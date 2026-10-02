@@ -243,3 +243,15 @@ test('timeseries: col fora da faixa não gera viewBox absurdo', () => {
     assert.equal(h, 240, 'altura é sempre a mesma');
   }
 });
+
+// Print da prova dash-v2 (02/10/2026): com o herói largo (CPA, ~400px), a animação de entrada
+// usava stroke-dasharray 200 e, com vector-effect non-scaling-stroke, o traço é medido em pixel
+// de tela: só 200px da linha apareciam, com um pedaço solto no fim. O traço tem que cobrir a
+// linha inteira em qualquer largura de card.
+import { readFileSync as lerCss } from 'node:fs';
+test('sparkline: animação de entrada cobre a linha inteira (dasharray maior que qualquer card)', () => {
+  const css = lerCss(new URL('../public/assets/css/main.css', import.meta.url), 'utf8');
+  const m = css.match(/\.kpi__spark polyline \{[^}]*stroke-dasharray:\s*(\d+)/);
+  assert.ok(m, 'regra de animação da sparkline existe');
+  assert.ok(Number(m[1]) >= 2000, `dasharray ${m[1]} é curto: corta a linha num card largo`);
+});

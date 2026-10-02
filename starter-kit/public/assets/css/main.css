@@ -246,7 +246,8 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 /* Faixa estreita: o span 2 do heroi espremeria os vizinhos abaixo do minimo legivel. */
 @media (max-width: 1100px) { .kpi--hero { grid-column: span 1; } }
 @media (prefers-reduced-motion: no-preference) {
-  .kpi--hero .kpi__spark polyline { stroke-dasharray: 200; stroke-dashoffset: 200; animation: spark-in 0.7s ease-out forwards; }
+  .kpi--hero .kpi__spark polyline { stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: spark-in 0.7s ease-out forwards; }
+  /* 3000: o traco e medido em pixel de tela (non-scaling-stroke); 200 cortava a linha no heroi largo. */
   @keyframes spark-in { to { stroke-dashoffset: 0; } }
 }
 
