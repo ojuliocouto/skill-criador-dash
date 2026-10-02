@@ -403,8 +403,9 @@ esta faltando. Nenhuma explicacao substitui rodar de novo verde. <<<**
 
 Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 7 --arquivo evidencias/etapa-7.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
-Salve o contexto do projeto da pessoa em `projetos/YYYYMMDD-descricao.md` (crie a pasta com
-`mkdir -p projetos`; ela é gitignored de propósito, é contexto privado do cliente): projeto Pages,
+Salve o contexto do projeto da pessoa em `~/meu-dash/projetos/YYYYMMDD-descricao.md` (crie a
+pasta com `mkdir -p ~/meu-dash/projetos`). Ela fica de fora do git pelo `~/meu-dash/.gitignore`,
+que veio junto na cópia do starter-kit, de propósito: é contexto privado do cliente. Conteúdo: projeto Pages,
 domínio, modo de dados, fontes, decisões. Nunca coloque token, Account ID ou id real: use placeholders.
 
 ## A caixa de peças (biblioteca provada em `starter-kit/`)
@@ -488,7 +489,8 @@ import + testes quebram na hora se faltar um; widget novo é `render` puro + ent
 
 Ao terminar um trabalho nesta skill:
 1. Atualize este `SKILL.md` (e o `references/` correspondente) se algo mudou: novo domínio, conector, modo, passo.
-2. Salve o contexto do projeto da pessoa em `projetos/YYYYMMDD-descricao.md` (pasta gitignored; crie com
-   `mkdir -p projetos`). Nunca coloque token, Account ID ou id de KV/D1 real: use placeholders.
+2. Salve o contexto do projeto da pessoa em `~/meu-dash/projetos/YYYYMMDD-descricao.md` (fica de
+   fora do git pelo `~/meu-dash/.gitignore`; crie com `mkdir -p ~/meu-dash/projetos`). Nunca
+   coloque token, Account ID ou id de KV/D1 real: use placeholders.
 3. Antes de distribuir/publicar o repo, apague o cache local `rm -rf starter-kit/.wrangler` (fica
    gitignored, mas guarda Account ID e dados de dev em cache; não deve ir junto num zip/cópia).

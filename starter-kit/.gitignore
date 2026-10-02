@@ -1,0 +1,17 @@
+# Vem junto quando a pessoa copia o starter-kit pra ~/meu-dash (SKILL.md, seção "Pastas").
+# Tudo aqui é privado da pessoa ou gerado localmente: nunca vai pro git.
+node_modules/
+.wrangler/
+.dev.vars
+.env
+.env.*
+*.log
+.DS_Store
+# PNG da prova de tela (prova-dash.js)
+prova/
+prova-parcial/
+# Evidências dos gates e contexto do cliente
+evidencias/
+projetos/
+.etapas-verificadas.json
+.ferramentas-usadas.json

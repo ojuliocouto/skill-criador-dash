@@ -88,6 +88,14 @@ class Roteiro(unittest.TestCase):
         self.assertTrue("test/layout-padrao" in SKILL and "npm run test:biblioteca" in SKILL,
                         "o SKILL.md precisa separar teste da biblioteca do teste do layout padrão")
 
+    def test_t13_pasta_projetos_com_raiz(self):
+        # "Salve em projetos/..., ela é gitignored": gitignored onde?
+        soltos = re.findall(r"(?<!~/meu-dash/)projetos/YYYYMMDD", SKILL)
+        self.assertFalse(soltos, "projetos/YYYYMMDD sem a raiz ~/meu-dash/")
+        gi = RAIZ / "starter-kit" / ".gitignore"
+        self.assertTrue(gi.exists() and "projetos/" in gi.read_text(),
+                        "a cópia do starter-kit precisa levar o .gitignore com projetos/")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
