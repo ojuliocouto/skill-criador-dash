@@ -116,8 +116,9 @@ def checagens(pular_testes=False):
                f"{n.group(1)} testes passando" if (ok and n) else saida.splitlines()[-1][:110] if saida else "",
                "cd starter-kit && npm test (peca quebrada nao vira dashboard de ninguem)")
 
-    ok, saida = roda(
-        f'NODE_PATH="$HOME/.npm-global/lib/node_modules" node "{RAIZ}/scripts/prova-dash.js" --check')
+    # O prova-dash.js acha o Playwright global sozinho, pela pasta do `npm root -g` (T10):
+    # nada de caminho fixo da maquina do dono.
+    ok, saida = roda(f'node "{RAIZ}/scripts/prova-dash.js" --check')
     yield ("Playwright", "prova de tela: o dash publicado abre e mostra numero", True, ok,
            saida.splitlines()[0][:110] if saida else "",
            "npm i -g playwright && npx playwright install chromium")

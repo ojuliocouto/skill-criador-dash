@@ -19,14 +19,28 @@
 const fs = require('fs');
 const path = require('path');
 
+// Pasta dos pacotes globais, do jeito que o PROPRIO npm informa. T10 (teste com aluno,
+// 02/10/2026): o caminho fixo da maquina do dono nao existe pra quem instalou o Node pelo
+// Homebrew (/opt/homebrew/lib/node_modules) nem pelo nvm.
+function npmRootGlobal() {
+  try {
+    const r = require('child_process').spawnSync('npm', ['root', '-g'], { encoding: 'utf8', timeout: 20000 });
+    const pasta = (r.stdout || '').trim();
+    return r.status === 0 && pasta ? pasta : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function resolvePlaywright() {
   // NAO devolva "ok" antes desta linha: o bug que isso corrige foi um --check que
   // saia ANTES do require e respondia identico com e sem o pacote instalado.
-  const tentativas = [
-    () => require('playwright'),
-    () => require(path.join(process.env.HOME, '.npm-global/lib/node_modules/playwright')),
-    () => require(path.join(process.env.HOME, '.npm-global/lib/node_modules/playwright-core')),
-  ];
+  const tentativas = [() => require('playwright')];
+  const global = npmRootGlobal();
+  if (global) {
+    tentativas.push(() => require(path.join(global, 'playwright')));
+    tentativas.push(() => require(path.join(global, 'playwright-core')));
+  }
   for (const t of tentativas) { try { return t(); } catch (_) {} }
   return null;
 }
@@ -36,7 +50,7 @@ const flag = (n, d = null) => { const i = args.indexOf(n); return i >= 0 ? (args
 
 if (args.includes('--check')) {
   const pw = resolvePlaywright();
-  if (!pw) { console.error('Playwright nao resolve. npm i -g playwright'); process.exit(1); }
+  if (!pw) { console.error('Playwright não encontrado (nem local, nem na pasta do `npm root -g`). Instale: npm i -g playwright'); process.exit(1); }
   let bin;
   try { bin = pw.chromium.executablePath(); } catch (e) {
     console.error('Playwright resolve, mas nao sabe o caminho do Chromium: ' + e.message);

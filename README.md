@@ -322,6 +322,9 @@ Dashboards personalizados precisam preservar esse marcador nos valores de métri
 
 ```bash
 node scripts/test-prova-dash.cjs
+node scripts/test-resolver-playwright.cjs
+python3 scripts/test-skill-md.py
+python3 scripts/test-biblioteca-independe-do-layout.py
 python3 scripts/test-preflight.py
 python3 scripts/test-uso-ferramentas.py
 python3 scripts/test-gate-etapas.py
