@@ -60,6 +60,21 @@ if (!url) {
 const senha = flag('--senha');
 const outDir = flag('--out', path.join(process.cwd(), 'prova'));
 
+// Um card de KPI so passa com numero de verdade. Traco, travessao, vazio, NaN, erro ou
+// "Nao mapeada" reprovam, e a mensagem diz o que fazer.
+function motivoCardRuim({ valor, naoMapeada }) {
+  const v = String(valor || '').trim();
+  if (naoMapeada || /n[ãa]o mapead/i.test(v)) {
+    return 'métrica não mapeada. Mapeie a coluna no wizard ou oculte a métrica na configuração (hiddenMetrics)';
+  }
+  if (!v) return 'valor vazio';
+  if (/^[-–—]+$/.test(v)) return `mostra "${v}" no lugar do número`;
+  if (/NaN|undefined|Infinity|null/.test(v)) return `valor quebrado: ${v}`;
+  if (/erro|error/i.test(v)) return `card com erro: ${v}`;
+  if (!/\d/.test(v)) return `sem número: "${v}"`;
+  return '';
+}
+
 // Placeholders que um painel mostra quando o dado NAO chegou. Achar so isso na tela,
 // e nenhum numero, e exatamente o modo de falha que passava despercebido.
 const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
@@ -107,10 +122,25 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
       // Ano no título aprovava um painel com todos os KPIs vazios. O alvo é a métrica visível.
       await page.waitForFunction(() => [...document.querySelectorAll('.kpi__value')].some(el =>
         el.getClientRects().length && /\d/.test(el.innerText)), null, { timeout: 10000 }).catch(() => {});
-      const valores = await page.locator('.kpi__value:visible').allTextContents();
       const texto = (await page.locator('body').innerText().catch(() => '')) || '';
-      const temNumero = valores.some(valor => /\d/.test(valor));
-      if (!temNumero) falhas.push(`[${perfil.nome}] nenhum KPI visível com número: o painel abriu vazio`);
+      // T4 (teste com aluno, 02/10/2026): bastava UM card com dígito pra passar, e um painel
+      // com 3 de 5 cards em traço saiu aprovado. Agora CADA card visível é conferido.
+      const cards = await page.$$eval('.kpi__value', (els) => els
+        .filter((el) => el.getClientRects().length)
+        .map((el) => {
+          const kpi = el.closest('.kpi');
+          const rotulo = kpi && kpi.querySelector('.kpi__label');
+          return {
+            label: (rotulo ? rotulo.innerText : '').trim() || '(sem rótulo)',
+            valor: (el.innerText || '').trim(),
+            naoMapeada: !!(kpi && (kpi.classList.contains('is-unmapped') || kpi.dataset.estado === 'nao-mapeada')),
+          };
+        }));
+      if (!cards.length) falhas.push(`[${perfil.nome}] nenhum card de KPI visível: o painel abriu vazio`);
+      for (const c of cards) {
+        const motivo = motivoCardRuim(c);
+        if (motivo) falhas.push(`[${perfil.nome}] card "${c.label}": ${motivo}`);
+      }
 
       const placeholders = VAZIO.filter((p) => texto.includes(p));
       if (placeholders.length) {
@@ -136,9 +166,9 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
   avisos.forEach((a) => console.log('  aviso: ' + a));
   if (falhas.length) {
     falhas.forEach((f) => console.log('  FALHA: ' + f));
-    console.log('\n  O dashboard NAO passou. Nao declare pronto.\n');
+    console.log('\n  O dashboard NÃO passou. Não declare pronto.\n');
     process.exit(1);
   }
-  console.log('  Painel abre, autentica e mostra numero, no desktop e no mobile.');
-  console.log('  OLHE os dois PNG antes de entregar: isto prova que ha numero, nao que ele esta certo.\n');
+  console.log('  Painel abre, autentica e mostra número em TODOS os cards, no desktop e no mobile.');
+  console.log('  OLHE os dois PNG antes de entregar: isto prova que há número, não que ele está certo.\n');
 })();

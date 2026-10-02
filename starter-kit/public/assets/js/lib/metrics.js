@@ -178,6 +178,13 @@ export function isMetricMapped(def, colMap, rows, mappedByKey = {}) {
       const denMapped = mappedByKey[denKey] !== false;
       return numMapped && denMapped;
     }
+    case 'derived':
+      // `dependsOn` (opcional): chaves das metricas que a derivada usa. Sem ele, continua
+      // mapeada por padrao (fallback deliberado como vendas_ganhas). Com ele, basta UMA
+      // dependencia sem coluna pra a derivada virar "nao mapeada": ROAS sem Receita saia
+      // "0" com cara de numero certo (T4, teste com aluno de 02/10/2026).
+      if (Array.isArray(def.dependsOn)) return def.dependsOn.every((k) => mappedByKey[k] !== false);
+      return true;
     default:
       return true;
   }

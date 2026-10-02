@@ -21,7 +21,7 @@ export const template = {
     { key: 'entradas', label: 'Entradas', agg: 'sum', column: 'entrada', format: 'currency', betterWhen: 'higher' },
     { key: 'saidas', label: 'Saídas', agg: 'sum', column: 'saida', format: 'currency', betterWhen: 'lower' },
     // Derivadas
-    { key: 'saldo', label: 'Saldo', agg: 'derived', format: 'currency', betterWhen: 'higher',
+    { key: 'saldo', label: 'Saldo', agg: 'derived', format: 'currency', betterWhen: 'higher', dependsOn: ['entradas', 'saidas'],
       compute: ({ computed }) => (computed.entradas || 0) - (computed.saidas || 0) },
     // Margem: quanto do que entrou sobrou como saldo (saldo / entradas).
     { key: 'margem', label: 'Margem', agg: 'ratio', ratioOf: ['saldo', 'entradas'], format: 'percent', betterWhen: 'higher' },

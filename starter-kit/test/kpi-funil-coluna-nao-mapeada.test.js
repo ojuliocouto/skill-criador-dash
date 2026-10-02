@@ -47,25 +47,26 @@ const COL_MKT_SEM_LEADS = {
 };
 const COL_MKT_COMPLETO = { ...COL_MKT_SEM_LEADS, leads: 'Leads' };
 
-test('KPI: sem coluna de Leads mapeada, o card de Leads e o de CPL mostram traco, NUNCA "R$ 0,00"', () => {
+test('KPI: sem coluna de Leads mapeada, o card de Leads e o de CPL mostram "Não mapeada", NUNCA "R$ 0,00"', () => {
   const { computed, mapped } = computeAllMapped(marketing.metrics, rowsMkt, COL_MKT_SEM_LEADS);
   const html = renderKpiBlock(kpiBlockItems(marketing), marketing, computed, mapped, {}, null);
 
   assert.ok(!html.includes('R$ 0,00'), 'CPL nao pode aparecer como R$ 0,00 (zero com cara de certo)');
   assert.equal((html.match(/class="kpi is-unmapped"/g) || []).length, 2, 'exatamente 2 cards ficam sem-dado: Leads e CPL');
+  assert.ok(!html.includes('kpi__value">-<'), 'nenhum card com traco (T4)');
 
   // Card de Leads: traco + hint explicando o motivo. slice com Math.max(0, ...)
   // porque indexOf pode devolver algo menor que 200 no inicio do HTML (um
   // start negativo em String.slice conta a partir do FIM da string, nao zero).
   const idxLeads = html.indexOf('>Leads<');
   const leadsCard = html.slice(Math.max(0, idxLeads - 200), idxLeads + 300);
-  assert.match(leadsCard, /kpi__value">-</, 'Leads mostra traco, nao 0');
+  assert.match(leadsCard, /kpi__value">Não mapeada</, 'Leads mostra "Não mapeada", nao 0 nem traco (T4)');
   assert.match(leadsCard, /Coluna não mapeada/, 'Leads explica que a coluna nao esta mapeada');
 
   // Card de CPL: idem.
   const idxCpl = html.indexOf('>CPL<');
   const cplCard = html.slice(Math.max(0, idxCpl - 200), idxCpl + 300);
-  assert.match(cplCard, /kpi__value">-</, 'CPL mostra traco, nao 0');
+  assert.match(cplCard, /kpi__value">Não mapeada</, 'CPL mostra "Não mapeada", nao 0 nem traco (T4)');
   assert.match(cplCard, /Coluna não mapeada/, 'CPL explica que a coluna nao esta mapeada');
 });
 

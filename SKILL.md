@@ -264,8 +264,11 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
 ```
 node scripts/prova-dash.js "<URL-DO-DASHBOARD>" [--senha <SENHA>]
 ```
-  Ele abre no navegador de verdade, autentica se precisar, espera os dados chegarem e reprova se o
-  painel abrir sem número, mostrar `NaN`/`undefined`/`Infinity` ou se algum request voltar 4xx/5xx.
+  Ele abre no navegador de verdade, autentica se precisar, espera os dados chegarem e reprova se
+  QUALQUER card de KPI estiver com `-`, `—`, vazio, `NaN`, erro ou "Não mapeada", ou se algum
+  request voltar 4xx/5xx. A saída diz qual card falhou. Card "Não mapeada" se resolve mapeando a
+  coluna no wizard ou ocultando a métrica na configuração (`hiddenMetrics`, passo 5); nunca
+  mostrando "0" no lugar.
   Grava `prova/dash-desktop.png` e `prova/dash-mobile.png`. **Saída diferente de zero = não está
   pronto**, e nenhuma explicação substitui rodar de novo verde.
 

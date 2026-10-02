@@ -41,6 +41,8 @@ export const template = {
       agg: 'derived',
       format: 'number',
       betterWhen: 'higher',
+      // Sem Receita mapeada o ROAS seria "0" com cara de numero certo: vira "Nao mapeada".
+      dependsOn: ['receita', 'investimento'],
       compute: ({ computed }) => (computed.investimento ? computed.receita / computed.investimento : 0),
     },
   ],

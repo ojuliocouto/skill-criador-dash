@@ -53,7 +53,7 @@ test('kpi herói: coluna não mapeada não ganha sparkline (série seria zero fa
   // e desenhar um gráfico disso mostra dado que não existe.
   const html = renderKpi({ label: 'CPL', hero: true, unmapped: true, spark: [1, 2, 3, 4] }, 0);
   assert.ok(!html.includes('kpi__spark'), 'sem coluna mapeada, não desenha série');
-  assert.ok(html.includes('-'), 'continua mostrando o traço');
+  assert.ok(html.includes('Não mapeada'), 'diz que a métrica não está mapeada (T4)');
 });
 
 test('kpi herói: sparkline não injeta HTML pela série', () => {

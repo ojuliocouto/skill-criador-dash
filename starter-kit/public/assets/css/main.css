@@ -252,6 +252,9 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 /* KPI sem coluna mapeada (achado 1): valor em traco e apagado, pra nao competir
    visualmente com os KPIs que TEM numero de verdade ao lado. */
 .kpi.is-unmapped .kpi__value { color: var(--text-faint); font-weight: 500; }
+/* Widget (ranking, serie) cuja coluna de valor nao foi mapeada: texto que explica, sem barra
+   com zero falso. */
+.widget__unmapped { color: var(--text-dim); font-size: 13.5px; padding: 18px 0; }
 
 /* Widget wrapper. Titulos de widget: FRASE normal (sentence-case), nao mais um
    "eyebrow" uppercase-tracked. Ferramenta de verdade (Linear/Vercel) reserva o

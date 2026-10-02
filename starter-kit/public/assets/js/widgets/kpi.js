@@ -47,8 +47,10 @@ export function render(props = {}, value) {
   // dado real quando na verdade e ausencia de dado. Em vez disso, mostra um
   // traco (hifen) e explica o motivo no hint (ignorando trend/goal, que tambem
   // seriam calculados sobre esse mesmo zero falso).
-  const valor = unmapped ? '-' : fmtBy(format, value);
-  const hintText = unmapped ? 'Coluna não mapeada' : hint;
+  // T4 (02/10/2026): o traço "-" passava por placeholder de carregamento e o gate de tela
+  // aprovava o painel. Agora o card diz o que aconteceu e o que fazer.
+  const valor = unmapped ? 'Não mapeada' : fmtBy(format, value);
+  const hintText = unmapped ? 'Coluna não mapeada: mapeie a coluna ou oculte esta métrica' : hint;
   const hintHtml = hintText
     ? `<div class="kpi__hint">${esc(hintText)}</div>`
     : '';
@@ -74,7 +76,7 @@ export function render(props = {}, value) {
   // grafico de dado que nao existe. Mesma regra que ja vale pra trend e goal.
   const sparkHtml = !unmapped && hero ? sparkSvg(spark) : '';
   return (
-    `<div class="kpi${hero ? ' kpi--hero' : ''}${unmapped ? ' is-unmapped' : ''}">` +
+    `<div class="kpi${hero ? ' kpi--hero' : ''}${unmapped ? ' is-unmapped' : ''}"${unmapped ? ' data-estado="nao-mapeada"' : ''}>` +
       `<div class="kpi__label">${esc(label)}</div>` +
       `<div class="kpi__value">${esc(valor)}</div>` +
       sparkHtml +

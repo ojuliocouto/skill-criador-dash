@@ -20,6 +20,7 @@ import { render as renderFunnel } from './funnel.js';
 import { render as renderTable } from './table.js';
 import { render as renderRanking } from './ranking.js';
 import { groupBy, timeSeries } from '../lib/metrics.js';
+import { esc } from './_util.js';
 
 // Agregacoes que groupBy/timeSeries sabem aplicar por bucket. 'ratio'/'derived'
 // nao fazem sentido por bucket (dependem de multiplas metricas), entao caem no
@@ -54,6 +55,20 @@ function bucketAggFor(template, findMetricDef, valueSlot) {
   return BUCKET_AGGS.has(agg) ? agg : 'sum';
 }
 
+// Card honesto quando a coluna de VALOR do widget nao foi mapeada. Antes o ranking somava
+// zero por canal e mostrava "Instagram 0" (T4, teste com aluno de 02/10/2026): numero falso
+// com cara de dado. Agora o card fica, mas diz o que falta e o que fazer.
+function slotLabel(template, slot) {
+  const s = ((template && template.slots) || []).find((x) => x.key === slot);
+  return (s && s.label) || slot;
+}
+function naoMapeadaHtml(template, slot) {
+  return `<div class="widget__unmapped" data-estado="nao-mapeada">` +
+    `<strong>Não mapeada:</strong> falta a coluna ${esc(slotLabel(template, slot))}. ` +
+    `Mapeie a coluna na configuração ou tire este widget do painel.</div>`;
+}
+const valorSemColuna = (colMap, slot, agg) => slot != null && agg !== 'count' && !(colMap && colMap[slot]);
+
 export const registry = {
   // kpi: agrupado no dashboard.js (bloco 'kpis'); nunca renderiza como single.
   kpi: {
@@ -73,6 +88,9 @@ export const registry = {
       // Agregacao por dia deriva do `agg` da MetricDef do valueSlot (ex: 'avg'
       // para CSAT/tempo), com fallback seguro pra 'sum' quando nao ha MetricDef.
       const agg = bucketAggFor(template, findMetricDef, props.valueSlot);
+      if (valorSemColuna(colMap, props.valueSlot, agg)) {
+        return card(props.title || 'Evolução no tempo', naoMapeadaHtml(template, props.valueSlot), 'chart');
+      }
       const points = timeSeries(dataset.rows, colMap, props.dateSlot, props.valueSlot, agg);
       const title = props.title || 'Evolução no tempo';
       // repassa o span da celula: a proporcao do grafico depende da largura que ele vai ocupar
@@ -90,6 +108,10 @@ export const registry = {
       // Agregacao por dimensao deriva do `agg` da MetricDef do valueSlot (ex:
       // 'avg' para CSAT), com fallback seguro pra 'sum' quando nao ha MetricDef.
       const agg = bucketAggFor(template, findMetricDef, props.valueSlot);
+      if (valorSemColuna(colMap, props.valueSlot, agg)) {
+        const t = props.title || `Ranking por ${props.dimensionSlot || ''}`.trim();
+        return card(t, naoMapeadaHtml(template, props.valueSlot));
+      }
       let items = groupBy(dataset.rows, colMap, props.dimensionSlot, props.valueSlot, agg);
       // hideZeros: descarta a linha cujo valor agregado deu zero. Existe pro
       // financeiro, onde a MESMA coluna de categoria descreve os dois lados do
