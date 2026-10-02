@@ -325,6 +325,7 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 .table__arrasta { display: none; }
 @media (max-width: 720px) { .table__arrasta { display: inline; } }
 .table__title, .chart__title { font-size: 13.5px; font-weight: 560; color: var(--text-dim); letter-spacing: -0.01em; margin: 0 0 16px; }
+.table__el .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table__empty { color: var(--text-faint); text-align: center; padding: 30px 0; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
