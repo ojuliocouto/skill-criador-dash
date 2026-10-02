@@ -36,10 +36,10 @@ REGISTRO = ".ferramentas-usadas.json"
 # Ferramentas que, ESTANDO VIVAS, precisam ter sido usadas. A chave casa com o rotulo do
 # checar-ferramentas.py; o valor explica o que se espera ver na pagina.
 # O 21st.dev (magic) saiu daqui em 02/10/2026: e opcional e React, nao encaixa no starter-kit
-# HTML, entao cobrar o uso so empurraria toda entrega pra uma dispensa de fachada.
+# HTML, entao cobrar o uso so empurraria toda entrega pra uma dispensa de fachada. A
+# design-taste-frontend saiu pelo mesmo motivo: ela se declara fora de escopo pra dashboard.
 COBRADAS = {
     "Playwright": "prova de tela do dashboard publicado (PNG desktop e mobile)",
-    "skill design-taste-frontend": "gate anti-slop rodado sobre o painel antes de publicar",
     "skill frontend-design": "direcao estetica do painel decidida antes de montar",
     "skill high-end-visual-design": "passe de acabamento premium",
     "skill animate": "microinteracao (hover de card, entrada, transicao de filtro)",

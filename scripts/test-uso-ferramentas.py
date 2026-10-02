@@ -45,6 +45,11 @@ class GateUso(unittest.TestCase):
                 self.assertEqual(self.checar({nome: True, "Playwright": True},
                                             {"Playwright": self.registro()}), 0)
 
+    def test_taste_vivo_e_nao_usado_nao_reprova(self):
+        # T3: fora de escopo pra dashboard; o pré-voo anti-slop é a lista de tells da skill.
+        self.assertEqual(self.checar({"skill design-taste-frontend": True, "Playwright": True},
+                                    {"Playwright": self.registro()}), 0)
+
     def test_pasta_nao_e_artefato(self):
         self.assertFalse(uso.evidencia_vale({"tipo": "arquivo", "valor": "."}, self.projeto)[0])
 

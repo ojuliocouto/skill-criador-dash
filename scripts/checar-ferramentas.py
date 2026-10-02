@@ -144,9 +144,12 @@ def checagens(pular_testes=False):
     # O comando vai LITERAL: quem cai aqui esta com a ferramenta faltando e precisa copiar
     # e colar. Placeholder do tipo "<fonte>" nao instala nada, so parece que instrui.
     TASTE = "npx skills add Leonxlnx/taste-skill"
+    # T3 (02/10/2026): a design-taste-frontend se declara fora de escopo pra dashboard. Vira
+    # leitura de apoio opcional; o pre-voo anti-slop e a lista de tells em direcao-de-arte.md.
+    # A frontend-design (plano visual antes do codigo, passo 2.5) e a obrigatoria.
     for s, papel, critico, fix in [
-        ("design-taste-frontend", "gate anti-slop antes de publicar", True, TASTE),
-        ("frontend-design", "direcao estetica antes de montar as telas", False,
+        ("design-taste-frontend", "opcional: leitura de apoio pra tipografia e hierarquia", False, TASTE),
+        ("frontend-design", "plano visual do painel antes do código (passo 2.5)", True,
          "npx -y skills add anthropics/skills --skill frontend-design --agent claude-code"),
         ("high-end-visual-design", "acabamento premium do painel", False, TASTE),
         ("animate", "microinteracao (hover, entrada de card, transicao de filtro)", False,

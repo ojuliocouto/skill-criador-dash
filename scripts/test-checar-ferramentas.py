@@ -65,6 +65,10 @@ chk.estado_mcp, chk.roda = orig_estado, orig_roda2
 item_21st = next((k for k in linhas if "21st" in k), None)
 checa("21st.dev aparece no relatorio", item_21st is not None)
 checa("21st.dev e OPCIONAL: sem chave nao bloqueia o passo 0", item_21st is not None and linhas[item_21st] is False)
+# T3: a design-taste-frontend se declara fora de escopo pra dashboard. Vira apoio opcional;
+# a frontend-design (plano visual antes do codigo) e a obrigatoria.
+checa("design-taste-frontend e apoio opcional", linhas.get("skill design-taste-frontend") is False)
+checa("frontend-design e obrigatoria", linhas.get("skill frontend-design") is True)
 
 # So faz sentido se a ferramenta estiver instalada: senao seria testar o ambiente, nao o checador.
 est_magic, det = chk.estado_mcp("magic")

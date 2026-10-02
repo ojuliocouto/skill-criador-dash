@@ -38,6 +38,17 @@ class Roteiro(unittest.TestCase):
         self.assertFalse(re.search(r"^\s*U=", SKILL, re.MULTILINE), "SKILL.md ainda define U=")
         self.assertFalse(re.search(r"\$U\b", SKILL), "SKILL.md ainda usa $U")
 
+    def test_t3_anti_slop_e_a_lista_de_tells_e_a_taste_so_apoia(self):
+        # A design-taste-frontend se declara fora de escopo pra dashboard ("Not dashboards").
+        for linha in linhas_com(SKILL, r"design-taste-frontend"):
+            with self.subTest(linha=linha[:80]):
+                self.assertRegex(linha.lower(), r"apoio|fora de escopo|opcional",
+                                 "a design-taste-frontend só pode aparecer como leitura de apoio")
+        self.assertTrue("pré-voo anti-slop" in SKILL, "falta " + "pré-voo anti-slop")
+        self.assertTrue("tells" in SKILL, "falta " + "tells")
+        self.assertTrue(re.search(r"`frontend-design`[^\n]*obrigat", SKILL), "frontend-design precisa constar como obrigatória")
+        self.assertTrue("pré-voo anti-slop" in ARTE, "falta " + "pré-voo anti-slop")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

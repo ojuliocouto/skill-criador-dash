@@ -92,8 +92,9 @@ antes de mandar comando.
 | **Peças do starter-kit** | é a biblioteca testada de onde o dashboard é montado | `cd starter-kit && npm test`. Peça quebrada não vira dashboard de ninguém: conserte antes. |
 | **Playwright** | prova de tela: abre o dashboard publicado e confere que ele mostra número | `npm i -g playwright && npx playwright install chromium` (~265 MB; a versão leve é `--only-shell`, ~94 MB). |
 | **magic (21st.dev), opcional** | inspiração de componente; nunca bloqueia o passo 0 | O código do componente é pago e vem em React + Tailwind, e o starter-kit é HTML montado em string: não encaixa direto. Aluno sem chave pula e segue. Quem já tem a chave pode usar só como referência visual. |
-| **skill design-taste-frontend** | gate anti-slop antes de publicar | `npx skills add Leonxlnx/taste-skill` |
-| **skills de design (opcionais)** | direção estética, acabamento e microinteração | `frontend-design`, `high-end-visual-design`, `animate` |
+| **skill frontend-design** (obrigatória) | plano visual do painel antes do código (passo 2.5) | `npx -y skills add anthropics/skills --skill frontend-design --agent claude-code` |
+| **skill design-taste-frontend** (opcional, só leitura de apoio) | ela se declara fora de escopo pra dashboard; serve de apoio pra tipografia e hierarquia | `npx skills add Leonxlnx/taste-skill` |
+| **skills de acabamento (opcionais)** | acabamento e microinteração | `high-end-visual-design`, `animate` |
 
 **Regra que nasceu daqui, e vale pra qualquer ferramenta que esta skill venha a usar:** toda
 dependência nova entra no `checar-ferramentas.py` com um teste que a EXERCITA. Se você não
@@ -158,14 +159,18 @@ O painel nasce feio quando ninguém decidiu o que ele responde. Esta é a fase d
 diretor de arte, e ela vem ANTES de escolher widget, cor ou layout.
 
 Leia `references/direcao-de-arte.md` (norte: Linear, Vercel e Stripe) e feche por escrito, com
-a pessoa, seis decisões. **Junto com elas, acione duas skills de design** (se a pessoa não tiver,
-instale antes de seguir; não monte a tela sem elas):
+a pessoa, seis decisões. Junto com elas:
 
-- `frontend-design`: direção visual do painel (tipografia, paleta, hierarquia) escrita como plano
-  ANTES do código, a partir das seis decisões abaixo.
-- `design-taste-frontend` (anti-slop): o pré-voo dela roda sobre o plano e de novo sobre a tela
-  pronta, e o que ela reprovar se corrige antes do deploy. Painel com cara de template (roxo
-  genérico, card igual a card, número sem hierarquia) não passa.
+- `frontend-design` (obrigatória): direção visual do painel (tipografia, paleta, hierarquia)
+  escrita como plano ANTES do código, a partir das seis decisões abaixo. Sem o plano escrito,
+  não se monta tela.
+- **pré-voo anti-slop**: a lista de tells de painel da Fase 3 de `references/direcao-de-arte.md`
+  roda DUAS vezes, sobre o plano e de novo sobre a tela pronta. O que ela reprovar se corrige
+  antes do deploy. Painel com cara de template (roxo genérico, card igual a card, número sem
+  hierarquia) não passa. Conte os tells antes e depois: a contagem vai no `passe_de_gosto` da
+  etapa 6.
+- A `design-taste-frontend` NÃO é gate aqui: ela mesma se declara fora de escopo pra dashboard
+  e presume React, Tailwind e imagens. Use só como leitura de apoio pra tipografia e hierarquia.
 
 As seis decisões:
 
@@ -248,12 +253,13 @@ Ao concluir, execute `python3 <dir-da-skill>/scripts/gate-etapas.py --perfil das
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Publique na conta DA PESSOA (`wrangler pages deploy public --project-name=<NOME>`).
 - Modo histórico: deploy do Worker cron e força uma primeira captura (`references/infra.md`).
-- **PASSE DE GOSTO (antes de dizer pronto).** Rode a skill **`design-taste-frontend`** sobre o
-  painel publicado, nos DOIS temas: é o gate anti-slop, e procura os tells de interface gerada
-  por IA (card tingido, barrinha colorida no topo do widget, gradiente atrás de número, ícone
-  colorido por métrica, sombra difusa sem hairline, "Sem dados" como único estado vazio). Depois
-  dela, a **`high-end-visual-design`** para o acabamento. Lista completa em
-  `references/direcao-de-arte.md`, Fase 3. Registre os usos (6.1).
+- **PASSE DE GOSTO (antes de dizer pronto).** Rode o pré-voo anti-slop de novo sobre o painel
+  publicado, nos DOIS temas: a lista de tells de painel em `references/direcao-de-arte.md`, Fase 3
+  (card tingido, barrinha colorida no topo do widget, gradiente atrás de número, ícone colorido
+  por métrica, sombra difusa sem hairline, "Sem dados" como único estado vazio, rótulo em caixa
+  alta espaçada, número em fonte mono esticada). A `high-end-visual-design` é opcional, para o
+  acabamento; a `design-taste-frontend` fica como leitura de apoio (fora de escopo pra painel).
+  Registre os usos (6.1).
 - **GATE de tela (bloqueia a entrega).** Rode contra o dashboard PUBLICADO, não contra o local:
 ```
 node scripts/prova-dash.js "<URL-DO-DASHBOARD>" [--senha <SENHA>]

@@ -90,8 +90,10 @@ disso mascara layout ruim.
 
 ## Fase 3: PASSE FINAL (antes de publicar, Passo 6)
 
-Rode a `design-taste-frontend` sobre o painel publicado, nos dois temas. É o gate anti-slop:
-ela procura os tells de interface gerada por IA. Os mais comuns em dashboard:
+**O pré-voo anti-slop é esta lista**, e ela roda duas vezes: sobre o plano da `frontend-design`
+(antes de montar) e sobre o painel publicado, nos dois temas (antes de entregar). Conte os tells
+encontrados antes e depois; a contagem final precisa ser zero e vai no `passe_de_gosto` da etapa 6.
+Os tells de painel:
 
 - card com fundo tingido de accent, ou barrinha colorida no topo de cada widget
 - gradiente decorativo atrás de número
@@ -99,9 +101,18 @@ ela procura os tells de interface gerada por IA. Os mais comuns em dashboard:
 - sombra difusa grande em card, sem hairline
 - "Sem dados" como único estado vazio
 - cor como enfeite em vez de significado
+- rótulo de card ou de coluna em CAIXA ALTA espaçada (kicker): rótulo é frase em caixa normal
+- número em fonte mono com espaçamento esticado ("R$ 95,17" largo demais): número usa a fonte
+  do texto com `font-variant-numeric: tabular-nums`
+- card com metade vazia (herói sem sparkline) ou card de KPI com "-", "0" falso ou "não mapeada"
+- data em formato americano (mm/dd/yyyy): no Brasil é dd/mm/aaaa
 
-Depois dela, a `high-end-visual-design` para o acabamento (hairline, espaçamento óptico,
-alinhamento de números, peso de fonte).
+Por que não a `design-taste-frontend` como gate: ela mesma diz que painel e tabela densa estão
+fora do escopo dela e presume React, Tailwind, imagens reais e tema duplo obrigatório. Ela serve
+como leitura de apoio pra tipografia e hierarquia, não como reprovação.
+
+Depois do pré-voo, a `high-end-visual-design` (opcional) para o acabamento (hairline, espaçamento
+óptico, alinhamento de números, peso de fonte).
 
 **Nada disso substitui olhar o PNG.** Os testes e o gate automático já deixaram passar uma
 regressão em que o card herói empurrou outro KPI para uma segunda linha com um bloco cinza
