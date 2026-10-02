@@ -41,7 +41,7 @@ test('SOURCES tem as fontes conhecidas com label e canHistory', () => {
   assert.equal(SOURCES.csv.canHistory, false);
   assert.equal(SOURCES.meta.label, 'Meta Ads');
   assert.equal(SOURCES.meta.canHistory, true);
-  assert.equal(SOURCES.d1.label, 'Historico (D1)');
+  assert.equal(SOURCES.d1.label, 'Histórico (D1)');
   assert.equal(SOURCES.d1.canHistory, false);
 });
 

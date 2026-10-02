@@ -53,13 +53,13 @@ if (args.includes('--check')) {
   if (!pw) { console.error('Playwright não encontrado (nem local, nem na pasta do `npm root -g`). Instale: npm i -g playwright'); process.exit(1); }
   let bin;
   try { bin = pw.chromium.executablePath(); } catch (e) {
-    console.error('Playwright resolve, mas nao sabe o caminho do Chromium: ' + e.message);
+    console.error('Playwright resolve, mas não sabe o caminho do Chromium: ' + e.message);
     process.exit(1);
   }
   // Pacote instalado sem o browser baixado e o caso que mais engana: `require` passa,
   // o launch quebra so na hora da prova.
   if (!bin || !fs.existsSync(bin)) {
-    console.error('Playwright instalado, mas o Chromium nao foi baixado: npx playwright install chromium');
+    console.error('Playwright instalado, mas o Chromium não foi baixado: npx playwright install chromium');
     process.exit(1);
   }
   console.log('Playwright OK, Chromium em ' + bin);
@@ -95,7 +95,7 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
 
 (async () => {
   const pw = resolvePlaywright();
-  if (!pw) { console.error('Playwright nao resolve. npm i -g playwright'); process.exit(1); }
+  if (!pw) { console.error('Playwright não resolve. npm i -g playwright'); process.exit(1); }
   fs.mkdirSync(outDir, { recursive: true });
 
   const browser = await pw.chromium.launch();
@@ -117,7 +117,7 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
 
     try {
       const resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      if (resp && resp.status() >= 400) falhas.push(`[${perfil.nome}] a propria pagina voltou ${resp.status()}`);
+      if (resp && resp.status() >= 400) falhas.push(`[${perfil.nome}] a própria página voltou ${resp.status()}`);
 
       if (senha) {
         const campo = page.locator('input[type="password"]').first();
@@ -130,7 +130,7 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
       // Espera o dado chegar, nao o DOM montar: painel monta o esqueleto na hora e
       // preenche depois. Sem isso a prova fotografa o esqueleto e aprova vazio.
       await page.waitForLoadState('networkidle', { timeout: 45000 }).catch(() => {
-        avisos.push(`[${perfil.nome}] rede nao aquietou em 45s (polling? stream?)`);
+        avisos.push(`[${perfil.nome}] rede não aquietou em 45s (polling? stream?)`);
       });
 
       // Ano no título aprovava um painel com todos os KPIs vazios. O alvo é a métrica visível.

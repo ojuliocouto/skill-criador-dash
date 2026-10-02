@@ -27,11 +27,11 @@ function tooMany(retryAfter) {
 // um painel protegido. Nao poder verificar a protecao tem que NEGAR, nunca liberar.
 async function loadConfig(env, id) {
   const kv = env && env.DASHBOARDS_KV;
-  if (!kv) return { erro: { msg: 'Binding DASHBOARDS_KV nao configurado.', status: 500 } };
+  if (!kv) return { erro: { msg: 'Binding DASHBOARDS_KV não configurado.', status: 500 } };
   const raw = await kv.get(`dash:${id}`);
-  if (!raw) return { erro: { msg: 'Dashboard nao encontrado.', status: 404 } };
+  if (!raw) return { erro: { msg: 'Dashboard não encontrado.', status: 404 } };
   try { return { config: JSON.parse(raw) }; }
-  catch { return { erro: { msg: 'Configuracao corrompida.', status: 500 } }; }
+  catch { return { erro: { msg: 'Configuração corrompida.', status: 500 } }; }
 }
 
 /**
@@ -84,7 +84,7 @@ export async function onRequest(context) {
     if (!row) {
       return json(
         {
-          error: 'Ainda nao ha dados capturados. Rode o cron ou aguarde a primeira captura.',
+          error: 'Ainda não há dados capturados. Rode o cron ou aguarde a primeira captura.',
         },
         404
       );

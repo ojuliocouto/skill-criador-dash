@@ -18,7 +18,7 @@ Faça os passos NA ORDEM, um de cada vez; o passo 2 é bloqueante (não pule).
 ### Passo 1: crie os namespaces KV
 ```
 wrangler kv namespace create DASHBOARDS_KV
-# O comando IMPRIME o id do namespace. Dependendo da versao do wrangler (3.x vs 4.x) o formato varia:
+# O comando IMPRIME o id do namespace. Dependendo da versão do wrangler (3.x vs 4.x) o formato varia:
 # pode vir como  id = "abc123..."  ou dentro de um bloco [[kv_namespaces]]. Em qualquer caso, copie o valor do id.
 wrangler kv namespace create DASHBOARD_CACHE      # opcional (cache 5 min); imprime outro id
 ```
@@ -100,7 +100,7 @@ da raiz e cole o `database_id`, e re-deploy o Pages; ou (b) no painel Pages > se
 Bindings > add D1 binding `DASHBOARD_DB` apontando pro mesmo banco.
 
 A primeira captura acontece no próximo disparo do cron (de hora em hora), então o dashboard mostra
-"Ainda nao ha dados capturados" até lá (não está quebrado). Para ver dado NA HORA, force uma captura:
+"Ainda não há dados capturados" até lá (não está quebrado). Para ver dado NA HORA, force uma captura:
 ```
 cd workers/snapshot && wrangler dev --remote --test-scheduled   # --test-scheduled expoe a rota /__scheduled; --remote usa o D1/KV reais
 # noutro terminal, dispara o scheduled uma vez:

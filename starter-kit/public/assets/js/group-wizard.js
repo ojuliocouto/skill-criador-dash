@@ -159,7 +159,7 @@ function renderForm(app, cands) {
       criarBtn.disabled = false;
       criarBtn.textContent = 'Criar grupo';
       if (e && e.adminNotConfigured) {
-        feedback.appendChild(errorBox('Este ambiente esta com a criacao bloqueada (ADMIN_TOKEN nao configurado no servidor). Peca pra configurar o secret ADMIN_TOKEN no projeto Pages.'));
+        feedback.appendChild(errorBox('Este ambiente está com a criação bloqueada (ADMIN_TOKEN não configurado no servidor). Peça pra configurar o secret ADMIN_TOKEN no projeto Pages.'));
         return;
       }
       if (e && e.needsAdmin) {

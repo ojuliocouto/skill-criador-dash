@@ -96,12 +96,12 @@ const SNAPSHOT_FETCHERS = {
 for (const type of Object.keys(SNAPSHOT_FETCHERS)) {
   const d = getSource(type);
   if (!d || !d.canHistory) {
-    throw new Error(`SNAPSHOT_FETCHERS tem '${type}', mas o registry nao marca canHistory:true. Ajuste sources/index.js.`);
+    throw new Error(`SNAPSHOT_FETCHERS tem '${type}', mas o registry não marca canHistory:true. Ajuste sources/index.js.`);
   }
 }
 for (const type of historyTypes()) {
   if (!SNAPSHOT_FETCHERS[type]) {
-    throw new Error(`Fonte '${type}' tem canHistory:true no registry mas nao tem fetcher no Worker de snapshot.`);
+    throw new Error(`Fonte '${type}' tem canHistory:true no registry mas não tem fetcher no Worker de snapshot.`);
   }
 }
 

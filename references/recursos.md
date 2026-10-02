@@ -98,7 +98,7 @@ da IMAGEM no WhatsApp, aí sim precisaria de um gerador raster (PNG via workers-
 ```
 ARCHITECTURE.md                 contratos das 3 camadas (fonte da verdade)
 package.json  wrangler.toml
-db/schema.sql                   tabela de snapshots do modo historico (D1)
+db/schema.sql                   tabela de snapshots do modo histórico (D1)
 examples/                       marketing-exemplo.csv, vendas-exemplo.csv, suporte-exemplo.csv
 functions/
   _middleware.js                CORS + cache KV + security headers (CSP) + injeta OpenGraph no HTML do dashboard
@@ -109,13 +109,13 @@ functions/
       sheets.js                 conector carro-chefe (gviz CSV)
       csv.js                     conector de upload
       meta-ads.js                conector Meta Ads (Graph API, token no servidor)
-      d1.js                      conector do modo historico (le snapshot do D1)
+      d1.js                      conector do modo histórico (lê snapshot do D1)
       crm.js  hotmart.js         stubs (ponto de partida)
   lib/
     csv.mjs                     parseCSV + detectDelimiter (puro, testavel)
     sheets-url.mjs              sheetUrlToCsv (compartilhado por sheets.js e pelo worker)
     meta.mjs                    buildInsightsUrl + mapInsightsToDataSet (puro)
-    snapshots.mjs               SQL do modo historico + rowToDataSet (puro)
+    snapshots.mjs               SQL do modo histórico + rowToDataSet (puro)
     auth-config.mjs             needsAuth/authOk (PBKDF2 salgado)/safeEqual/checkAdminToken (neutro)
     rate-limit.mjs              rate limiter em KV (gate de senha + preview Meta)
     domains.mjs                 lista DOMAINS do servidor (valida o POST); paridade com a do browser
@@ -127,7 +127,7 @@ public/
   index.html  config.html (wizard)  group.html (wizard de grupo)  dashboard.html
   assets/css/main.css
   assets/js/
-    config-wizard.js  group-wizard.js  dashboard.js  index-page.js  domains.mjs (lista DOMAINS do browser: fonte da verdade dos dominios)
+    config-wizard.js  group-wizard.js  dashboard.js  index-page.js  domains.mjs (lista DOMAINS do browser: fonte da verdade dos domínios)
     sources/ index.js (registry de fontes: type, label, canHistory)
     lib/ api-client.js  automap.js  format.js  metrics.js  filters.js (filtro puro)  auth.js  theme.js  color.js  html.js
     templates/ index.js  marketing.js  vendas.js  suporte.js  financeiro.js  estoque.js

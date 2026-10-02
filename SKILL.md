@@ -162,11 +162,38 @@ Antes de qualquer outro comando deste passo, crie a pasta do projeto (seção "P
 `cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash && cd ~/meu-dash`. É nela que
 ficam `evidencias/` (dos gates), `.dev.vars` e o dashboard da pessoa.
 
-Primeira vez da pessoa com isso? Antes de tocar na conta Cloudflare real, rode com ela o Quickstart
-do README (`git clone` -> `npm test` -> criar `.dev.vars` -> `npm run dev` -> abrir
-`http://localhost:8788/config.html`) pra ela ver um dashboard funcionando local, com dados dela, em
-minutos. Isso separa "ambiente funciona" de "infra provisionada": se algo falhar depois, você já sabe
-que não é o Node, o wrangler nem o wizard, é a parte de provisionamento real.
+#### Quickstart (primeira vez, só no seu computador)
+
+Antes de tocar na conta Cloudflare real, rode isto com a pessoa, um passo por vez, pra ela ver um
+dashboard funcionando no próprio computador em poucos minutos. Isso separa "ambiente funciona" de
+"infra provisionada": se algo falhar depois, você já sabe que não é o Node, o wrangler nem o
+wizard, é o provisionamento.
+
+1. Crie a pasta do projeto e entre nela:
+   ```bash
+   cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash
+   cd ~/meu-dash
+   ```
+2. Confira o ambiente. Não existe `npm install` (o kit não tem dependência), então isto já prova
+   que Node e npm funcionam. Tudo tem que sair verde:
+   ```bash
+   npm test
+   ```
+3. Crie o arquivo do token local. Criar dashboard é bloqueado até no seu computador (modelo
+   fail-closed), então este passo não é opcional. Escolha qualquer valor, ele só vale aqui e o
+   arquivo nunca vai pro git:
+   ```bash
+   echo "ADMIN_TOKEN=token-local-de-teste" > .dev.vars
+   ```
+4. Suba o servidor local:
+   ```bash
+   npm run dev
+   ```
+5. Abra `http://localhost:8788/config.html` no navegador e siga os 4 passos do wizard: escolha o
+   domínio (Marketing), suba o arquivo de exemplo `examples/marketing-exemplo.csv` (ou a planilha
+   da pessoa), confira as colunas, dê um nome e uma cor. Ao salvar, o wizard pede o token de
+   administrador: cole o mesmo valor do `.dev.vars`.
+6. Pronto: o primeiro dashboard está rodando local. O deploy na conta da pessoa vem no passo 4.
 
 **Porta ocupada.** Se o `npm run dev` responder `Address already in use (127.0.0.1:8788)`, já tem
 outro servidor usando a porta 8788 (talvez um `npm run dev` antigo aberto em outra janela). Rode
@@ -334,28 +361,28 @@ node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-DO-DASHBOARD>" [-
 - **Depois de verde, OLHE os dois PNG.** O script prova que há número na tela, não que o número está
   certo nem que a tela está boa. Cheque KPIs, funil, tendência, a cor de marca e os DOIS temas.
 
-### 6.1 GATE DE USO: ferramenta viva nao se pula
+### 6.1 GATE DE USO: ferramenta viva não se pula
 
 ```bash
 python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash checar
 ```
 
-**A regra, e ela nao tem excecao:** toda ferramenta que o Passo 0 mediu como RESPONDENDO
-precisa aparecer no registro de uso, com evidencia. Ferramenta que nao respondeu nao e cobrada,
-porque ali a degradacao ja foi declarada. Nao existe terceira opcao. **"A prova de tela eu pulei"
+**A regra, e ela não tem exceção:** toda ferramenta que o Passo 0 mediu como RESPONDENDO
+precisa aparecer no registro de uso, com evidência. Ferramenta que não respondeu não é cobrada,
+porque ali a degradação já foi declarada. Não existe terceira opção. **"A prova de tela eu pulei"
 com o Playwright vivo REPROVA a entrega.** (O 21st.dev é opcional e nunca é cobrado aqui.)
 
-**Por que este gate e diferente do 0.0-PRE:** o Passo 0 garante que a ferramenta RESPONDE. Este
-garante que ela foi USADA. Sao buracos distintos, e tapar so o primeiro nao resolve nada: da
+**Por que este gate é diferente do Passo 0:** o Passo 0 garante que a ferramenta RESPONDE. Este
+garante que ela foi USADA. São buracos distintos, e tapar só o primeiro não resolve nada: dá
 pra ter o Playwright verde no verificador e o painel sair sem nenhuma prova de tela do mesmo
-jeito. O resultado e identico ao da ferramenta morta, so que agora sem nem a desculpa.
+jeito. O resultado é idêntico ao da ferramenta morta, só que agora sem nem a desculpa.
 
-**A evidencia nao e a sua palavra.** Cada registro aponta um artefato que o script confere de
+**A evidência não é a sua palavra.** Cada registro aponta um artefato que o script confere de
 novo na hora do gate: arquivo que precisa existir e ter tamanho, ou trecho que precisa ser
-achado no codigo. Registro cujo artefato sumiu vale como nao registrado (o PNG da prova que
-voce apagou depois: o gate pega).
+achado no código. Registro cujo artefato sumiu vale como não registrado (o PNG da prova que
+você apagou depois: o gate pega).
 
-Registre conforme for usando, nao no fim de memoria:
+Registre conforme for usando, não no fim de memória.
 
 Cada comando vai inteiro, sem variável de atalho: no zsh (o terminal padrão do Mac) um
 atalho guardado numa variável (`U="python3 ..."`) e chamado depois quebra com
@@ -367,35 +394,34 @@ python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu
 python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash registrar "skill frontend-design" --arquivo evidencias/plano-visual.md --detalhe "plano visual antes do código"
 ```
 
-**Nao se aplica a esta pagina? DISPENSE, com motivo, e o motivo vai na entrega:**
+**Não se aplica a este painel? DISPENSE, com motivo, e o motivo vai na entrega:**
 
 ```bash
-python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash dispensar "skill animate" --motivo "este painel nao tem serie temporal: o widget de tendencia nao entra"
+python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash dispensar "skill animate" --motivo "este painel não tem série temporal: o widget de tendência não entra"
 ```
 
-Dispensa exige motivo de verdade (o script recusa "nao usei") e sai marcada no relatorio e no
-bloco de entrega. A diferenca entre dispensar e pular e essa: **dispensa e uma decisao assinada
-que o dono le; pulo e uma decisao escondida que ele descobre pelo resultado, meses depois.**
+Dispensa exige motivo de verdade (o script recusa "não usei") e sai marcada no relatório e no
+bloco de entrega. A diferença entre dispensar e pular é essa: **dispensa é uma decisão assinada
+que o dono lê; pulo é uma decisão escondida que ele descobre pelo resultado, meses depois.**
 
-
-**O caminho muda o que e cobrado.** O mesmo vale aqui, e cobrar as mesmas
-ferramentas em todos seria o mesmo erro de cobrar direcao de arte pra corrigir o nome de uma coluna:
+**O caminho muda o que é cobrado.** Cobrar as mesmas ferramentas em todo caminho seria o mesmo
+erro de cobrar direção de arte pra corrigir o nome de uma coluna:
 
 ```bash
 # CRIAR, CLONAR e MELHORAR: cobra tudo que estiver vivo
 python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash checar --caminho criar
 
-# EDITAR (mudanca pontual): cobra so a PROVA do ponto alterado
+# EDITAR (mudança pontual): cobra só a PROVA do ponto alterado
 python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash checar --caminho editar
 ```
 
-Exigir passe de gosto pra trocar um rotulo nao melhora nada, e gate impossivel
-de passar honestamente empurra pra dispensar tudo, que e como um gate deixa de valer.
-**A regra que continua valendo na edicao:** se a MUDANCA pede a ferramenta (o pedido e "poe um
-video no hero"), ela volta a ser cobrada e voce registra o uso normalmente.
+Exigir passe de gosto pra trocar um rótulo não melhora nada, e gate impossível de passar
+honestamente empurra pra dispensar tudo, que é como um gate deixa de valer.
+**A regra que continua valendo na edição:** se a MUDANÇA pede a ferramenta (o pedido é "põe um
+gráfico de tendência"), ela volta a ser cobrada e você registra o uso normalmente.
 
-**>>> GATE 6.1: `uso-ferramentas.py checar` saiu com codigo 0? Se NAO, volte e USE o que
-esta faltando. Nenhuma explicacao substitui rodar de novo verde. <<<**
+**>>> GATE 6.1: `uso-ferramentas.py checar` saiu com código 0? Se NÃO, volte e USE o que
+está faltando. Nenhuma explicação substitui rodar de novo verde. <<<**
 
 ---
 

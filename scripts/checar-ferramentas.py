@@ -53,7 +53,7 @@ def estado_mcp(nome):
     """
     ok, saida = roda("claude mcp list", timeout=45)
     if not ok and not saida:
-        return "indeterminado", "nao consegui rodar `claude mcp list`"
+        return "indeterminado", "não consegui rodar `claude mcp list`"
     for linha in saida.splitlines():
         if not linha.strip().startswith(nome):
             continue
@@ -66,7 +66,7 @@ def estado_mcp(nome):
             return "tools_falharam", linha.strip()
         if "connected" in baixo:
             return "conectado", linha.strip()
-    return "ausente", f"'{nome}' nao aparece em `claude mcp list`"
+    return "ausente", f"'{nome}' não aparece em `claude mcp list`"
 
 
 def skill_existe(nome):
@@ -88,7 +88,7 @@ def versao_node():
 def checagens(pular_testes=False):
     """Cada item: (rotulo, papel, critico, ok, detalhe, como_resolver)."""
     major, txt = versao_node()
-    yield ("Node 22+", "wrangler 4.x nao roda em versao mais velha", True,
+    yield ("Node 22+", "wrangler 4.x não roda em versão mais velha", True,
            major is not None and major >= 22, txt,
            "instale o Node 22 ou mais novo (nvm install 22 / brew install node)")
 
@@ -112,14 +112,14 @@ def checagens(pular_testes=False):
     if not pular_testes:
         ok, saida = roda("npm test", timeout=300, cwd=STARTER)
         n = re.search(r"# pass (\d+)", saida)
-        yield ("Pecas do starter-kit", "a biblioteca testada de onde o dash e montado", True, ok,
+        yield ("Peças do starter-kit", "a biblioteca testada de onde o dash é montado", True, ok,
                f"{n.group(1)} testes passando" if (ok and n) else saida.splitlines()[-1][:110] if saida else "",
-               "cd starter-kit && npm test (peca quebrada nao vira dashboard de ninguem)")
+               "cd starter-kit && npm test (peça quebrada não vira dashboard de ninguém)")
 
     # O prova-dash.js acha o Playwright global sozinho, pela pasta do `npm root -g` (T10):
     # nada de caminho fixo da maquina do dono.
     ok, saida = roda(f'node "{RAIZ}/scripts/prova-dash.js" --check')
-    yield ("Playwright", "prova de tela: o dash publicado abre e mostra numero", True, ok,
+    yield ("Playwright", "prova de tela: o dash publicado abre e mostra número", True, ok,
            saida.splitlines()[0][:110] if saida else "",
            "npm i -g playwright && npx playwright install chromium")
 
@@ -140,7 +140,7 @@ def checagens(pular_testes=False):
            est == "conectado", f"{est}: {det[:110]}",
            'chave em https://21st.dev/mcp, depois: claude mcp add magic --scope user '
            '-e API_KEY=<CHAVE> -- npx -y @21st-dev/magic@latest '
-           '(a chave vai por ENV, NAO pela flag --api-key; e o nome vem ANTES do -e)')
+           '(a chave vai por ENV, NÃO pela flag --api-key; e o nome vem ANTES do -e)')
 
     # O comando vai LITERAL: quem cai aqui esta com a ferramenta faltando e precisa copiar
     # e colar. Placeholder do tipo "<fonte>" nao instala nada, so parece que instrui.
@@ -182,13 +182,13 @@ def main():
         if criticos:
             print(f"  {len(criticos)} ferramenta(s) CRITICA(s) sem responder.")
             print("  Resolva ANTES do Passo 1. Sem elas o dashboard nasce pela rota degradada")
-            print("  e ninguem percebe, porque o fallback nao reclama: o sintoma chega semanas")
+            print("  e ninguém percebe, porque o fallback não reclama: o sintoma chega semanas")
             print("  depois, como 'o painel ficou feio'.\n")
         elif quebrados:
-            print(f"  Tudo critico responde. {len(quebrados)} opcional(is) degradado(s):")
-            print("  siga e DECLARE a degradacao na entrega.\n")
+            print(f"  Tudo crítico responde. {len(quebrados)} opcional(is) degradado(s):")
+            print("  siga e DECLARE a degradação na entrega.\n")
         else:
-            print("  Tudo respondendo. Pode comecar o Passo 1.\n")
+            print("  Tudo respondendo. Pode começar o Passo 1.\n")
 
     return 1 if any(not l["ok"] and l["critico"] for l in linhas) else 0
 

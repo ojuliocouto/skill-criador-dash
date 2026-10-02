@@ -144,7 +144,7 @@ export async function authOk(config, providedHash) {
 // servidor nao tem contra o que comparar. Por isso e uma resposta DISTINTA do 401
 // needsAdmin (que so pede o header quando o servidor JA tem o token).
 const ADMIN_NOT_CONFIGURED_MSG =
-  'ADMIN_TOKEN nao configurado no servidor. Defina o secret com: wrangler pages secret put ADMIN_TOKEN --project-name=<seu-projeto>. Sem ele, criar/gerenciar dashboards fica bloqueado (fail-closed).';
+  'ADMIN_TOKEN não configurado no servidor. Defina o secret com: wrangler pages secret put ADMIN_TOKEN --project-name=<seu-projeto>. Sem ele, criar/gerenciar dashboards fica bloqueado (fail-closed).';
 
 // Mensagem do 401 needsAdmin (servidor JA tem ADMIN_TOKEN, falta o header certo).
 // Achado da auditoria pre-aula: o quickstart manda o aluno criar o .dev.vars com

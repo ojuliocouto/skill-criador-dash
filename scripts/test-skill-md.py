@@ -96,6 +96,17 @@ class Roteiro(unittest.TestCase):
         self.assertTrue(gi.exists() and "projetos/" in gi.read_text(),
                         "a cópia do starter-kit precisa levar o .gitignore com projetos/")
 
+    def test_t14_quickstart_em_portugues_no_proprio_roteiro(self):
+        # O passo 1 mandava seguir o Quickstart do README, que é todo em inglês.
+        self.assertFalse("Quickstart\ndo README" in SKILL or "Quickstart do README" in SKILL,
+                         "o roteiro ainda manda o aluno pro Quickstart em inglês do README")
+        self.assertTrue("#### Quickstart (primeira vez, só no seu computador)" in SKILL, "falta o Quickstart em português")
+        bloco = SKILL.split("#### Quickstart (primeira vez, só no seu computador)", 1)[-1].split("###", 1)[0]
+        for trecho in ("cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash", "npm test",
+                       ".dev.vars", "npm run dev", "http://localhost:8788/config.html", "examples/marketing-exemplo.csv"):
+            with self.subTest(trecho=trecho):
+                self.assertTrue(trecho in bloco, f"Quickstart sem: {trecho}")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

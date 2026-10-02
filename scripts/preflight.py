@@ -42,8 +42,8 @@ def run(cmd: list) -> str:
 def check_node(problemas: list) -> None:
     node = shutil.which("node")
     if not node:
-        problemas.append("Node nao encontrado. Instale em nodejs.org (sem Node nao roda wrangler nem os testes).")
-        print(f"{BLOQUEIO} Node: nao encontrado")
+        problemas.append("Node não encontrado. Instale em nodejs.org (sem Node não roda wrangler nem os testes).")
+        print(f"{BLOQUEIO} Node: não encontrado")
         return
     versao = run(["node", "-v"])
     major = re.fullmatch(r"v(\d+)\.\d+\.\d+", versao)
@@ -60,11 +60,11 @@ def check_wrangler(problemas: list, avisos: list) -> None:
         versao = run(["wrangler", "--version"])
         print(f"{OK} wrangler global: {versao or 'instalado'}")
     elif shutil.which("npx"):
-        avisos.append("wrangler nao esta global; os comandos vao usar 'npx wrangler' (mais lento na 1a vez).")
-        print(f"{AVISO} wrangler: nao esta global, mas npx existe (npm run dev funciona via npx)")
+        avisos.append("wrangler não está global; os comandos vão usar 'npx wrangler' (mais lento na 1a vez).")
+        print(f"{AVISO} wrangler: não está global, mas npx existe (npm run dev funciona via npx)")
     else:
         problemas.append("Nem wrangler nem npx encontrados. Instale Node/npm e rode: npm i -g wrangler")
-        print(f"{BLOQUEIO} wrangler: nao encontrado (nem npx)")
+        print(f"{BLOQUEIO} wrangler: não encontrado (nem npx)")
 
 
 def check_api_token(avisos: list) -> None:
@@ -72,18 +72,18 @@ def check_api_token(avisos: list) -> None:
         avisos.append(
             "CLOUDFLARE_API_TOKEN esta exportado no ambiente: ele SOBREPOE o 'wrangler login' e pode "
             "apontar pra outra conta. Confira com 'wrangler whoami'; se for indevido, rode "
-            "'unset CLOUDFLARE_API_TOKEN' na mesma sessao antes de deployar."
+            "'unset CLOUDFLARE_API_TOKEN' na mesma sessão antes de deployar."
         )
         print(f"{AVISO} CLOUDFLARE_API_TOKEN exportado no shell (pode apontar pra conta errada)")
     else:
-        print(f"{OK} CLOUDFLARE_API_TOKEN: nao exportado (deploy usa o OAuth do wrangler login)")
+        print(f"{OK} CLOUDFLARE_API_TOKEN: não exportado (deploy usa o OAuth do wrangler login)")
 
 
 def check_toml(path: Path, problemas: list, nome: str, exigir_projeto: bool,
                avisos: list = None, bloquear: bool = True) -> None:
     if not path.exists():
-        problemas.append(f"{nome} nao encontrado em {path}. Rode a partir da raiz do repo (--starter-kit).")
-        print(f"{BLOQUEIO} {nome}: nao encontrado ({path})")
+        problemas.append(f"{nome} não encontrado em {path}. Rode a partir da raiz do repo (--starter-kit).")
+        print(f"{BLOQUEIO} {nome}: não encontrado ({path})")
         return
     texto = path.read_text(encoding="utf-8", errors="replace")
     # So linhas ATIVAS bloqueiam: placeholder em linha comentada (ex: o bloco D1
@@ -104,7 +104,7 @@ def check_toml(path: Path, problemas: list, nome: str, exigir_projeto: bool,
     elif sobrando:
         problemas.append(
             f"{nome} ainda tem placeholder: {', '.join(sobrando)}. "
-            "Se deployar assim, o deploy passa mas a API responde 500 'Binding DASHBOARDS_KV nao configurado'."
+            "Se deployar assim, o deploy passa mas a API responde 500 'Binding DASHBOARDS_KV não configurado'."
         )
         print(f"{BLOQUEIO} {nome}: placeholders pendentes -> {', '.join(sobrando)}")
     else:
@@ -117,14 +117,14 @@ def check_dev_vars(starter: Path, avisos: list) -> None:
         if "ADMIN_TOKEN" in dev_vars.read_text(encoding="utf-8", errors="replace"):
             print(f"{OK} .dev.vars: existe com ADMIN_TOKEN (fluxo completo funciona no npm run dev)")
         else:
-            avisos.append(".dev.vars existe mas nao define ADMIN_TOKEN: criar dashboard local vai dar 403.")
+            avisos.append(".dev.vars existe mas não define ADMIN_TOKEN: criar dashboard local vai dar 403.")
             print(f"{AVISO} .dev.vars: existe mas sem ADMIN_TOKEN")
     else:
         avisos.append(
             "Sem starter-kit/.dev.vars: no dev local, criar dashboard da 403 (fail-closed). "
             "Crie o arquivo com ADMIN_TOKEN=<valor-de-dev> pra testar o fluxo completo."
         )
-        print(f"{AVISO} .dev.vars: nao existe (mutacao local ficara bloqueada)")
+        print(f"{AVISO} .dev.vars: não existe (mutação local ficará bloqueada)")
 
 
 def run_tests(starter: Path, problemas: list) -> None:
@@ -135,22 +135,22 @@ def run_tests(starter: Path, problemas: list) -> None:
         for l in resumo:
             print("  " + l.strip())
         if out.returncode != 0:
-            problemas.append("npm test falhou. Nao deploye com a suite vermelha; rode 'npm test' e leia o erro.")
+            problemas.append("npm test falhou. Não deploye com a suite vermelha; rode 'npm test' e leia o erro.")
             print(f"{BLOQUEIO} suite de testes: FALHOU")
         else:
             print(f"{OK} suite de testes: verde")
     except (OSError, subprocess.TimeoutExpired) as e:
-        problemas.append(f"Nao consegui rodar npm test: {e}")
-        print(f"{BLOQUEIO} npm test: nao rodou ({e})")
+        problemas.append(f"Não consegui rodar npm test: {e}")
+        print(f"{BLOQUEIO} npm test: não rodou ({e})")
 
 
 def main() -> int:
     default_starter = Path(__file__).resolve().parent.parent / "starter-kit"
     parser = argparse.ArgumentParser(description="Preflight do criador-dash: ambiente + wrangler.toml antes do deploy.")
     parser.add_argument("--starter-kit", default=str(default_starter),
-                         help="caminho da pasta starter-kit (padrao: resolvido a partir do proprio script, "
+                         help="caminho da pasta starter-kit (padrão: resolvido a partir do próprio script, "
                               "funciona chamado de qualquer lugar)")
-    parser.add_argument("--history", action="store_true", help="inclui as checagens do modo historico (worker de snapshot)")
+    parser.add_argument("--history", action="store_true", help="inclui as checagens do modo histórico (worker de snapshot)")
     parser.add_argument("--run-tests", action="store_true", help="roda npm test no final")
     parser.add_argument("--antes-do-deploy", action="store_true",
                         help="passo 4: placeholder no wrangler.toml vira BLOQUEIO (sem a flag, é só aviso)")
@@ -176,7 +176,7 @@ def main() -> int:
 
     print()
     if avisos:
-        print("Avisos (nao bloqueiam, mas leia):")
+        print("Avisos (não bloqueiam, mas leia):")
         for a in avisos:
             print(f"  - {a}")
     if problemas:

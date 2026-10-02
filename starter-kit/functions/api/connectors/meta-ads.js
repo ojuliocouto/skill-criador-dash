@@ -65,7 +65,7 @@ export async function onRequest(context) {
       if (adminGate) return adminGate;
 
       let body;
-      try { body = await request.json(); } catch { return erro('Corpo invalido. Envie token e account.', 400); }
+      try { body = await request.json(); } catch { return erro('Corpo inválido. Envie token e account.', 400); }
       // No preview, mapeia QUALQUER falha para uma mensagem generica: nao vaza o
       // texto cru da Graph API (que revelaria se o token/conta e valido).
       try {
@@ -78,13 +78,13 @@ export async function onRequest(context) {
     if (method === 'GET') {
       const { searchParams } = new URL(request.url);
       const id = searchParams.get('id');
-      if (!id) return erro('Parametro "id" e obrigatorio.', 400);
+      if (!id) return erro('Parâmetro "id" é obrigatório.', 400);
       const kv = env && env.DASHBOARDS_KV;
-      if (!kv) return erro('Binding DASHBOARDS_KV nao configurado.', 500);
+      if (!kv) return erro('Binding DASHBOARDS_KV não configurado.', 500);
       const raw = await kv.get(`dash:${id}`);
-      if (!raw) return erro('Dashboard nao encontrado.', 404);
+      if (!raw) return erro('Dashboard não encontrado.', 404);
       let config;
-      try { config = JSON.parse(raw); } catch { return erro('Configuracao corrompida.', 500); }
+      try { config = JSON.parse(raw); } catch { return erro('Configuração corrompida.', 500); }
       // Protecao por senha: dashboard protegido exige a senha tambem para os DADOS.
       if (needsAuth(config)) {
         const senhaOk = await authOk(config, request.headers.get('x-dash-auth') || '');
@@ -97,7 +97,7 @@ export async function onRequest(context) {
         }
       }
       const m = config.source && config.source.meta;
-      if (!m || !m.token) return erro('Este dashboard nao tem conector Meta Ads configurado.', 400);
+      if (!m || !m.token) return erro('Este dashboard não tem conector Meta Ads configurado.', 400);
       // Mesma protecao do preview: NAO repassa o texto cru da Graph API. Sem isso
       // o GET vira oraculo de validacao do token/conta GUARDADO no dashboard.
       try {
@@ -107,7 +107,7 @@ export async function onRequest(context) {
       }
     }
 
-    return erro(`Metodo ${method} nao suportado.`, 405);
+    return erro(`Método ${method} não suportado.`, 405);
   } catch (e) {
     return erro(e && e.message ? e.message : 'Falha ao consultar o Meta Ads.', 502);
   }

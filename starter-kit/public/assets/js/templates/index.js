@@ -17,7 +17,7 @@ const byId = { marketing, vendas, suporte, financeiro, estoque };
 export const templates = Object.fromEntries(
   DOMAINS.map((id) => {
     const tpl = byId[id];
-    if (!tpl) throw new Error(`Dominio "${id}" listado em domains.mjs nao tem template correspondente.`);
+    if (!tpl) throw new Error(`Domínio "${id}" listado em domains.mjs não tem template correspondente.`);
     return [id, tpl];
   }),
 );

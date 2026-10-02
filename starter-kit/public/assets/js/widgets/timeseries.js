@@ -122,8 +122,8 @@ export function render(props = {}, points) {
   const pointsLabel = `${n} pontos`;
   const rangeLabel = `de ${fmtNumber(dataMin)} a ${fmtNumber(dataMax)}`;
   const label = title
-    ? `Grafico de linha: ${title}, ${pointsLabel}, ${rangeLabel}`
-    : `Grafico de linha, ${pointsLabel}, ${rangeLabel}`;
+    ? `Gráfico de linha: ${title}, ${pointsLabel}, ${rangeLabel}`
+    : `Gráfico de linha, ${pointsLabel}, ${rangeLabel}`;
 
   // Sem preserveAspectRatio="none": o SVG escala uniformemente (xMidYMid meet, padrao),
   // entao a curva mantem a inclinacao fiel e os pontos ficam redondos, nao ovais.

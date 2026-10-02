@@ -196,7 +196,7 @@ function showError(app, message, action) {
     : '';
   app.innerHTML =
     `<div class="empty-state">` +
-      `<h2>Nao foi possivel abrir o dashboard</h2>` +
+      `<h2>Não foi possível abrir o dashboard</h2>` +
       `<p class="error">${esc(message)}</p>` +
       `<div class="row-actions" style="justify-content:center">${btn}</div>` +
     `</div>`;
@@ -281,7 +281,7 @@ function renderSingle(item, ctx) {
   // (uma config com widget invalido nao deve derrubar o dashboard inteiro).
   if (!entry || typeof entry.toHtml !== 'function') {
     const tipo = item && item.widget;
-    console.error(`[dashboard] widget desconhecido no layout: "${tipo}". Nao existe no registry de widgets.`);
+    console.error(`[dashboard] widget desconhecido no layout: "${tipo}". Não existe no registry de widgets.`);
     return '';
   }
   return entry.toHtml(item, { ...ctx, findMetricDef, card: cardWith });
@@ -562,7 +562,7 @@ async function loadDashboardInto(container, config, id, opts = {}) {
   // A personalizacao (heroi e metricas ocultas) vem da config DESTE dashboard (T7).
   const template = aplicarPersonalizacao(getTemplate(config.domain), config);
   if (!template) {
-    showError(container, `Dominio desconhecido: ${config.domain}.`, {
+    showError(container, `Domínio desconhecido: ${config.domain}.`, {
       href: `/config.html?id=${encodeURIComponent(id)}`, label: 'Reconfigurar',
     });
     return false;
@@ -582,7 +582,7 @@ async function loadDashboardInto(container, config, id, opts = {}) {
     return false;
   }
   if (!dataset || !Array.isArray(dataset.rows)) {
-    showError(container, 'A fonte nao devolveu dados validos.', {
+    showError(container, 'A fonte não devolveu dados válidos.', {
       href: `/config.html?id=${encodeURIComponent(id)}`, label: 'Reconfigurar',
     });
     return false;
@@ -602,7 +602,7 @@ async function initGroup(app, group, groupId) {
 
   const tabs = (group.tabs || []).filter((t) => t && t.id);
   if (!tabs.length) {
-    showError(app, 'Este grupo nao tem abas configuradas.', { href: '/', label: 'Ver meus dashboards' });
+    showError(app, 'Este grupo não tem abas configuradas.', { href: '/', label: 'Ver meus dashboards' });
     return;
   }
   const params = new URLSearchParams(location.search);
@@ -638,7 +638,7 @@ async function initGroup(app, group, groupId) {
         cache[childId] = cfg;
       } catch (err) {
         const msg = err && err.needsPassword
-          ? 'Esta aba e um dashboard protegido por senha e nao pode ser embutida no grupo.'
+          ? 'Esta aba é um dashboard protegido por senha e não pode ser embutida no grupo.'
           : (err && err.message) || 'Falha ao carregar esta aba.';
         showError(panel, msg, { href: `/dashboard.html?id=${encodeURIComponent(childId)}`, label: 'Abrir direto' });
         return;
@@ -674,13 +674,13 @@ async function init() {
       renderPasswordPrompt(app, id);
       return;
     }
-    showError(app, err && err.message ? err.message : 'Falha ao carregar a configuracao.', {
+    showError(app, err && err.message ? err.message : 'Falha ao carregar a configuração.', {
       href: '/', label: 'Ver meus dashboards',
     });
     return;
   }
   if (!config || !config.id) {
-    showError(app, 'Dashboard nao encontrado.', { href: '/', label: 'Ver meus dashboards' });
+    showError(app, 'Dashboard não encontrado.', { href: '/', label: 'Ver meus dashboards' });
     return;
   }
 

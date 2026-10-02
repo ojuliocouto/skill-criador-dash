@@ -75,7 +75,7 @@ async function mutationOrThrow(res) {
   let data;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
   if (res.status === 403 && data && data.adminNotConfigured) {
-    const e = new Error(data.error || 'O servidor nao tem ADMIN_TOKEN configurado.');
+    const e = new Error(data.error || 'O servidor não tem ADMIN_TOKEN configurado.');
     e.adminNotConfigured = true;
     throw e;
   }
@@ -194,13 +194,13 @@ const DEDICATED_FETCH_TYPES = new Set(['d1']);
 // divergirem, apontando exatamente o type faltando/sobrando.
 for (const type of Object.keys(LIVE_FETCHERS)) {
   if (!getSource(type)) {
-    throw new Error(`LIVE_FETCHERS tem '${type}', mas o registry de fontes nao. Ajuste sources/index.js.`);
+    throw new Error(`LIVE_FETCHERS tem '${type}', mas o registry de fontes não. Ajuste sources/index.js.`);
   }
 }
 for (const type of sourceTypes()) {
   if (DEDICATED_FETCH_TYPES.has(type)) continue;
   if (!LIVE_FETCHERS[type]) {
-    throw new Error(`Fonte '${type}' esta no registry mas sem fetcher live em api-client.js.`);
+    throw new Error(`Fonte '${type}' está no registry mas sem fetcher live em api-client.js.`);
   }
 }
 

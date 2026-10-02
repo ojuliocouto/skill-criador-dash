@@ -220,7 +220,7 @@ function pedirAdminToken(feedback, retry) {
   const salvarBtn = el('button', { class: 'btn', type: 'button', text: 'Continuar com token' });
   const box = el('div', { class: 'card' }, [
     el('h3', { text: 'Este ambiente exige um token de administrador' }),
-    el('p', { class: 'hint', text: 'Cole o valor que voce definiu em ADMIN_TOKEN. Rodando local, e a linha ADMIN_TOKEN=... do arquivo .dev.vars. Em producao, e o secret ADMIN_TOKEN do projeto.' }),
+    el('p', { class: 'hint', text: 'Cole o valor que você definiu em ADMIN_TOKEN. Rodando local, é a linha ADMIN_TOKEN=... do arquivo .dev.vars. Em produção, é o secret ADMIN_TOKEN do projeto.' }),
     el('label', { class: 'field' }, [
       el('span', { class: 'lbl', text: 'Token de administrador' }),
       tokenInput,
@@ -289,9 +289,9 @@ function pedirSenhaDashboard(feedback, id, retry) {
  */
 function mostrarAdminNaoConfigurado(feedback) {
   const box = el('div', { class: 'card' }, [
-    el('h3', { text: 'O servidor ainda nao tem ADMIN_TOKEN configurado' }),
-    el('p', { class: 'hint', text: 'Criar e gerenciar dashboards fica bloqueado ate o operador definir o token no servidor (modelo fail-closed). Colar um token aqui nao resolve, porque o servidor nao tem contra o que comparar.' }),
-    el('p', { class: 'hint', text: 'Rode: wrangler pages secret put ADMIN_TOKEN --project-name=<seu-projeto> e faca o re-deploy. Depois recarregue esta pagina.' }),
+    el('h3', { text: 'O servidor ainda não tem ADMIN_TOKEN configurado' }),
+    el('p', { class: 'hint', text: 'Criar e gerenciar dashboards fica bloqueado até o operador definir o token no servidor (modelo fail-closed). Colar um token aqui não resolve, porque o servidor não tem contra o que comparar.' }),
+    el('p', { class: 'hint', text: 'Rode: wrangler pages secret put ADMIN_TOKEN --project-name=<seu-projeto> e faça o re-deploy. Depois recarregue esta página.' }),
   ]);
   box.style.marginTop = '16px';
   feedback.appendChild(box);
@@ -388,7 +388,7 @@ function renderDomain(body) {
 
 function renderSource(body) {
   body.appendChild(el('h2', { text: 'Conecte a fonte de dados' }));
-  body.appendChild(el('p', { class: 'hint', text: 'Atenção à privacidade: a planilha fica acessível por link e o dashboard publicado pode ser aberto por qualquer pessoa que tenha a URL. Use dados que voce nao se importa que sejam vistos por quem tiver o link.' }));
+  body.appendChild(el('p', { class: 'hint', text: 'Atenção à privacidade: a planilha fica acessível por link e o dashboard publicado pode ser aberto por qualquer pessoa que tenha a URL. Use dados que você não se importa que sejam vistos por quem tiver o link.' }));
 
   // Opção A: Google Sheets
   const sheetsCard = el('div', { class: 'card' }, [
@@ -697,8 +697,8 @@ function renderFinish(body) {
       logoImg.style.display = 'none';
       logoImg.removeAttribute('src');
       logoHint.textContent = raw && raw.trim()
-        ? 'Use uma URL https:// de imagem (o link atual nao sera aplicado).'
-        : 'Sem logo: mostramos o ponto de marca padrao.';
+        ? 'Use uma URL https:// de imagem (o link atual não será aplicado).'
+        : 'Sem logo: mostramos o ponto de marca padrão.';
     }
   };
 
@@ -759,15 +759,15 @@ function renderFinish(body) {
       logoPreview,
     ]),
     el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Cor secundaria (opcional)' }),
+      el('span', { class: 'lbl', text: 'Cor secundária (opcional)' }),
       el('div', { style: 'display:flex;align-items:center;gap:10px' }, [
         accent2Input,
         el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim)' }, [
           usarPadraoChk,
-          el('span', { text: 'Usar padrao (derivar da cor de destaque)' }),
+          el('span', { text: 'Usar padrão (derivar da cor de destaque)' }),
         ]),
       ]),
-      el('span', { class: 'hint', text: 'Tinge o fundo suave do dashboard (area do grafico e trilha dos badges).' }),
+      el('span', { class: 'hint', text: 'Tinge o fundo suave do dashboard (área do gráfico e trilha dos badges).' }),
     ]),
   ];
   // Sincroniza o preview do logo com o estado inicial ao montar o passo.
@@ -801,14 +801,14 @@ function renderFinish(body) {
     });
     fields.push(el('label', { class: 'field' }, [
       goalLbl,
-      el('input', { class: 'input', id: 'dashGoal', type: 'number', min: '0', placeholder: 'Deixe em branco se nao tiver meta' }),
+      el('input', { class: 'input', id: 'dashGoal', type: 'number', min: '0', placeholder: 'Deixe em branco se não tiver meta' }),
       el('span', { class: 'hint', text: 'Mostra o progresso (percentual da meta) no card principal.' }),
     ]));
   }
   fields.push(el('label', { class: 'field' }, [
     el('span', { class: 'lbl', text: 'Senha de acesso (opcional)' }),
     el('input', { class: 'input', id: 'dashPassword', type: 'password', placeholder: 'Deixe em branco para dashboard aberto', autocomplete: 'new-password' }),
-    el('span', { class: 'hint', text: 'Com senha, quem abrir o link precisa digita-la. A senha nao e guardada em texto puro, so o hash.' }),
+    el('span', { class: 'hint', text: 'Com senha, quem abrir o link precisa digitá-la. A senha não é guardada em texto puro, só o hash.' }),
   ]));
   // Modo de dados: so oferece historico para fontes que suportam (canHistory no
   // registry de fontes). Hoje: planilha e Meta suportam; CSV nao.
@@ -816,13 +816,13 @@ function renderFinish(body) {
   const podeHistorico = !!(getSource(sourceType) && getSource(sourceType).canHistory);
   if (podeHistorico) {
     const modeSelect = el('select', { class: 'input', id: 'dashStorage' }, [
-      el('option', { value: 'live', text: 'Ao vivo (le a fonte na hora)' }),
-      el('option', { value: 'd1', text: 'Historico (guarda no banco D1 via cron)' }),
+      el('option', { value: 'live', text: 'Ao vivo (lê a fonte na hora)' }),
+      el('option', { value: 'd1', text: 'Histórico (guarda no banco D1 via cron)' }),
     ]);
     fields.push(el('label', { class: 'field' }, [
       el('span', { class: 'lbl', text: 'Modo de dados' }),
       modeSelect,
-      el('span', { class: 'hint', text: 'Historico precisa do D1 e do Worker cron provisionados (o agente configura). Ao vivo nao precisa de banco.' }),
+      el('span', { class: 'hint', text: 'Histórico precisa do D1 e do Worker cron provisionados (o agente configura). Ao vivo não precisa de banco.' }),
     ]));
   }
   const card = el('div', { class: 'card' }, fields);

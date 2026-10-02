@@ -38,7 +38,7 @@ export const SOURCES = {
   sheets: { type: 'sheets', label: 'Google Sheets', canHistory: true },
   csv: { type: 'csv', label: 'CSV', canHistory: false },
   meta: { type: 'meta', label: 'Meta Ads', canHistory: true },
-  d1: { type: 'd1', label: 'Historico (D1)', canHistory: false },
+  d1: { type: 'd1', label: 'Histórico (D1)', canHistory: false },
 };
 
 /**
