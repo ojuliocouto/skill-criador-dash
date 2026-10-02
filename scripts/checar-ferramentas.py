@@ -128,11 +128,14 @@ def checagens(pular_testes=False):
     # ESCOPO IMPORTA: sem `--scope user` o servidor fica preso ao projeto do diretorio
     # atual e SOME quando o cwd muda (a pasta da skill tem git proprio, entao e outro
     # projeto). Sempre `--scope user`.
+    # OPCIONAL (02/10/2026, teste com aluno): o 21st.dev cobra pelo codigo do componente e
+    # entrega React + Tailwind, enquanto o starter-kit e HTML montado em string. Ele nunca
+    # bloqueia o passo 0: aluno sem chave segue normalmente.
     for _n in ("21st", "magic"):
         est, det = estado_mcp(_n)
         if est == "conectado":
             break
-    yield ("21st ou magic (21st.dev)", "componentes de UI reais no lugar de card feito a mao", True,
+    yield ("21st ou magic (21st.dev)", "opcional: inspiração de componente (é React, não encaixa direto no starter-kit HTML)", False,
            est == "conectado", f"{est}: {det[:110]}",
            'chave em https://21st.dev/mcp, depois: claude mcp add magic --scope user '
            '-e API_KEY=<CHAVE> -- npx -y @21st-dev/magic@latest '

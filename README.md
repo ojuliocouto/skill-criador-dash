@@ -299,18 +299,15 @@ MIT.
 ## Ferramentas e gates do roteiro guiado
 
 Antes do Passo 1, execute `python3 scripts/checar-ferramentas.py` na raiz da skill.
-Além de Node 22+, wrangler e starter-kit, o roteiro exige Python 3.9+, Playwright,
-21st.dev e a skill design-taste-frontend. A biblioteca isolada pode ser testada sem
-esses MCPs; o roteiro guiado bloqueia se faltar uma ferramenta crítica.
+Além de Node 22+, wrangler e starter-kit, o roteiro exige Python 3.9+ e Playwright.
+O 21st.dev é opcional e nunca bloqueia: o código dele é pago e vem em React, e o
+starter-kit é HTML puro. O roteiro guiado bloqueia só se faltar uma ferramenta crítica.
 
 ```bash
 npm install -g playwright && npx playwright install chromium
-npx skills add Leonxlnx/taste-skill
-claude mcp add --transport http 21st https://21st.dev/api/mcp --scope user --header "x-api-key: SUA_CHAVE"
 ```
 
-Obtenha sua própria chave em https://21st.dev/mcp e substitua SUA_CHAVE localmente.
-Não publique a chave. Frontend-design, high-end-visual-design e animate são opcionais.
+High-end-visual-design e animate são opcionais.
 Sem elas, declare a degradação. O starter-kit não tem dependências: use `npm test`,
 sem `npm ci`, pois não há arquivo de lock.
 

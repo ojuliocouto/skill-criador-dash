@@ -31,17 +31,19 @@ class GateUso(unittest.TestCase):
         return {"evidencia": {"tipo": "arquivo", "valor": "prova.png"}}
 
     def test_positivo_com_artefatos(self):
-        self.assertEqual(self.checar({"magic": True, "Playwright": True},
-                                    {"magic": self.registro(), "Playwright": self.registro()}), 0)
+        self.assertEqual(self.checar({"Playwright": True, "skill frontend-design": True},
+                                    {"Playwright": self.registro(), "skill frontend-design": self.registro()}), 0)
 
     def test_negativo_sem_uso(self):
-        self.assertEqual(self.checar({"magic": True}, {}), 1)
+        self.assertEqual(self.checar({"Playwright": True}, {}), 1)
 
-    def test_alias_nao_pode_sumir_da_cobranca(self):
-        for nome in ("21st", "21st ou magic (21st.dev)"):
+    def test_21st_vivo_e_nao_usado_nao_reprova(self):
+        # T1: componente do 21st.dev e React; o starter-kit e HTML em string. Cobrar uso
+        # empurraria toda entrega pra uma dispensa de fachada.
+        for nome in ("magic", "21st", "21st ou magic (21st.dev)"):
             with self.subTest(nome=nome):
                 self.assertEqual(self.checar({nome: True, "Playwright": True},
-                                            {"Playwright": self.registro()}), 1)
+                                            {"Playwright": self.registro()}), 0)
 
     def test_pasta_nao_e_artefato(self):
         self.assertFalse(uso.evidencia_vale({"tipo": "arquivo", "valor": "."}, self.projeto)[0])

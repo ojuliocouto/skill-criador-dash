@@ -55,6 +55,17 @@ for linha, esperado in [
     checa(f"'{linha.split('- ')[1]}' classifica como {esperado}", got == esperado, got)
 chk.roda = orig
 
+# T1 (aluno, 02/10/2026): o 21st.dev e pago, React e Tailwind, e o starter-kit e HTML em
+# string. Ele nunca pode BLOQUEAR o passo 0 de quem nao tem a chave.
+orig_estado, orig_roda2 = chk.estado_mcp, chk.roda
+chk.estado_mcp = lambda nome: ("sem_auth", f"{nome}: Needs authentication")
+chk.roda = lambda *a, **k: (True, "v22.13.1")
+linhas = {r: c for r, p, c, o, d, f in chk.checagens(pular_testes=True)}
+chk.estado_mcp, chk.roda = orig_estado, orig_roda2
+item_21st = next((k for k in linhas if "21st" in k), None)
+checa("21st.dev aparece no relatorio", item_21st is not None)
+checa("21st.dev e OPCIONAL: sem chave nao bloqueia o passo 0", item_21st is not None and linhas[item_21st] is False)
+
 # So faz sentido se a ferramenta estiver instalada: senao seria testar o ambiente, nao o checador.
 est_magic, det = chk.estado_mcp("magic")
 if est_magic == "ausente":

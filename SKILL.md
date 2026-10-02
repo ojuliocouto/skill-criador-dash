@@ -62,8 +62,8 @@ coisa e confere se voltou. Sai com código diferente de zero quando falta algo c
 
 **Por que isso existe (26/08/2026, custou meses sem ninguém perceber):** na skill irmã
 (construtor-paginas) o MCP do 21st.dev estava configurado e MORTO havia tempo indeterminado
-(`Not authenticated: your API key is missing or was reset`). A skill mandava "usar componentes
-do 21st.dev OU fazer à mão", o MCP nunca respondia, e ela caía no "à mão" TODA VEZ. Ninguém viu,
+(`Not authenticated: your API key is missing or was reset`). A skill mandava usar componentes
+dele (MORTO) ou fazer à mão, o MCP nunca respondia, e ela caía no "à mão" TODA VEZ. Ninguém viu,
 porque **fallback silencioso não reclama**: o sintoma chegou pelo RESULTADO ("o design não está
 interessante"), meses depois. O criador-dash estava pior: não mencionava nenhuma ferramenta
 visual e não tinha prova de tela nenhuma. Eram 654 testes passando, e nenhum olhava o dashboard.
@@ -80,8 +80,8 @@ conferir o retorno.
 | Só opcional degradado | Segue, e DECLARE a degradação na entrega |
 
 **CONDUZIR, não avisar.** Quem usa esta skill quase sempre não sabe o que é um MCP. Não diga
-"você precisa configurar o 21st.dev": abra a página, dê o comando pronto, espere a chave, cole
-e confirme que subiu. Uma ferramenta por vez, do jeito que o Passo 1 ensina cada palavra técnica
+"você precisa instalar o Playwright": dê o comando pronto, espere terminar e confirme que
+respondeu. Uma ferramenta por vez, do jeito que o Passo 1 ensina cada palavra técnica
 antes de mandar comando.
 
 | Ferramenta | Para quê | Como conduzir |
@@ -91,7 +91,7 @@ antes de mandar comando.
 | **Login Cloudflare** | é a conta DA PESSOA que recebe o dashboard | `wrangler login`, depois `wrangler whoami` pra confirmar a conta. **Um `CLOUDFLARE_API_TOKEN` exportado no shell SOBREPÕE o login e pode publicar na conta errada:** o verificador denuncia; se for indevido, `unset CLOUDFLARE_API_TOKEN`. |
 | **Peças do starter-kit** | é a biblioteca testada de onde o dashboard é montado | `cd starter-kit && npm test`. Peça quebrada não vira dashboard de ninguém: conserte antes. |
 | **Playwright** | prova de tela: abre o dashboard publicado e confere que ele mostra número | `npm i -g playwright && npx playwright install chromium` (~265 MB; a versão leve é `--only-shell`, ~94 MB). |
-| **magic (21st.dev)** | componentes de UI reais no lugar de card feito à mão | Pegue a chave em `https://21st.dev/mcp` e rode:<br>`claude mcp add magic --scope user -e API_KEY=<CHAVE> -- npx -y @21st-dev/magic@latest`<br>**Dois erros que custam tempo:** a chave vai por ENV `API_KEY`, NÃO pela flag `--api-key` (a flag conecta e devolve "not authenticated"); e o NOME vem ANTES do `-e`, senão o flag variádico engole o nome do servidor. As tools novas só aparecem na próxima sessão. |
+| **magic (21st.dev), opcional** | inspiração de componente; nunca bloqueia o passo 0 | O código do componente é pago e vem em React + Tailwind, e o starter-kit é HTML montado em string: não encaixa direto. Aluno sem chave pula e segue. Quem já tem a chave pode usar só como referência visual. |
 | **skill design-taste-frontend** | gate anti-slop antes de publicar | `npx skills add Leonxlnx/taste-skill` |
 | **skills de design (opcionais)** | direção estética, acabamento e microinteração | `frontend-design`, `high-end-visual-design`, `animate` |
 
@@ -233,9 +233,10 @@ node scripts/prova-dash.js "<URL-local-ou-publicada>" --out prova-parcial
 os outros widgets copiam esse padrão. A tabela de conferência (hierarquia, grid, cor, números,
 densidade, estado vazio) está em `references/direcao-de-arte.md`, Fase 2.
 
-Use a **`magic` (21st.dev)** para os componentes de interface (card, tabela, filtro, aba) em vez
-de montar à mão, e a **`animate`** para microinteração DEPOIS que o layout estiver resolvido:
-movimento antes disso mascara layout ruim. Registre os dois usos (6.1).
+Os componentes já existem no starter-kit (`public/assets/js/widgets/`): card de KPI, tabela,
+filtro e aba são HTML puro, testados. O 21st.dev é opcional e não encaixa direto (é React), então
+serve no máximo de referência visual. A **`animate`** entra para microinteração DEPOIS que o layout
+estiver resolvido: movimento antes disso mascara layout ruim. Registre o uso (6.1).
 
 **>>> GATE 5.1: o primeiro render corresponde à direção do 2.5? Se NÃO, corrija AGORA, antes de
 montar o resto. Replicar padrão errado é o jeito mais caro de errar. <<<**
@@ -277,26 +278,24 @@ python3 scripts/uso-ferramentas.py --projeto <dir-do-projeto> checar
 
 **A regra, e ela nao tem excecao:** toda ferramenta que o Passo 0 mediu como RESPONDENDO
 precisa aparecer no registro de uso, com evidencia. Ferramenta que nao respondeu nao e cobrada,
-porque ali a degradacao ja foi declarada. Nao existe terceira opcao. **"O 21st.dev eu pulei"
-com o 21st.dev vivo REPROVA a entrega.**
+porque ali a degradacao ja foi declarada. Nao existe terceira opcao. **"A prova de tela eu pulei"
+com o Playwright vivo REPROVA a entrega.** (O 21st.dev é opcional e nunca é cobrado aqui.)
 
 **Por que este gate e diferente do 0.0-PRE:** o Passo 0 garante que a ferramenta RESPONDE. Este
 garante que ela foi USADA. Sao buracos distintos, e tapar so o primeiro nao resolve nada: da
-pra ter o 21st.dev conectado, verde no verificador, e o painel sair 100% feito a mao do mesmo
-jeito. O resultado e identico ao do MCP morto, so que agora sem nem a desculpa.
+pra ter o Playwright verde no verificador e o painel sair sem nenhuma prova de tela do mesmo
+jeito. O resultado e identico ao da ferramenta morta, so que agora sem nem a desculpa.
 
 **A evidencia nao e a sua palavra.** Cada registro aponta um artefato que o script confere de
 novo na hora do gate: arquivo que precisa existir e ter tamanho, ou trecho que precisa ser
-achado no codigo. Registro cujo artefato sumiu vale como nao registrado (o componente do
-21st.dev que voce trocou por um card a mao depois: o gate pega).
+achado no codigo. Registro cujo artefato sumiu vale como nao registrado (o PNG da prova que
+voce apagou depois: o gate pega).
 
 Registre conforme for usando, nao no fim de memoria:
 
 ```bash
 U="python3 scripts/uso-ferramentas.py --projeto <dir-do-projeto>"
 
-# componente que veio mesmo do MCP: o trecho tem que estar no codigo
-$U registrar magic --no-codigo "<classe-ou-nome-do-componente>" --em <dir> --detalhe "card de KPI do 21st.dev"
 # artefato no disco
 $U registrar Playwright --arquivo prova/dash-desktop.png --detalhe "prova de tela lida"
 $U registrar "skill design-taste-frontend" --arquivo public/dashboard.html --detalhe "passe de gosto, 3 tells removidos"

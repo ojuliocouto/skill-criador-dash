@@ -80,10 +80,11 @@ Abra o PNG e confira contra o que foi decidido na Fase 1:
 | Densidade | metade da tela vazia, ou dado espremido sem respiro |
 | Vazio | algum widget mostra "Sem dados" sem dizer por quê |
 
-Use a `magic` (21st.dev) para os componentes de interface (card, tabela, filtro, aba) em vez de
-montar à mão. Componente pronto e testado sobra tempo para o que só você pode fazer, que é a
-direção. A `animate` entra aqui, e só depois que o layout está resolvido: movimento antes disso
-mascara layout ruim.
+Os componentes (card de KPI, tabela, filtro, aba) já vêm prontos e testados no starter-kit, em
+HTML puro. O 21st.dev é opcional: o código dele é React + Tailwind e não encaixa direto aqui, então
+serve no máximo de referência visual. Componente pronto sobra tempo para o que só você pode fazer,
+que é a direção. A `animate` entra aqui, e só depois que o layout está resolvido: movimento antes
+disso mascara layout ruim.
 
 ---
 
