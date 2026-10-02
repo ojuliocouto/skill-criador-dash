@@ -165,6 +165,9 @@ export function montarPersonalizacao(tpl, heroi, ocultas) {
 // state.accent2 fica vazio e nada muda visualmente.
 const ACCENT2_DEFAULT = '#3cd3a4';
 
+// Guia do token do Meta Ads (T11): a pessoa gera o PROPRIO token, passo a passo.
+const META_GUIA_URL = 'https://github.com/ojuliocouto/skill-criador-dash/blob/main/references/token-meta-ads.md';
+
 const STEPS = [
   { n: 1, label: 'Domínio' },
   { n: 2, label: 'Fonte' },
@@ -422,9 +425,13 @@ function renderSource(body) {
   if (state.domain === 'marketing') {
     metaCard = el('div', { class: 'card' }, [
       el('h3', { text: 'Meta Ads (avançado)' }),
-      el('p', { class: 'hint', text: 'Puxa os números das campanhas direto da Meta. Você precisa de um token de usuário do sistema (validade Nunca, permissões ads_read e read_insights) e do ID da conta de anúncios, o número depois de act= no endereço do Gerenciador de Anúncios. O token fica só no servidor e nunca aparece no dashboard.' }),
+      el('p', { class: 'hint', text: 'Puxa os números das campanhas direto da Meta. Você precisa de um token de usuário do sistema (um usuário de robô, criado no Gerenciador de Negócios, que só lê os anúncios e não depende da sua senha), com validade Nunca e as permissões ads_read e read_insights, e do ID da conta de anúncios, o número depois de act= no endereço do Gerenciador de Anúncios. O token fica só no servidor e nunca aparece no dashboard.' }),
+      el('p', { class: 'hint' }, [
+        el('a', { href: META_GUIA_URL, target: '_blank', rel: 'noopener noreferrer', text: 'Como gerar o seu token' }),
+        ' (passo a passo, com o que fazer em cada erro da Meta).',
+      ]),
       el('label', { class: 'field' }, [
-        el('span', { class: 'lbl', text: 'Access token' }),
+        el('span', { class: 'lbl', text: 'Token de acesso' }),
         el('input', { class: 'input', id: 'metaToken', type: 'password', placeholder: 'EAAB...', autocomplete: 'off' }),
       ]),
       el('label', { class: 'field' }, [
@@ -436,7 +443,7 @@ function renderSource(body) {
         el('input', { class: 'input', id: 'metaSince', type: 'date' }),
       ]),
       el('label', { class: 'field' }, [
-        el('span', { class: 'lbl', text: 'Ate (opcional)' }),
+        el('span', { class: 'lbl', text: 'Até (opcional)' }),
         el('input', { class: 'input', id: 'metaUntil', type: 'date' }),
       ]),
       el('button', { class: 'btn', type: 'button', id: 'connectMeta', text: 'Conectar Meta Ads' }),
@@ -569,7 +576,7 @@ function renderSource(body) {
       const since = metaCard.querySelector('#metaSince').value || undefined;
       const until = metaCard.querySelector('#metaUntil').value || undefined;
       feedback.innerHTML = '';
-      if (!token || !account) { feedback.appendChild(errorBox('Informe o access token e o ID da conta de anuncios.')); return; }
+      if (!token || !account) { feedback.appendChild(errorBox('Informe o token de acesso e o ID da conta de anúncios.')); return; }
       tentarConectarMeta({ token, account, since, until });
     });
   }

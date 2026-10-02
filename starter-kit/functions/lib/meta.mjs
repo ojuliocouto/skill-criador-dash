@@ -44,7 +44,7 @@ const SPECIFIC_PURCHASE_ACTION_TYPES = [
  */
 export function buildInsightsUrl({ token, accountId, account, since, until, level = 'campaign' } = {}) {
   if (!token) {
-    throw new Error('Meta Ads: informe o access token para buscar os insights.');
+    throw new Error('Meta Ads: informe o token de acesso para buscar os insights.');
   }
   // Aceita tanto accountId quanto o alias account (o wizard grava source.meta.account).
   const acc = accountId || account;

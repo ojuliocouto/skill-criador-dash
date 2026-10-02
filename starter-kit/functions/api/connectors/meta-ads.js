@@ -32,7 +32,7 @@ const PREVIEW_WINDOW = 60;
 // Mensagem generica de preview: NAO repassa o texto cru da Graph API para o
 // cliente, senao o endpoint vira um oraculo de validacao de token/conta (qualquer
 // um testaria tokens roubados e leria a resposta detalhada da Meta).
-const PREVIEW_ERRO_GENERICO = 'Nao foi possivel validar o token/conta do Meta Ads. Confira o access token e o id da conta e tente de novo.';
+const PREVIEW_ERRO_GENERICO = 'Não foi possível validar o token ou a conta do Meta Ads. Confira o token de acesso e o ID da conta de anúncios e tente de novo.';
 
 async function fetchMeta({ token, account, since, until } = {}) {
   const url = buildInsightsUrl({ token, accountId: account, since, until });
