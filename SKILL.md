@@ -24,6 +24,28 @@ tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pa
 > construir, com a pessoa, o dashboard DELA, na conta Cloudflare DELA, a partir das peças testadas
 > em `starter-kit/`. Placeholders ficam entre `<...>`. Nunca commite token, Account ID ou id real.
 
+## Glossário (explique a palavra antes de mandar o comando)
+
+Quem usa esta skill quase nunca viu estas palavras. Diga a frase de cada uma na primeira vez em
+que ela aparecer:
+
+- **Cloudflare Pages**: onde o dashboard fica hospedado, de graça. Abreviado como **Pages**.
+- **wrangler**: a linha de comando do Cloudflare. É por ela que a gente cria e publica tudo.
+- **KV**: um banco de dados simples, de chave e valor, onde ficam as configurações dos
+  dashboards. "Namespace KV" é o nome de um desses bancos.
+- **binding**: a ligação entre o código e um recurso do Cloudflare. É o nome (ex:
+  `DASHBOARDS_KV`) pelo qual o código acha o banco KV, escrito no `wrangler.toml`.
+- **secret**: uma variável guardada escondida no Cloudflare, que o código lê mas ninguém vê
+  (ex: o `ADMIN_TOKEN`). Nunca vai no código nem no git.
+- **D1**: o banco de dados SQL do Cloudflare. Só entra no modo histórico, pra guardar as fotos
+  dos dados de cada dia.
+- **Worker cron**: um programinha do Cloudflare que roda sozinho num horário marcado (ex: toda
+  hora) e tira a foto dos dados pro D1. Só no modo histórico.
+- **gviz CSV**: o jeito que o Google Sheets entrega uma planilha compartilhada como tabela. Com
+  ele a pessoa só cola o link da planilha, sem login nem senha do Google.
+- **fail-closed**: "na dúvida, bloqueia". Sem o `ADMIN_TOKEN` configurado, ninguém cria nem
+  apaga dashboard, nem o dono. É de propósito: protege o painel de quem tem o link.
+
 ## Pastas: onde fica cada coisa (defina antes do primeiro comando)
 
 | Nome no roteiro | Caminho | O que é |
@@ -136,8 +158,7 @@ Nunca presuma que a pessoa leu o README. Explique em 3 frases:
 - No fim, o dashboard fica publicado num domínio seu, e você é o dono do código e da infra.
 
 Explique em uma frase cada palavra técnica antes de mandar comando (a pessoa pode nunca ter usado):
-Cloudflare Pages = onde o dashboard fica hospedado (de graça). KV = banco chave-valor das configs.
-wrangler = a linha de comando do Cloudflare, é por ela que a gente cria e publica.
+as frases prontas estão no Glossário, no topo deste roteiro.
 
 Rode o preflight, que checa o ambiente de uma vez e diz o que falta:
 ```

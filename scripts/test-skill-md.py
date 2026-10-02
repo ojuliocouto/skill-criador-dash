@@ -107,6 +107,17 @@ class Roteiro(unittest.TestCase):
             with self.subTest(trecho=trecho):
                 self.assertTrue(trecho in bloco, f"Quickstart sem: {trecho}")
 
+    def test_t15_glossario_no_topo(self):
+        # "namespace KV", "binding", "secret", "Worker cron", "D1", "gviz CSV" e "fail-closed"
+        # apareciam sem a frase de explicação prometida.
+        self.assertTrue("## Glossário" in SKILL, "falta o glossário")
+        topo, resto = SKILL.split("## Glossário", 1)
+        self.assertFalse("### 1." in topo, "o glossário precisa vir antes dos passos")
+        glossario = resto.split("\n## ", 1)[0]
+        for termo in ("KV", "binding", "secret", "D1", "Worker cron", "gviz CSV", "fail-closed", "wrangler", "Pages"):
+            with self.subTest(termo=termo):
+                self.assertTrue(re.search(rf"\*\*{re.escape(termo)}\*\*", glossario), f"glossário sem {termo}")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
