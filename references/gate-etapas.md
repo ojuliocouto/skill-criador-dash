@@ -57,6 +57,10 @@ Campos do perfil `dash`:
 | 7 | `contexto` |
 
 Todas as etapas também exigem `arquivos`: lista de arquivos não vazios dentro do projeto.
+No perfil `dash`, "Não" não é prova: `conta_confirmada` começando com "Não" bloqueia a etapa 4, e
+a etapa 6 só passa com a URL `https://` do dashboard publicado em `prova_publicada` e o PNG do
+`prova-dash.js` (ex: `prova/dash-desktop.png`) em `arquivos`. Sem conta da pessoa, o roteiro para
+na etapa 4 e a entrega fica pendente, declarada como tal.
 Para `passe_de_gosto`, use `{"antes": 0, "depois": 0, "inspecao": "Itens efetivamente inspecionados"}`.
 A contagem final precisa ser zero. Para campos sem pendência, escreva `"Nenhuma"`.
 Para trabalho futuro, como métricas após tráfego, registre o plano e a limitação atual.

@@ -8,7 +8,9 @@ Valida presença, sequência e integridade. Julgamento de qualidade continua nas
 import argparse
 import hashlib
 import json
+import re
 import sys
+import unicodedata
 from pathlib import Path
 
 PAGINAS = {
@@ -38,6 +40,29 @@ def digest(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+def comeca_com_nao(valor):
+    """'Não', 'NÃO', 'nao' no começo do campo: declaração de que a etapa NÃO aconteceu."""
+    texto = unicodedata.normalize("NFKD", str(valor)).encode("ascii", "ignore").decode().strip().lower()
+    return bool(re.match(r"nao\b", texto))
+
+
+def validar_dash(etapa, doc):
+    """T12 (teste com aluno, 02/10/2026): "Não" passava como prova porque o gate só via campo
+    preenchido. Conta não confirmada não fecha a etapa 4; painel não publicado não fecha a 6."""
+    if etapa == "4" and comeca_com_nao(doc.get("conta_confirmada", "")):
+        raise ValueError("Etapa 4: conta não confirmada. Sem a conta Cloudflare da pessoa (wrangler whoami) "
+                         "não existe infra; volte a esta etapa quando ela confirmar.")
+    if etapa == "6":
+        prova = str(doc.get("prova_publicada", ""))
+        if comeca_com_nao(prova) or not re.search(r"https://\S+", prova):
+            raise ValueError("Etapa 6: prova_publicada precisa ter a URL https:// do dashboard publicado. "
+                             "\"Não publicada\" ou endereço local não fecham a entrega.")
+        arquivos = doc.get("arquivos") if isinstance(doc.get("arquivos"), list) else []
+        if not any(str(a).lower().endswith(".png") for a in arquivos):
+            raise ValueError("Etapa 6: liste em arquivos o PNG do prova-dash.js rodado contra a URL publicada "
+                             "(ex: prova/dash-desktop.png).")
+
+
 def validar(projeto, arquivo, etapa, campos, perfil):
     doc = json.loads(arquivo.read_text())
     if not isinstance(doc, dict):
@@ -49,6 +74,8 @@ def validar(projeto, arquivo, etapa, campos, perfil):
         for campo in ("nicho", "local", "publico", "oferta", "preco", "acao"):
             if not isinstance(doc["briefing"], dict) or not doc["briefing"].get(campo):
                 raise ValueError(f"Briefing incompleto: {campo}. Fato ausente deve constar como pendente, nunca inventado.")
+    if perfil == "dash":
+        validar_dash(etapa, doc)
     if "passe_de_gosto" in campos:
         passe = doc["passe_de_gosto"]
         if not isinstance(passe, dict) or type(passe.get("antes")) is not int or passe["antes"] < 0 or type(passe.get("depois")) is not int or passe["depois"] != 0 or not passe.get("inspecao"):

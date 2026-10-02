@@ -303,6 +303,10 @@ montar o resto. Replicar padrão errado é o jeito mais caro de errar. <<<**
 Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 6 --arquivo evidencias/etapa-6.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Publique na conta DA PESSOA (`wrangler pages deploy public --project-name=<NOME>`).
+- O gate da etapa 6 só fecha com a URL `https://` publicada em `prova_publicada` e o PNG do
+  `prova-dash.js` em `arquivos`. "Não publicada" ou `http://localhost` não passam: sem deploy
+  na conta da pessoa, a entrega não está pronta (e o gate da etapa 4 já barra "Não" em
+  `conta_confirmada`).
 - Modo histórico: deploy do Worker cron e força uma primeira captura (`references/infra.md`).
 - **PASSE DE GOSTO (antes de dizer pronto).** Rode o pré-voo anti-slop de novo sobre o painel
   publicado, nos DOIS temas: a lista de tells de painel em `references/direcao-de-arte.md`, Fase 3
