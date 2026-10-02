@@ -83,6 +83,11 @@ class Roteiro(unittest.TestCase):
         self.assertTrue("Address already in use" in SKILL and "npm run dev -- --port 8790" in SKILL,
                         "falta a saída pra porta 8788 ocupada")
 
+    def test_t9_skill_explica_biblioteca_x_layout_padrao(self):
+        # O aluno não sabia se revertia a decisão da dona ou editava o teste.
+        self.assertTrue("test/layout-padrao" in SKILL and "npm run test:biblioteca" in SKILL,
+                        "o SKILL.md precisa separar teste da biblioteca do teste do layout padrão")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -30,11 +30,29 @@ function findMetricDef(template, key) {
 }
 const card = (title, inner) => `<div class="card" data-title="${title}">${inner}</div>`;
 
+// Fixtures PROPRIAS (T9): este teste confere a biblioteca (KPI e funil diante de coluna nao
+// mapeada), entao nao pode depender do layout de fabrica do template, que o aluno pode mudar.
+// O layout padrao e conferido so em test/layout-padrao/.
+const kpi = (k) => ({ widget: 'kpi', props: { metricKey: k } });
+const KPIS_FIXOS = {
+  marketing: ['investimento', 'leads', 'CTR', 'CPL', 'CPA', 'ROAS'].map(kpi),
+  suporte: ['atendimentos', 'resolvidos', 'taxa_resolucao', 'tempo_resposta', 'csat'].map(kpi),
+};
+const FUNIS_FIXOS = {
+  marketing: { widget: 'funnel', props: { title: 'Funil de conversão', steps: [
+    { label: 'Impressões', metricKey: 'impressoes' }, { label: 'Cliques', metricKey: 'cliques' },
+    { label: 'Leads', metricKey: 'leads' }, { label: 'Conversões', metricKey: 'conversoes' }] } },
+  suporte: { widget: 'funnel', props: { title: 'Resolução', steps: [
+    { label: 'Atendimentos', metricKey: 'atendimentos' }, { label: 'Resolvidos', metricKey: 'resolvidos' }] } },
+  vendas: { widget: 'funnel', props: { title: 'Funil de vendas', steps: [
+    { label: 'Negócios', metricKey: 'num_vendas' }, { label: 'Ganhas', metricKey: 'vendas_ganhas' }] } },
+};
 function kpiBlockItems(template) {
-  return planLayout(template.layout).find((b) => b.type === 'kpis').items;
+  const itens = planLayout(KPIS_FIXOS[template.id]).find((b) => b.type === 'kpis').items;
+  return itens;
 }
 function funnelItem(template) {
-  return template.layout.find((i) => i.widget === 'funnel');
+  return FUNIS_FIXOS[template.id];
 }
 
 // ---------- KPI: Marketing sem a coluna de Leads mapeada ----------

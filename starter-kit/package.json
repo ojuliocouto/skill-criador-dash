@@ -4,8 +4,10 @@
   "description": "Construtor guiado de dashboards (Marketing, Vendas, Suporte, Financeiro, Estoque) para Cloudflare Pages + Functions + KV/D1",
   "type": "module",
   "scripts": {
-    "test": "node --test \"test/*.test.js\"",
-    "dev": "npx wrangler pages dev public --compatibility-date=2026-01-01"
+    "test": "node --test \"test/*.test.js\" \"test/layout-padrao/*.test.js\"",
+    "dev": "npx wrangler pages dev public --compatibility-date=2026-01-01",
+    "test:biblioteca": "node --test \"test/*.test.js\"",
+    "test:layout": "node --test \"test/layout-padrao/*.test.js\""
   },
   "license": "MIT"
 }

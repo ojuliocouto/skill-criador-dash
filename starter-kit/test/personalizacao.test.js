@@ -16,12 +16,27 @@ import { computeAllMapped } from '../public/assets/js/lib/metrics.js';
 import { prefillStateFromConfig, montarPersonalizacao } from '../public/assets/js/config-wizard.js';
 import { validarPersonalizacao } from '../functions/lib/personalizacao-shape.mjs';
 import { onRequest as dashboards } from '../functions/api/dashboards.js';
-import { template as marketing } from '../public/assets/js/templates/marketing.js';
+import { template as marketingDeFabrica } from '../public/assets/js/templates/marketing.js';
 
 const rows = parseCSV(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'examples', 'marketing-exemplo.csv'), 'utf8')).rows;
 const COLMAP = {
   data: 'Data', canal: 'Canal', investimento: 'Investimento', impressoes: 'Impressões',
   cliques: 'Cliques', leads: 'Leads', conversoes: 'Conversões', receita: 'Receita',
+};
+// Fixture PROPRIA (T9): as métricas são as do Marketing, mas layout e herói são fixos aqui, pra
+// este teste da biblioteca não depender do layout de fábrica (conferido em test/layout-padrao/).
+const kpiItem = (k) => ({ widget: 'kpi', props: { metricKey: k } });
+const marketing = {
+  ...marketingDeFabrica,
+  primaryMetric: 'leads',
+  layout: [
+    ...['investimento', 'leads', 'CTR', 'CPL', 'CPA', 'ROAS'].map(kpiItem),
+    { widget: 'timeseries', col: 12, props: { dateSlot: 'data', valueSlot: 'investimento', title: 'Investimento no tempo' } },
+    { widget: 'funnel', col: 6, props: { title: 'Funil de conversão', steps: [
+      { label: 'Impressões', metricKey: 'impressoes' }, { label: 'Cliques', metricKey: 'cliques' },
+      { label: 'Leads', metricKey: 'leads' }, { label: 'Conversões', metricKey: 'conversoes' }] } },
+    { widget: 'table', col: 12, props: {} },
+  ],
 };
 const kpis = (tpl) => planLayout(tpl.layout).filter((b) => b.type === 'kpis').flatMap((b) => b.items);
 const kpiKeys = (tpl) => kpis(tpl).map((i) => i.props.metricKey);

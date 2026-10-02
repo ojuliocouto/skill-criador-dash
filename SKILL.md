@@ -108,7 +108,7 @@ antes de mandar comando.
 | **Node 22+** | o wrangler 4.x não roda em versão mais velha; com Node 18/20 nem os testes nem o deploy funcionam | `nvm install 22` ou `brew install node`. Confira com `node -v`. |
 | **wrangler** | publicar no Cloudflare (Pages, KV, D1) | `npm i -g wrangler`. Se o comando não for achado depois de instalar, o bin global do npm não está no PATH (`npm prefix -g` mostra a pasta). |
 | **Login Cloudflare** | é a conta DA PESSOA que recebe o dashboard | `wrangler login`, depois `wrangler whoami` pra confirmar a conta. **Um `CLOUDFLARE_API_TOKEN` exportado no shell SOBREPÕE o login e pode publicar na conta errada:** o verificador denuncia; se for indevido, `unset CLOUDFLARE_API_TOKEN`. |
-| **Peças do starter-kit** | é a biblioteca testada de onde o dashboard é montado | o verificador roda o `npm test` da biblioteca sozinho. Peça quebrada não vira dashboard de ninguém: conserte antes. |
+| **Peças do starter-kit** | é a biblioteca testada de onde o dashboard é montado | o verificador roda o `npm test` sozinho. Peça quebrada (`npm run test:biblioteca` vermelho) não vira dashboard de ninguém: conserte antes. |
 | **Playwright** | prova de tela: abre o dashboard publicado e confere que ele mostra número | `npm i -g playwright && npx playwright install chromium` (~265 MB; a versão leve é `--only-shell`, ~94 MB). |
 | **magic (21st.dev), opcional** | inspiração de componente; nunca bloqueia o passo 0 | O código do componente é pago e vem em React + Tailwind, e o starter-kit é HTML montado em string: não encaixa direto. Aluno sem chave pula e segue. Quem já tem a chave pode usar só como referência visual. |
 | **skill frontend-design** (obrigatória) | plano visual do painel antes do código (passo 2.5) | `npx -y skills add anthropics/skills --skill frontend-design --agent claude-code` |
@@ -272,6 +272,14 @@ dashboard (`heroMetric` e `hiddenMetrics`, pelo wizard ou no JSON do POST). O ar
 `public/assets/js/templates/<dominio>.js` é a biblioteca, compartilhada por todo dashboard daquele
 domínio: editar ele à mão muda o painel de todo mundo e quebra os testes do layout padrão.
 Pra corrigir na hora, clique em "Reconfigurar", ajuste no passo Finalizar e salve.
+
+**Os testes têm duas partes, e personalizar não derruba nenhuma.** `npm test` roda as duas:
+- `npm run test:biblioteca` (`test/*.test.js`): conectores, métricas, widgets, wizard. Usa fixtures
+  próprias e não depende do layout de fábrica. Ficou vermelho? É peça quebrada: conserte antes.
+- `npm run test:layout` (`test/layout-padrao/`): confere só o layout de fábrica de cada domínio.
+  Como a personalização da pessoa mora na config (`heroMetric`, `hiddenMetrics`), ela não toca
+  nesse teste. Ele só acusa se alguém editar `templates/<dominio>.js` à mão; aí é decisão de
+  mudar o padrão pra todo mundo, e o teste do layout é atualizado junto, de propósito.
 
 ```bash
 node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-local-ou-publicada>" --out prova-parcial
