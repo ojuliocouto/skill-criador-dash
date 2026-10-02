@@ -12,6 +12,7 @@ import { sha256Hex } from './lib/auth.js';
 import { aplicarAccent } from './lib/color.js';
 import { safeLogoSrc } from './lib/brand.js';
 import { metricasDoPainel } from './lib/personalizacao.js';
+import { brParaISO, mascaraDataBR } from './lib/data-br.js';
 
 // Le o tema atual do documento (o theme.js grava dataset.theme). Serve pra
 // calibrar o accent do preview com o contraste certo do tema em uso.
@@ -440,11 +441,11 @@ function renderSource(body) {
       ]),
       el('label', { class: 'field' }, [
         el('span', { class: 'lbl', text: 'De (opcional)' }),
-        el('input', { class: 'input', id: 'metaSince', type: 'date' }),
+        el('input', { class: 'input fb-date', id: 'metaSince', type: 'text', inputmode: 'numeric', maxlength: '10', placeholder: 'dd/mm/aaaa', oninput: (ev) => { ev.target.value = mascaraDataBR(ev.target.value); } }),
       ]),
       el('label', { class: 'field' }, [
         el('span', { class: 'lbl', text: 'Até (opcional)' }),
-        el('input', { class: 'input', id: 'metaUntil', type: 'date' }),
+        el('input', { class: 'input fb-date', id: 'metaUntil', type: 'text', inputmode: 'numeric', maxlength: '10', placeholder: 'dd/mm/aaaa', oninput: (ev) => { ev.target.value = mascaraDataBR(ev.target.value); } }),
       ]),
       el('button', { class: 'btn', type: 'button', id: 'connectMeta', text: 'Conectar Meta Ads' }),
     ]);
@@ -573,8 +574,9 @@ function renderSource(body) {
       if (state.connecting) return;
       const token = metaCard.querySelector('#metaToken').value.trim();
       const account = metaCard.querySelector('#metaAccount').value.trim();
-      const since = metaCard.querySelector('#metaSince').value || undefined;
-      const until = metaCard.querySelector('#metaUntil').value || undefined;
+      // Datas digitadas em dd/mm/aaaa; a Graph API recebe ISO (aaaa-mm-dd).
+      const since = brParaISO(metaCard.querySelector('#metaSince').value) || undefined;
+      const until = brParaISO(metaCard.querySelector('#metaUntil').value) || undefined;
       feedback.innerHTML = '';
       if (!token || !account) { feedback.appendChild(errorBox('Informe o token de acesso e o ID da conta de anúncios.')); return; }
       tentarConectarMeta({ token, account, since, until });

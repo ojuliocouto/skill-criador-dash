@@ -17,6 +17,7 @@ import { DEFAULT_ACCENT, aplicarAccent } from './lib/color.js';
 import { esc } from './lib/html.js';
 import { brandInnerHtml } from './lib/brand.js';
 import { aplicarPersonalizacao } from './lib/personalizacao.js';
+import { brParaISO, isoParaBR, mascaraDataBR } from './lib/data-br.js';
 import {
   dimensionSlots, distinctValues, dateBounds, emptyFilterState, applyFilters,
 } from './lib/filters.js';
@@ -405,7 +406,7 @@ function buildMetaText(dataset) {
 // seletor por dimensao mapeada com 2..200 valores distintos. Devolve '' quando
 // nao ha nada filtravel (ai a barra nem aparece). Cada controle carrega um id/
 // data-slot estavel pra o wireFilters ler o estado sem reprocessar o template.
-function buildFilterBar(template, dataset, colMap) {
+export function buildFilterBar(template, dataset, colMap) {
   const rows = dataset.rows || [];
   const fields = [];
 
@@ -414,13 +415,17 @@ function buildFilterBar(template, dataset, colMap) {
   if (dateCol) {
     const { min, max } = dateBounds(rows, dateCol);
     if (min && max) {
-      const bounds = `min="${esc(min)}" max="${esc(max)}"`;
-      fields.push(
-        `<div class="fb-field"><span class="fb-label">De</span>` +
-          `<input id="fb-from" type="date" class="input fb-input" ${bounds} value="" /></div>`,
-        `<div class="fb-field"><span class="fb-label">Até</span>` +
-          `<input id="fb-to" type="date" class="input fb-input" ${bounds} value="" /></div>`,
-      );
+      // Campo de texto com máscara dd/mm/aaaa (nao type="date": o nativo segue o idioma do
+      // navegador e saia mm/dd/yyyy). O periodo dos dados vai na dica, em formato brasileiro.
+      const de = isoParaBR(min);
+      const ate = isoParaBR(max);
+      const campo = (id, rotulo, exemplo) =>
+        `<div class="fb-field"><label class="fb-label" for="${id}">${rotulo}</label>` +
+          `<input id="${id}" type="text" inputmode="numeric" autocomplete="off" maxlength="10" ` +
+          `placeholder="dd/mm/aaaa" class="input fb-input fb-date" value="" ` +
+          `title="Dados de ${esc(de)} a ${esc(ate)}. Ex: ${esc(exemplo)}" /></div>`;
+      fields.push(campo('fb-from', 'De', de), campo('fb-to', 'Até', ate));
+      fields.push(`<span class="fb-range hint">Dados de ${esc(de)} a ${esc(ate)}</span>`);
     }
   }
 
@@ -455,7 +460,8 @@ function readFilterState() {
   document.querySelectorAll('#filterbar [data-slot]').forEach((el) => {
     dims[el.dataset.slot] = el.value || '';
   });
-  return { from: val('fb-from'), to: val('fb-to'), dims };
+  // Datas digitadas em dd/mm/aaaa viram ISO; data incompleta ou invalida nao filtra.
+  return { from: brParaISO(val('fb-from')), to: brParaISO(val('fb-to')), dims };
 }
 
 // Recalcula metricas/tendencia/meta em cima das linhas filtradas e repinta so o
@@ -487,6 +493,14 @@ function wireFilters(baseCtx) {
   const bar = document.getElementById('filterbar');
   if (!bar) return;
   bar.addEventListener('change', () => renderBody(baseCtx, readFilterState()));
+  // Mascara dd/mm/aaaa enquanto digita; filtra assim que a data fica completa ou vazia.
+  bar.querySelectorAll('.fb-date').forEach((el) => {
+    el.addEventListener('input', () => {
+      const v = mascaraDataBR(el.value);
+      if (v !== el.value) el.value = v;
+      if (v.length === 10 || v.length === 0) renderBody(baseCtx, readFilterState());
+    });
+  });
   const reset = document.getElementById('fb-reset');
   if (reset) {
     reset.addEventListener('click', () => {

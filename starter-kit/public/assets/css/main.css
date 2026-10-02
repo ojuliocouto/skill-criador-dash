@@ -195,6 +195,9 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 .filterbar .fb-label { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 .filterbar .fb-input { width: auto; min-width: 150px; padding: 8px 11px; font-size: 13.5px; }
 .filterbar .fb-reset { margin-left: auto; align-self: flex-end; padding: 9px 14px; font-size: 13.5px; }
+/* Campo de data dd/mm/aaaa (texto com mascara): largura de 10 digitos, numero alinhado. */
+.filterbar .fb-date { min-width: 0; width: 132px; font-variant-numeric: tabular-nums; }
+.filterbar .fb-range { align-self: center; padding-top: 18px; }
 @media (max-width: 620px) {
   .filterbar { gap: 8px; }
   .filterbar .fb-field { flex: 1 1 140px; }
