@@ -50,3 +50,37 @@ test('tabela: .num alinha à direita com algarismos tabulares', () => {
   assert.match(r, /text-align:\s*right/);
   assert.match(r, /tabular-nums/);
 });
+
+// Planilha de controle de processos de abertura de empresa (caso real, 02/10/2026):
+// colunas que sao SO digitos mas contam um CODIGO, nao uma quantidade. A formatacao
+// pt-BR as pegava junto. O segundo teste e o grave: perdia digito.
+test('tabela: identificador nao ganha separador de milhar', () => {
+  const html = renderTable({}, {
+    columns: ['NIRE', 'CNPJ', 'PROTOCOLO', 'Atendimentos'],
+    rows: [{ NIRE: '4220456789', CNPJ: '23002667000129', PROTOCOLO: '202600123456', Atendimentos: '1' },
+           { NIRE: '4220456790', CNPJ: '23002667000130', PROTOCOLO: '202600123457', Atendimentos: '1' }],
+  });
+  assert.match(html, />4220456789</, 'NIRE fica como veio');
+  assert.match(html, />23002667000129</, 'CNPJ sem pontuacao fica como veio');
+  assert.match(html, />202600123456</, 'protocolo fica como veio');
+  assert.doesNotMatch(html, />4\.220\.456\.789</, 'codigo nao ganha milhar');
+  assert.match(html, /<th scope="col" class="num">Atendimentos<\/th>/, 'quantidade continua numerica');
+});
+
+test('tabela: zero a esquerda nao e reformatado (perderia digito)', () => {
+  const html = renderTable({}, {
+    columns: ['Codigo'],
+    rows: [{ Codigo: '000123456' }, { Codigo: '000123457' }],
+  });
+  assert.match(html, />000123456</, 'os zeros a esquerda ficam');
+  assert.doesNotMatch(html, />123\.456</, 'nao vira numero menor que o da planilha');
+});
+
+test('tabela: zero a esquerda protegido mesmo com nome de coluna neutro', () => {
+  // A guarda (a) e de correcao: vale independente do nome da coluna.
+  const html = renderTable({}, {
+    columns: ['Lote'],
+    rows: [{ Lote: '08010000' }, { Lote: '08020000' }],
+  });
+  assert.match(html, />08010000</);
+});
