@@ -33,6 +33,11 @@ class Roteiro(unittest.TestCase):
                 self.assertRegex(linha.lower(), r"opcional|react|morto|nunca|pulei",
                                  "toda menção ao 21st.dev precisa dizer que é opcional")
 
+    def test_t2_comando_sem_variavel_que_o_zsh_nao_quebra(self):
+        # zsh não divide $U em palavras: "no such file or directory: python3 ... --projeto ."
+        self.assertFalse(re.search(r"^\s*U=", SKILL, re.MULTILINE), "SKILL.md ainda define U=")
+        self.assertFalse(re.search(r"\$U\b", SKILL), "SKILL.md ainda usa $U")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -293,18 +293,20 @@ voce apagou depois: o gate pega).
 
 Registre conforme for usando, nao no fim de memoria:
 
-```bash
-U="python3 scripts/uso-ferramentas.py --projeto <dir-do-projeto>"
+Cada comando vai inteiro, sem variável de atalho: no zsh (o terminal padrão do Mac) um
+atalho guardado numa variável (`U="python3 ..."`) e chamado depois quebra com
+`no such file or directory`, porque o zsh não divide a variável em palavras.
 
+```bash
 # artefato no disco
-$U registrar Playwright --arquivo prova/dash-desktop.png --detalhe "prova de tela lida"
-$U registrar "skill design-taste-frontend" --arquivo public/dashboard.html --detalhe "passe de gosto, 3 tells removidos"
+python3 <dir-da-skill>/scripts/uso-ferramentas.py --projeto <dir-do-projeto> registrar Playwright --arquivo prova/dash-desktop.png --detalhe "prova de tela lida"
+python3 <dir-da-skill>/scripts/uso-ferramentas.py --projeto <dir-do-projeto> registrar "skill frontend-design" --arquivo evidencias/plano-visual.md --detalhe "plano visual antes do código"
 ```
 
 **Nao se aplica a esta pagina? DISPENSE, com motivo, e o motivo vai na entrega:**
 
 ```bash
-$U dispensar "skill animate" --motivo "este painel nao tem serie temporal: o widget de tendencia nao entra"
+python3 <dir-da-skill>/scripts/uso-ferramentas.py --projeto <dir-do-projeto> dispensar "skill animate" --motivo "este painel nao tem serie temporal: o widget de tendencia nao entra"
 ```
 
 Dispensa exige motivo de verdade (o script recusa "nao usei") e sai marcada no relatorio e no
