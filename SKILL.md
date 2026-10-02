@@ -168,6 +168,11 @@ do README (`git clone` -> `npm test` -> criar `.dev.vars` -> `npm run dev` -> ab
 minutos. Isso separa "ambiente funciona" de "infra provisionada": se algo falhar depois, você já sabe
 que não é o Node, o wrangler nem o wizard, é a parte de provisionamento real.
 
+**Porta ocupada.** Se o `npm run dev` responder `Address already in use (127.0.0.1:8788)`, já tem
+outro servidor usando a porta 8788 (talvez um `npm run dev` antigo aberto em outra janela). Rode
+`npm run dev -- --port 8790` e troque 8788 por 8790 em todos os endereços
+(`http://localhost:8790/config.html`).
+
 ### 2. Descoberta da operação
 
 Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2 --arquivo evidencias/etapa-2.json`.

@@ -78,6 +78,11 @@ class Roteiro(unittest.TestCase):
         self.assertFalse("Monte a faixa de KPI e o PRIMEIRO widget" in SKILL,
                          "o wizard cria o painel inteiro; o 5.1 precisa dizer crie, renderize, compare")
 
+    def test_t8_porta_ocupada_tem_saida(self):
+        # "Address already in use (127.0.0.1:8788)", em inglês, e o aluno não sabe o que fazer.
+        self.assertTrue("Address already in use" in SKILL and "npm run dev -- --port 8790" in SKILL,
+                        "falta a saída pra porta 8788 ocupada")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
