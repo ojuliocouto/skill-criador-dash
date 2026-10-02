@@ -483,7 +483,7 @@ Domínios prontos (métricas e layout por domínio):
 Recursos inclusos (detalhes e código em `references/recursos.md`): tendência por período nos KPIs,
 meta vs realizado, grid 2D no desktop (`col` 3..8), filtros client-side por período e dimensão,
 dashboard-grupo com abas (`kind:'group'`), tema claro/escuro, estética de ferramenta premium
-(Geist self-hosted, painel hairline, sem gradiente) e preview de link OpenGraph por dashboard.
+(Geist self-hosted, número com algarismo tabular, rótulo em caixa normal, painel hairline, sem gradiente) e preview de link OpenGraph por dashboard.
 Segurança (fail-closed, senha PBKDF2, validação de fonte no POST): `references/seguranca.md`.
 
 ## Os dois modos de dados

@@ -38,12 +38,12 @@ test('CSS: fonte propria (Geist) self-hosted via @font-face same-origin', () => 
   }
 });
 
-test('CSS: numeros (KPI/funil/ranking) em mono tabular', () => {
-  assert.ok(css.includes('--font-mono'), 'precisa do token --font-mono');
-  assert.ok(
-    /\.kpi__value[^{]*\{[^}]*var\(--font-mono\)/.test(css) || /\.kpi__value,[^{]*var\(--font-mono\)/.test(css) || css.includes('.kpi .kpi-value, .kpi__value { font-family: var(--font-mono)'),
-    'o valor do KPI precisa usar var(--font-mono)',
-  );
+// Print real (02/10/2026): "R$ 95,17" em Geist Mono saía esticado, com espaçamento quebrado.
+// Número usa a fonte do texto com algarismos tabulares: alinha em coluna sem esticar.
+test('CSS: números (KPI, funil, ranking, tabela, eixo) na fonte do texto com tabular-nums, nunca mono', () => {
+  assert.ok(!/font-family:\s*var\(--font-mono\)/.test(css), 'nenhuma regra usa a fonte mono');
+  assert.match(css, /\.kpi__value[^{]*\{[^}]*font-variant-numeric:\s*tabular-nums/, 'valor do KPI com tabular-nums');
+  assert.match(css, /\.kpi__value[^{]*\{[^}]*font-family:\s*var\(--font\)/, 'valor do KPI na fonte do texto');
 });
 
 // Identidade visual: classe do logo e cor secundaria no fundo suave.

@@ -27,9 +27,10 @@ sobrou padding.
 aparece em: fundo de card, borda de destaque, faixa no topo do widget, ícone colorido em cada
 métrica. **Card tingido é o tell de IA mais comum em dashboard**, e ainda some no tema escuro.
 
-**4. Número é mono tabular.** Coluna de números que dança quando o valor muda denuncia
-amadorismo. Aqui já é `Geist Mono` com `font-variant-numeric: tabular-nums`. Não troque por
-fonte de texto "porque fica mais bonito": fica, e fica pior de ler.
+**4. Número tem algarismo tabular.** Coluna de números que dança quando o valor muda denuncia
+amadorismo. Aqui o número usa a fonte do texto (Geist) com `font-variant-numeric: tabular-nums`:
+todo algarismo tem a mesma largura e a coluna alinha. Não use fonte mono no número: no print real
+de 02/10/2026 a Geist Mono deixou "R$ 95,17" esticado, com espaçamento quebrado.
 
 **5. Divisão por hairline, não por sombra.** Superfície em camadas com borda de 1px e sombra
 mínima tingida. Nada de card flutuando com sombra difusa, que é o visual de template genérico.
