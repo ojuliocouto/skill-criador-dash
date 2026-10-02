@@ -46,6 +46,12 @@ test('CSS: números (KPI, funil, ranking, tabela, eixo) na fonte do texto com ta
   assert.match(css, /\.kpi__value[^{]*\{[^}]*font-family:\s*var\(--font\)/, 'valor do KPI na fonte do texto');
 });
 
+// Print real (02/10/2026): rótulo de card e de coluna em CAIXA ALTA espaçada (kicker). O dono
+// odeia kicker uppercase: rótulo é frase em caixa normal.
+test('CSS: nenhum rótulo em caixa alta (sem text-transform: uppercase)', () => {
+  assert.ok(!/text-transform:\s*uppercase/i.test(css), 'rótulo de card, coluna e filtro em caixa normal');
+});
+
 // Identidade visual: classe do logo e cor secundaria no fundo suave.
 test('CSS: tem .brand-logo com limites de tamanho', () => {
   assert.ok(/\.brand-logo\s*\{/.test(css), 'precisa da classe .brand-logo');
