@@ -61,6 +61,8 @@ class EtapasDash(unittest.TestCase):
         self.pasta = pathlib.Path(self.temp.name)
         (self.pasta / 'nota.txt').write_text('evidência real', encoding='utf-8')
         (self.pasta / 'dash-desktop.png').write_bytes(b'\x89PNG prova')
+        (self.pasta / 'video-desktop.webm').write_bytes(b'\x1a\x45\xdf\xa3 video de prova')
+        (self.pasta / 'video-mobile.webm').write_bytes(b'\x1a\x45\xdf\xa3 video de prova')
 
     def registrar(self, etapa, doc):
         arq = self.pasta / f'etapa-{etapa}.json'
@@ -92,17 +94,45 @@ class EtapasDash(unittest.TestCase):
                             'registrar', '6', '--arquivo', arq.name], capture_output=True, text=True, encoding='utf-8', errors='replace')
         return r.returncode
 
+    URL = 'https://meu-dash.pages.dev/dashboard.html?id=x'
+    VIDEOS = ['video-desktop.webm', 'video-mobile.webm']
+
     def test_etapa_6_nao_aceita_nao_publicada(self):
-        self.assertEqual(self.etapa6('NÃO publicada: sem conta', ['dash-desktop.png']), 1)
+        self.assertEqual(self.etapa6('NÃO publicada: sem conta', ['dash-desktop.png', *self.VIDEOS]), 1)
 
     def test_etapa_6_exige_url_https(self):
-        self.assertEqual(self.etapa6('http://localhost:8788/dashboard.html?id=x', ['dash-desktop.png']), 1)
+        self.assertEqual(self.etapa6('http://localhost:8788/dashboard.html?id=x', ['dash-desktop.png', *self.VIDEOS]), 1)
 
     def test_etapa_6_exige_png_da_prova(self):
-        self.assertEqual(self.etapa6('https://meu-dash.pages.dev/dashboard.html?id=x', ['nota.txt']), 1)
+        self.assertEqual(self.etapa6(self.URL, ['nota.txt', *self.VIDEOS]), 1)
+
+    def test_etapa_6_exige_o_video_de_prova(self):
+        # A fatia 02 (3.6.0): etapa sem vídeo não registra, mesmo com URL e print.
+        self.assertEqual(self.etapa6(self.URL, ['dash-desktop.png']), 1)
+
+    def test_etapa_6_exige_video_do_desktop_e_do_celular(self):
+        self.assertEqual(self.etapa6(self.URL, ['dash-desktop.png', 'video-desktop.webm']), 1)
+        self.assertEqual(self.etapa6(self.URL, ['dash-desktop.png', 'video-mobile.webm']), 1)
+
+    def test_etapa_6_nao_aceita_arquivo_qualquer_com_nome_de_video(self):
+        # O nome certo com a extensão errada (um PNG renomeado, uma nota) não é vídeo.
+        (self.pasta / 'video-desktop.png').write_bytes(b'\x89PNG')
+        (self.pasta / 'video-mobile.txt').write_text('nota', encoding='utf-8')
+        self.assertEqual(self.etapa6(self.URL, ['dash-desktop.png', 'video-desktop.png', 'video-mobile.txt']), 1)
+
+    def test_etapa_6_aceita_mp4_alem_de_webm(self):
+        (self.pasta / 'video-desktop.mp4').write_bytes(b'mp4 de prova')
+        (self.pasta / 'video-mobile.mp4').write_bytes(b'mp4 de prova')
+        self.assertEqual(self.etapa6(self.URL, ['dash-desktop.png', 'video-desktop.mp4', 'video-mobile.mp4']), 0)
 
     def test_etapa_6_positivo(self):
-        self.assertEqual(self.etapa6('https://meu-dash.pages.dev/dashboard.html?id=x', ['dash-desktop.png']), 0)
+        self.assertEqual(self.etapa6(self.URL, ['dash-desktop.png', *self.VIDEOS]), 0)
+
+    def test_etapa_6_mensagem_do_video_diz_o_comando(self):
+        self.etapa6(self.URL, ['dash-desktop.png'])
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta),
+                            'registrar', '6', '--arquivo', 'etapa-6.json'], capture_output=True, text=True, encoding='utf-8', errors='replace')
+        self.assertIn('gravar-video.js', r.stdout)
 
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ Required, before you run any command below:
 - **Your data**, as a Google Sheet or a CSV file. If you use a Google Sheet, share it as "Anyone with the link" before pasting the link; without that sharing setting the connector cannot read it.
 
 - **Python 3.8 or newer**, for the guided-flow scripts (tool checker, preflight, step gates). You never call it by name: every script runs through `node scripts/py.mjs <script>.py`, which finds the right Python command for your system on its own (its name differs between Windows, macOS and Linux) and turns on UTF-8 mode.
-- **Playwright with Chromium** (`npm i -g playwright && npx playwright install chromium`), for the proof screenshot of the published dashboard.
+- **Playwright with Chromium** (`npm i -g playwright && npx playwright install chromium`), for the proof screenshot and the proof video of the published dashboard. `playwright install chromium` also downloads the ffmpeg build Playwright uses to record video; if it is missing, `npx playwright install ffmpeg`.
 - **The `frontend-design` skill**, for the visual plan: `npx -y skills add anthropics/skills --skill frontend-design --agent claude-code -g -y --copy`. The `-g` matters: without it the skill is installed into the current folder instead of your user-level skills folder.
 
 ### Windows, macOS and Linux
@@ -112,6 +112,7 @@ The person chooses per dashboard:
 - Light or dark mode chosen by the dashboard owner (`config.tema`: `claro`, `escuro` or `auto`). The server sets the initial `data-theme` in the HTML, so the wrong mode never flashes. Visitors can still toggle; their choice is stored per dashboard in their own browser.
 - Presence: a slow-moving background in the brand color, an opening greeting ("Olá, <name>", once per browser session, skippable, `config.saudacao`) that reveals the dashboard, loading skeletons in the shape of the dashboard with a progress bar, a Refresh button with "updated X ago" and an error state with "Try again". Everything collapses to the final state with `prefers-reduced-motion`. Opt out with `config.fundoAnimado: false` and `config.saudacaoLigada: false`.
 - `POST /api/admin-check`: lets the wizard confirm the admin key up front without mutating anything (rate limited per IP, constant-time compare, key only in a header).
+- Proof video: every delivery ships a 10 to 15 s video of the published dashboard (open, switch tab, filter) at 1440x900 and 390x844, recorded with Playwright's native `recordVideo` (no ffmpeg of your own, no Mac-only tool, output folders may contain spaces and accents): `node scripts/gravar-video.js "<dashboard-url>" --saida prova`. A default script, `scripts/roteiro-padrao.json` (open, wait, hover, click tabs, pick a filter option, scroll), works on any factory dashboard without editing; steps whose element does not exist are skipped. Because reviewers read images, not video, it also saves a contact sheet of 6 frames taken during the same run (`prancha-desktop.png`, `prancha-mobile.png`) and a `video-info.json` with format, size and duration (read from the WebM itself, no ffprobe). The output is WebM, about 1 MB per video. Step 6 of `gate-etapas.py` refuses to register a delivery without the desktop and mobile videos.
 - Engineered-tool visual system (deliberately not an "AI template" look): self-hosted Geist Sans for text and Geist Mono tabular for every number (KPIs, funnel, ranking, chart axis, table headers); KPIs live in one hairline-divided panel rather than N cards with a colored bar; the chart Y-axis uses round nice-number ticks and a filled area under the line; flat surfaces, hairline borders, tinted minimal shadow, no decorative gradient or glow. The brand accent works in both themes and is swappable per dashboard. Regression guards in `test/design.test.js` (no radial-gradient, fonts wired, numbers in mono). The moving brand-colored background and the opening greeting are the one deliberate exception: they live in a separate stylesheet, `presenca.css`, with their own guard in `test/presenca.test.js`, so the rules above still hold for `main.css`.
 - 2D desktop grid layout: non-KPI widgets flow into a 12-column grid (each layout item declares an optional `col` span 3..8), so the time series sits next to the funnel and rankings pair up, instead of a single vertical stack. Collapses to one column on mobile.
 - Built-in client-side filters: a filter bar (period from/to plus one selector per categorical dimension) recomputes every KPI, trend, funnel, series, ranking and table in the browser on change, without reloading or re-hitting the source.
@@ -348,6 +349,8 @@ Dashboards personalizados precisam preservar esse marcador nos valores de métri
 ```bash
 node scripts/test-prova-dash.cjs
 node scripts/test-resolver-playwright.cjs
+node scripts/test-roteiro-de-video.cjs
+node scripts/test-gravar-video-integracao.cjs
 node scripts/py.mjs test-skill-md.py
 node scripts/py.mjs test-biblioteca-independe-do-layout.py
 node scripts/py.mjs test-preflight.py
