@@ -135,8 +135,42 @@ a:hover { text-decoration: underline; }
      barra nasce desse tamanho e o conteúdo abaixo não desce quando eles chegam. */
   min-height: 78.75px;
 }
-.topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -0.01em; }
-.topbar .brand .dot { width: 9px; height: 9px; border-radius: 2px; background: var(--accent-fill-calc, var(--accent)); }
+/* A marca empurra o resto pra direita: o botão de tema fica junto das ações, não solto no meio. */
+.topbar .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; min-width: 0; font-weight: 650; letter-spacing: -0.01em; }
+.topbar .brand .dot { width: 9px; height: 9px; flex-shrink: 0; border-radius: 2px; background: var(--accent-fill-calc, var(--accent)); }
+/* Monograma: sem logotipo, as iniciais da marca num bloco da cor de destaque. */
+.topbar .brand .dot--mono {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 11px;
+  color: var(--accent-fg, #fff); font-size: 15px; font-weight: 700; letter-spacing: 0.01em;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 6px 14px -8px var(--accent-fill-calc, var(--accent));
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.topbar .brand:hover .dot--mono { transform: rotate(-6deg) scale(1.06); }
+.topbar .brand-textos { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.topbar .brand-textos .name { font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .brand-textos small { margin-top: 2px; font-size: 12.5px; }
+/* Faixa fina na cor da marca embaixo da barra: assina o topo sem pesar. */
+.topbar::after {
+  content: ""; position: absolute; left: 0; bottom: -1px; width: 100%; height: 2px;
+  background: var(--accent-fill-calc, var(--accent));
+  transform: scaleX(0.085); transform-origin: left center;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.topbar:hover::after { transform: scaleX(1); }
+/* Ações da barra: ícone + texto. A principal leva a cor da marca. */
+.topbar .btn-barra { gap: 8px; padding: 9px 14px; font-size: 14px; font-weight: 600; transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease; }
+.topbar .btn-barra:hover { transform: translateY(-1px); filter: none; }
+.topbar .btn-barra:active { transform: translateY(0) scale(0.97); }
+.topbar .btn-barra.ghost:hover { border-color: var(--accent-fill-calc, var(--accent)); color: var(--text); }
+.topbar .btn-barra--principal { background: var(--accent-fill-calc, var(--accent)); color: var(--accent-fg, #fff); }
+.topbar .btn-barra--principal:hover { box-shadow: 0 8px 18px -10px var(--accent-fill-calc, var(--accent)); }
+.topbar .btn-icone { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.2s ease; }
+.topbar .btn-barra:hover .btn-icone { transform: scale(1.12); }
+.topbar .btn-barra[data-copiado] { border-color: var(--good); color: var(--good); }
+.topbar .theme-toggle { width: 40px; height: 40px; border-radius: 11px; }
+.topbar .theme-toggle svg { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.topbar .theme-toggle:hover svg { transform: rotate(28deg) scale(1.1); }
 /* Logo da marca (identidade visual opcional). Substitui o .dot quando ha um src
    seguro. Limitado pra caber na topbar e nas linhas da lista sem estourar. */
 .brand-logo { max-height: 28px; max-width: 140px; object-fit: contain; display: block; }
@@ -148,6 +182,12 @@ a:hover { text-decoration: underline; }
   .topbar .brand .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .topbar .brand small { display: none; }
   .topbar .actions .btn { padding: 8px 12px; font-size: 13px; }
+  /* No celular as ações ficam só com o ícone (o nome de cada uma está no aria-label). */
+  .topbar .btn-barra .btn-texto { display: none; }
+  .topbar .btn-barra { padding: 10px; }
+  .topbar .brand .dot--mono { width: 34px; height: 34px; font-size: 13px; border-radius: 9px; }
+  .topbar .brand-textos small { display: block; font-size: 11.5px; }
+  .topbar .actions { gap: 6px; }
 }
 
 /* Headings */

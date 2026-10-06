@@ -29,6 +29,7 @@ import { sincronizarModoDoPainel } from './lib/theme.js';
 import { TEMPOS } from './lib/saudacao.js';
 import { esc } from './lib/html.js';
 import { brandInnerHtml } from './lib/brand.js';
+import { monograma, subtituloDoPainel, acoesHtml, ligarCopiarLink } from './lib/barra-topo.js';
 import { aplicarPersonalizacao } from './lib/personalizacao.js';
 import { aplicarRotulos } from './lib/rotulos.js';
 import { DURACAO, CURVA, textoDaContagemEntre, transformDoMarcador, menosMovimento, animar } from './lib/movimento.js';
@@ -1036,17 +1037,28 @@ function renderTopbar(config, id) {
   const brand = document.querySelector('.topbar .brand');
   // brandInnerHtml valida o src do logo no cliente (https/data:image) e escapa
   // nome e src; com logo seguro troca o .dot por <img class="brand-logo">.
-  if (brand) brand.innerHTML = brandInnerHtml(config.name || 'Dashboard', config.logo, config.logoFundo);
+  if (brand) {
+    brand.innerHTML = brandInnerHtml(config.name || 'Dashboard', config.logo, config.logoFundo);
+    // Sem logotipo, o quadradinho vira um monograma com as iniciais da marca.
+    const dot = brand.querySelector('.dot');
+    if (dot) { dot.classList.add('dot--mono'); dot.textContent = monograma(config.name); dot.setAttribute('aria-hidden', 'true'); }
+    // Nome em cima, área do painel embaixo.
+    const nome = brand.querySelector('.name');
+    if (nome) {
+      const textos = document.createElement('span');
+      textos.className = 'brand-textos';
+      nome.replaceWith(textos);
+      const sub = document.createElement('small');
+      sub.textContent = subtituloDoPainel(config && config.domain);
+      textos.append(nome, sub);
+    }
+  }
   const actions = document.querySelector('.topbar .actions');
   if (actions) {
-    // Grupo (abas) nao tem fluxo de reconfigurar no wizard ainda: so "Voltar".
+    // Grupo (abas) nao tem fluxo de reconfigurar no wizard ainda.
     // Cada aba individual continua reconfiguravel abrindo o dashboard-filho direto.
-    const isGroup = config && config.kind === 'group';
-    const cfgHref = `/config.html?id=${encodeURIComponent(id)}`;
-    const reconfig = isGroup ? '' : `<a class="btn ghost" href="${esc(cfgHref)}">Reconfigurar</a>`;
-    actions.innerHTML =
-      reconfig +
-      `<a class="btn ghost" href="/">Voltar</a>`;
+    actions.innerHTML = acoesHtml({ id, grupo: !!(config && config.kind === 'group') });
+    ligarCopiarLink(actions, location.href);
   }
 }
 
