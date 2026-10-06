@@ -103,3 +103,28 @@ export async function rateLimit(env, key, opts = {}) {
     return { ok: true };
   }
 }
+
+/**
+ * Consulta, SEM incrementar, se o balde já estourou na janela atual. Serve pra quem só quer
+ * contar as tentativas ERRADAS (via rateLimit) mas precisa recusar tudo depois do limite,
+ * inclusive a tentativa certa (ver functions/lib/admin-check.mjs).
+ * @param {Object} env
+ * @param {string} key
+ * @param {{ limit: number, windowSec: number, nowSec?: () => number }} opts
+ * @returns {Promise<{ estourado: boolean, retryAfter?: number }>}
+ */
+export async function rateLimitEstourado(env, key, opts = {}) {
+  const kv = (env && env.DASHBOARD_CACHE) || (env && env.DASHBOARDS_KV);
+  if (!kv) return { estourado: false };
+  const limit = Number(opts.limit) || 0;
+  const windowSec = Number(opts.windowSec) || 60;
+  const nowSec = typeof opts.nowSec === 'function' ? opts.nowSec() : Date.now() / 1000;
+  const janela = Math.floor(nowSec / windowSec);
+  try {
+    const atual = Number(await kv.get(`rl:${key}:${janela}`)) || 0;
+    if (atual < limit) return { estourado: false };
+    return { estourado: true, retryAfter: Math.max(1, Math.ceil((janela + 1) * windowSec - nowSec)) };
+  } catch {
+    return { estourado: false };
+  }
+}

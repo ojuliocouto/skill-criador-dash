@@ -6,6 +6,8 @@
 export const template = {
   id: 'financeiro',
   label: 'Financeiro',
+  // Frase do cartão da área no assistente (passo 1). Palavra comum, sem jargão.
+  descricao: 'Dinheiro que entra e que sai: o caixa do negócio, dia a dia.',
   // Metrica sugerida para a meta opcional (meta vs realizado).
   primaryMetric: 'saldo',
   // Slot semantico do eixo de TEMPO (usado pela tendencia no dashboard.js).

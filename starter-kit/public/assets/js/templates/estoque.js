@@ -6,6 +6,8 @@
 export const template = {
   id: 'estoque',
   label: 'Estoque',
+  // Frase do cartão da área no assistente (passo 1). Palavra comum, sem jargão.
+  descricao: 'Produtos: o que mais vende e o que está parado na prateleira.',
   // Metrica sugerida para a meta opcional (meta vs realizado).
   primaryMetric: 'receita',
   // Slot semantico do eixo de TEMPO (usado pela tendencia no dashboard.js).

@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.1.0
+version: 3.4.0
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -101,13 +101,8 @@ python3 ~/.claude/skills/criador-dash/scripts/checar-ferramentas.py
 O verificador não pergunta se a ferramenta está instalada: ele MANDA cada uma fazer alguma
 coisa e confere se voltou. Sai com código diferente de zero quando falta algo crítico.
 
-**Por que isso existe (26/08/2026, custou meses sem ninguém perceber):** na skill irmã
-(construtor-paginas) o MCP do 21st.dev estava configurado e MORTO havia tempo indeterminado
-(`Not authenticated: your API key is missing or was reset`). A skill mandava usar componentes
-dele (MORTO) ou fazer à mão, o MCP nunca respondia, e ela caía no "à mão" TODA VEZ. Ninguém viu,
-porque **fallback silencioso não reclama**: o sintoma chegou pelo RESULTADO ("o design não está
-interessante"), meses depois. O criador-dash estava pior: não mencionava nenhuma ferramenta
-visual e não tinha prova de tela nenhuma. Eram 654 testes passando, e nenhum olhava o dashboard.
+**Por que existe:** ferramenta configurada mas morta cai em fallback silencioso, que não reclama:
+a qualidade cai sem ninguém perceber e o sintoma só aparece no resultado, meses depois.
 
 **"Está instalada" e "aparece na lista" não são verificação.** Verificação é mandar fazer e
 conferir o retorno.
@@ -376,7 +371,7 @@ node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-DO-DASHBOARD>" [-
   pronto**, e nenhuma explicação substitui rodar de novo verde.
 
   Isto existe porque a suíte tem centenas de testes e NENHUM olhava o dashboard: teste de lógica não
-  vê painel publicado abrindo vazio, com "—" em todo card ou 500 no conector. Quem descobria era o
+  vê painel publicado abrindo vazio, com um traço em todo card ou 500 no conector. Quem descobria era o
   cliente.
 
 - **Depois de verde, OLHE os dois PNG.** O script prova que há número na tela, não que o número está
@@ -460,8 +455,14 @@ domínio, modo de dados, fontes, decisões. Nunca coloque token, Account ID ou i
 Código real e testado (500+ testes verdes, TDD; `npm test` mostra a contagem atual). Você compõe a
 partir daqui. Arquitetura em 3 camadas desacopladas (contratos completos em `starter-kit/ARCHITECTURE.md`):
 1. CONECTORES: buscam dados de uma fonte e devolvem um `DataSet` (schema comum tabular). Não sabem de métricas.
-2. WIDGETS: blocos visuais puros (KPI, série temporal, funil, tabela, ranking). Recebem dados já calculados.
-3. TEMPLATES DE DOMÍNIO: slots semânticos, métricas e layout de widgets de cada domínio.
+2. WIDGETS: blocos visuais puros (KPI, série temporal, funil, tabela, ranking, `resumo` e `meta`). Recebem dados já calculados.
+   - `resumo`: tabela agrupada por dimensão (ex. canal) ou por período (dia, semana, mês) com linha de
+     TOTAL. Cada linha e o total são recalculados pelo motor de métricas, nunca soma nem média de taxa.
+   - `meta`: calculadora de meta. A pessoa digita a meta de conversões e vê investimento, leads e
+     receita necessários, pelas médias do período filtrado.
+3. TEMPLATES DE DOMÍNIO: slots semânticos, métricas e layout de widgets de cada domínio. O template
+   pode declarar `tabs: [{ id, label, layout }]` para dividir o painel em abas (a aba ativa vai pro
+   hash da URL e sobrevive ao filtro); sem `tabs`, vale o `layout` plano.
 
 ```
 Fonte -> Conector -> DataSet (schema comum) -> Template -> Widgets -> Render
@@ -473,6 +474,8 @@ histórico) e sob medida (Contrato 2) pra qualquer outra fonte.
 
 Domínios prontos (métricas e layout por domínio):
 - MARKETING: investimento, impressões, cliques, leads, conversões, receita; derivadas CTR, CPC, CPL, CPA, ROAS.
+  Já sai em 5 abas: Visão geral (indicadores, resultado por canal com total, calculadora de meta),
+  Canais, Evolução (resultado por semana e gráficos por dia), Funil (taxa de passagem por canal) e Dados.
 - VENDAS: negócios, vendas ganhas, faturamento (só das ganhas; sem coluna de status, todas contam),
   ticket médio, taxa de conversão.
 - SUPORTE: atendimentos, resolvidos, taxa de resolução, tempo de resposta (média), CSAT (média).
@@ -485,6 +488,42 @@ meta vs realizado, grid 2D no desktop (`col` 3..8), filtros client-side por per�
 dashboard-grupo com abas (`kind:'group'`), tema claro/escuro, estética de ferramenta premium
 (Geist self-hosted, número com algarismo tabular, rótulo em caixa normal, painel hairline, sem gradiente) e preview de link OpenGraph por dashboard.
 Segurança (fail-closed, senha PBKDF2, validação de fonte no POST): `references/seguranca.md`.
+
+O assistente de criação (`/config`) é guiado em quatro perguntas, em palavra comum:
+1. "O que você quer acompanhar?": cada área lista os números e as abas ou blocos que o painel traz
+   (lidos do template). A chave de administrador é pedida aqui, antes de a pessoa preencher qualquer
+   coisa (`POST /api/admin-check` confere sem mutar nada, com limite de tentativas por IP).
+2. "Onde estão os seus números?": uma origem por vez (planilha do Google, CSV ou Meta Ads), as colunas
+   que a planilha precisa ter, planilha modelo pra baixar (`public/modelos/`) e, depois de conectar, o
+   número de linhas, o período detectado e as 3 primeiras linhas.
+3. "Confira as colunas": placar ("Encontramos 8 de 8"), exemplos de valor por coluna, o que o painel
+   deixa de mostrar sem um dado opcional, e "Trocar nome" (grava em `config.labels`, ex.:
+   `{"conversoes":"Alunas novas"}`; o nome novo aparece nos indicadores, tabelas, funil e calculadora).
+4. "Deixe com a sua cara": nome, logotipo enviado do computador (reduzido no navegador e guardado como
+   `data:image` em `config.logo`), cor por amostra ou livre, número em destaque e meta, com PRÉVIA AO VIVO
+   do painel de verdade ao lado. O resto fica em "Mais opções". No fim, tela com o link pra copiar.
+
+Movimento: tokens de duração e curva no `main.css`, lógica em `lib/movimento.js`. Só `transform` e
+`opacity`, entrada escalonada na primeira carga e na troca de aba (não a cada filtro), e tudo no estado
+final de imediato com `prefers-reduced-motion`. O valor final do número está no DOM desde o início.
+
+Presença (o que faz o painel não parecer modelo pronto; CSS em `public/assets/css/presenca.css`):
+- FUNDO VIVO na cor da marca (`config.accent` e `accent2`): manchas e curvas de gráfico derivando devagar
+  atrás do conteúdo, nos dois modos. Cartões seguem sólidos. `config.fundoAnimado: false` deixa parado.
+- SAUDAÇÃO DE ABERTURA: tela cheia com o logotipo e "Olá, <nome>", depois uma cortina na cor da marca
+  revela o painel e o conteúdo entra em sequência. Uma vez por sessão do navegador, clique ou tecla pula.
+  `config.saudacao` diz quem é cumprimentado (sem ele, o nome do painel); `config.saudacaoLigada: false` desliga.
+- CARREGAMENTO: esqueleto no formato do painel e barra de progresso no lugar de "Carregando...", botão
+  Atualizar com "Atualizado há X" e estado de erro com "Tentar de novo".
+- MODO PELA MARCA: `config.tema` (`claro`, `escuro` ou `auto`), escolhido no assistente com as duas
+  amostras lado a lado e uma sugestão calculada pelo logotipo e pela cor. O servidor já entrega o
+  `data-theme` no HTML, então o modo errado não pisca. O visitante pode alternar; a escolha dele vale só
+  pra ele e só praquele painel. A troca de modo abre em círculo a partir do botão.
+- ATENÇÃO ao conferir depois de gravar: o KV da Cloudflare leva alguns segundos pra espalhar uma gravação.
+  Ler ou tirar print logo depois do POST pode pegar a config anterior (medido em 05/10/2026: o painel
+  abriu no modo antigo por causa disso). Releia a config e só então tire o print.
+- Print de conferência do painel só depois de 3 s: antes disso a abertura está no meio e o número ainda
+  está contando.
 
 ## Os dois modos de dados
 
@@ -520,6 +559,10 @@ curl -X POST "$BASE/api/dashboards" -H "content-type: application/json" -H "x-ad
        "source":{"type":"csv","data":"Data,Canal,Investimento\n01/07/2026,Instagram,\"1.250,00\""},
        "colMap":{"data":"Data","canal":"Canal","investimento":"Investimento"}}'
 ```
+A config entra SEMPRE por esse POST. Nunca grave a config direto no KV (`wrangler kv key put`): isso
+pula a validação do `colMap` e a trava do `ADMIN_TOKEN`, e o painel publica "Coluna não mapeada" ou
+número errado com cara de certo (aconteceu no teste de 04/10/2026: 4 de 5 indicadores sem dado).
+
 O POST valida a forma da fonte nos tipos conhecidos (csv/sheets/meta) e devolve 400 apontando o campo
 errado; tipo desconhecido (conector sob medida) passa, a forma é do conector. Se algo falhar no caminho,
 toda resposta de erro da API vem em PT-BR dizendo o que corrigir (ex: 403 `adminNotConfigured` ensina o

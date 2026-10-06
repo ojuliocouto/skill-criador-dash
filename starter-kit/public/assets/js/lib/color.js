@@ -333,6 +333,27 @@ export function accentFill(hex, isDark, target = 3) {
  * @param {boolean} isDark true = tema escuro
  * @param {string} [accent2] cor secundaria opcional (fundo suave)
  */
+/**
+ * Accent SÓLIDO pra bloco preenchido com texto BRANCO em cima (aba ativa). Regra de gosto do
+ * dono: texto escuro nunca sobre bloco de cor saturada. accentForeground resolve o contraste
+ * trocando o texto pra escuro quando o accent é claro (amarelo, ciano); aqui é o contrário: o
+ * texto é sempre branco e quem cede é o fundo, escurecido (mistura com preto) só o necessário
+ * pra o branco passar em `target`. Accent que já passa fica como está. Hex inválido cai no padrão.
+ *
+ * @param {string} hex cor do accent
+ * @param {number} [target=4.5] contraste mínimo do branco sobre o fundo (WCAG AA texto)
+ * @returns {string} hex de 6 dígitos
+ */
+export function accentSolid(hex, target = 4.5) {
+  const base = toHex(parseHex(hex) || parseHex(DEFAULT_ACCENT));
+  if (contrastRatio(base, '#ffffff') >= target) return base;
+  for (let p = 96; p >= 0; p -= 4) {
+    const cand = mixSrgb(base, '#000000', p);
+    if (contrastRatio(cand, '#ffffff') >= target) return cand;
+  }
+  return '#000000';
+}
+
 export function aplicarAccent(el, hex, isDark, accent2) {
   if (!el || !el.style) return;
   const accent = parseHex(hex) ? hex : DEFAULT_ACCENT;
@@ -354,6 +375,9 @@ export function aplicarAccent(el, hex, isDark, accent2) {
   // era muito escuro (fundo escuro) ou muito claro (fundo claro). O main.css usa
   // var(--accent-fill-calc, var(--accent)).
   el.style.setProperty('--accent-fill-calc', accentFill(accent, isDark));
+  // Fundo da aba ativa: accent escurecido o suficiente pra texto branco (ver accentSolid).
+  // Não depende do tema: o par é o fundo sólido com o branco em cima.
+  el.style.setProperty('--accent-solido', accentSolid(accent));
   // Texto sobre a barra do funil: mede contra a cor VISIVEL (composta) da barra,
   // nao contra o accent cru (que e mais escuro e levava a branco reprovando AA).
   el.style.setProperty('--funnel-fg', fgForBackground(funnelBarBg(accent, isDark)));

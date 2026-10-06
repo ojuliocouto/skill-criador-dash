@@ -12,6 +12,9 @@ import { DOMAINS, isDomain } from '../lib/domains.mjs';
 import { validarFonte } from '../lib/source-shape.mjs';
 import { validarColMap, colunasDaFonte } from '../lib/colmap-shape.mjs';
 import { validarPersonalizacao } from '../lib/personalizacao-shape.mjs';
+import { validarLabels } from '../lib/labels-shape.mjs';
+import { validarFundoDoLogo } from '../lib/logo-shape.mjs';
+import { validarAparencia } from '../lib/aparencia-shape.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -371,6 +374,9 @@ async function create(kv, request, providedHash, env) {
   if (!isGroup) {
     const persInvalida = validarPersonalizacao(config);
     if (persInvalida) return erro(persInvalida, 400);
+    // Nomes trocados pela pessoa (config.labels): só a forma (texto curto, sem tag).
+    const labelsInvalidos = validarLabels(config);
+    if (labelsInvalidos) return erro(labelsInvalidos, 400);
   }
 
   // Valida a cor de destaque no servidor: se vier e nao for hex (#rgb/#rrggbb),
@@ -394,6 +400,15 @@ async function create(kv, request, providedHash, env) {
   if (config.logo != null && !isLogoSeguro(config.logo)) {
     return erro('Logo inválido: use uma URL https ou um data:image.', 400);
   }
+  // Fundo da plaquinha do logo: vira nome de classe no painel, então só 'claro' ou 'escuro'.
+  const fundoInvalido = validarFundoDoLogo(config);
+  if (fundoInvalido) return erro(fundoInvalido, 400);
+
+  // Presença do painel (modo claro ou escuro, quem a saudação cumprimenta, saudação e fundo
+  // ligados ou não). Vale pra painel comum e pra grupo. O modo vira atributo no <html> e o nome
+  // vira texto na tela de abertura: só a forma conhecida passa (functions/lib/aparencia-shape.mjs).
+  const aparenciaInvalida = validarAparencia(config);
+  if (aparenciaInvalida) return erro(aparenciaInvalida, 400);
 
   // SEGURANCA do id. Regras que convivem aqui:
   //

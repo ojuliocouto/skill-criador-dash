@@ -1,111 +1,53 @@
-// Wizard de configuração do dashboard. 4 passos, tudo client-side vanilla ESM.
-// Importa apenas módulos prontos (read-only): api-client, templates, automap.
+// Assistente de criação de painel: o orquestrador. Guarda o estado, troca de passo, salva e
+// cuida de abrir um painel existente (?id=) pra editar. Cada passo mora no seu módulo em
+// ./wizard/ e as regras puras em ./lib/ (com teste):
+//   wizard/passo-area.js       1. O que você quer acompanhar?
+//   wizard/passo-fonte.js      2. Onde estão os seus números?   (+ wizard/fonte-meta.js)
+//   wizard/passo-colunas.js    3. Confira as colunas
+//   wizard/passo-aparencia.js  4. Deixe com a sua cara          (+ previa.js, logo-arquivo.js)
+//   wizard/chave-admin.js      chave de administrador, pedida ANTES de preencher tudo
+//   wizard/sucesso.js          tela de sucesso (link, copiar, abrir, criar outro)
+//   wizard/passos.js           barra de passos e a transição entre eles
 
-import {
-  fetchSheet, uploadCsv, saveDashboard, previewMeta, setAdminToken,
-  getDashboard, fetchDataForSource, setDashboardAuth,
-} from './lib/api-client.js';
-import { templates, getTemplate } from './templates/index.js';
-import { autoMap } from './lib/automap.js';
-import { getSource } from './sources/index.js';
+import { saveDashboard, getDashboard, fetchDataForSource, setDashboardAuth } from './lib/api-client.js';
 import { sha256Hex } from './lib/auth.js';
-import { aplicarAccent } from './lib/color.js';
-import { safeLogoSrc } from './lib/brand.js';
-import { metricasDoPainel } from './lib/personalizacao.js';
-import { brParaISO, mascaraDataBR } from './lib/data-br.js';
+import { limparRotulos } from './lib/rotulos.js';
+import { fundoValido } from './lib/logo.js';
+import { DEFAULT_ACCENT } from './lib/color.js';
+import { temaDoModo } from './lib/tema-inicial.js';
+import { limparSaudacao, saudacaoValida } from './lib/saudacao.js';
+import { el, limpar, campo, erro, ocupar, liberar } from './wizard/dom.js';
+import { desenharPassos, esconderPassos, trocarPasso } from './wizard/passos.js';
+import { criarPortao } from './wizard/chave-admin.js';
+import { renderArea } from './wizard/passo-area.js';
+import { renderFonte } from './wizard/passo-fonte.js';
+import { renderColunas } from './wizard/passo-colunas.js';
+import { renderAparencia } from './wizard/passo-aparencia.js';
+import { renderSucesso } from './wizard/sucesso.js';
 
-// Le o tema atual do documento (o theme.js grava dataset.theme). Serve pra
-// calibrar o accent do preview com o contraste certo do tema em uso.
-function temaEscuroAtual() {
-  return typeof document !== 'undefined' && document.documentElement.dataset.theme !== 'light';
-}
-
-// ---------------------------------------------------------------------------
-// Validação pura de slots obrigatórios (testável, named export).
-// Retorna a lista de slots required que não têm coluna escolhida.
-// ---------------------------------------------------------------------------
-
-/**
- * @param {{key:string,label:string,required:boolean}[]} slots
- * @param {{ [slotKey:string]: string|null }} colMap
- * @returns {{key:string,label:string}[]} slots obrigatórios sem coluna mapeada
- */
-export function validateRequired(slots, colMap) {
-  const map = colMap || {};
-  return (slots || [])
-    .filter((s) => s && s.required)
-    .filter((s) => {
-      const v = map[s.key];
-      return v == null || String(v).trim() === '';
-    })
-    .map((s) => ({ key: s.key, label: s.label }));
-}
+// Funções puras que já tinham teste por este arquivo continuam saindo daqui.
+export { validateRequired } from './lib/mapa-colunas.js';
+export { montarPersonalizacao } from './lib/config-do-painel.js';
 
 // ---------------------------------------------------------------------------
-// REGRESSAO (aula 24/08): trocar de dominio no passo 1 depois de ja ter
-// mapeado colunas virava 400 ao salvar. O passo 1 so fazia `state.domain = id`
-// e NUNCA limpava o colMap antigo; o passo 3 so roda autoMap quando o colMap
-// esta VAZIO, entao as chaves do dominio anterior sobreviviam e o select do
-// dominio novo ia so ACRESCENTANDO chaves por cima. O POST final saia com uma
-// mistura de chaves dos dois dominios, e o gate do servidor (functions/lib/
-// colmap-shape.mjs) rejeita CORRETAMENTE qualquer chave que nao seja slot do
-// dominio novo (o gate esta certo; quem errava era o wizard mandando slot
-// errado). Pura e exportada para ser testavel sem DOM (mesmo padrao de
-// validateRequired/prefillStateFromConfig acima).
-// @param {string|null|undefined} domainAtual  dominio antes da troca (state.domain)
-// @param {string} domainNovo  dominio escolhido agora
+// REGRESSAO (aula 24/08): trocar de área no passo 1 depois de já ter ligado as colunas virava
+// 400 ao salvar. O colMap da área anterior sobrevivia e o da área nova ia sendo acrescentado
+// por cima; o servidor (functions/lib/colmap-shape.mjs) recusa, corretamente, chave que não é
+// campo da área nova. Pura e exportada pra ter teste.
+// @param {string|null|undefined} domainAtual  área antes da troca (state.domain)
+// @param {string} domainNovo  área escolhida agora
 // @param {object|null|undefined} colMapAtual  colMap antes da troca
-// @returns {object} colMap a usar depois da troca: intacto se o dominio nao
-//   mudou (fluxo normal), vazio se mudou (o passo 3 remapeia via autoMap).
+// @returns {object} intacto se a área não mudou; vazio se mudou (o passo 3 liga de novo)
 // ---------------------------------------------------------------------------
 export function colMapAoTrocarDominio(domainAtual, domainNovo, colMapAtual) {
   if (domainAtual === domainNovo) return colMapAtual || {};
   return {};
 }
 
-// ---------------------------------------------------------------------------
-// Estado em memória.
-// ---------------------------------------------------------------------------
-
-const state = {
-  step: 1, // 1..4
-  id: null, // id do dashboard sendo EDITADO (?id= na URL). null = dashboard novo.
-  domain: null, // 'marketing' | 'vendas' | 'suporte'
-  source: null, // { type:'sheets', url, gid } | { type:'csv', data }
-  dataset: null, // DataSet { columns, rows, meta }
-  colMap: {}, // { slotKey: columnName|null }
-  name: '',
-  accent: '#5b62d6',
-  logo: '', // URL do logo (opcional). Vazio = usa o .dot de hoje.
-  accent2: '', // cor secundaria hex (opcional). Vazio = derivada da primaria.
-  heroMetric: '', // numero heroi escolhido (T7). Vazio = o padrao do dominio.
-  hiddenMetrics: [], // metricas que nao entram no painel (T7).
-  connecting: false, // trava o botão Conectar durante a chamada
-};
-
-// ---------------------------------------------------------------------------
-// P7 (RODADA 3): "Reconfigurar" era link morto.
-//
-// O botao "Reconfigurar" do dashboard aponta pra /config.html?id=<id>, mas o
-// wizard sempre ignorava o parametro e abria "Novo dashboard" em branco. Na
-// pratica: aluno cria um dashboard PUBLICO, clica em Reconfigurar pra ADICIONAR
-// senha, refaz os 4 passos do zero (porque nada veio pre-preenchido) e salva.
-// Como o POST nunca manda `id`, o servidor cria um registro NOVO com id opaco;
-// o dashboard PUBLICO original fica orfao, vivo, e continua vazando o nome do
-// cliente na listagem anonima (o vazamento que o id opaco existe pra fechar).
-//
-// Duas funcoes PURAS abaixo (testaveis sem DOM) fazem a parte que importa pra
-// corretude; o resto (bootstrap, telas de senha/erro) e orquestracao de DOM,
-// no mesmo espirito do restante deste arquivo (render/actions tambem nao sao
-// testados diretamente, so via wizard-cards.test.js e verificacao manual).
-// ---------------------------------------------------------------------------
-
 /**
- * Le o id do dashboard a ser editado a partir da query string de config.html.
- * Pura (recebe a query string pronta, nao le `window` direto) pra ser
- * testavel sem DOM.
- * @param {string} search  ex: '?id=abc-123' (tipicamente location.search)
- * @returns {string|null} o id, ou null se ausente/vazio
+ * Lê o id do painel a editar a partir da query string de config.html. Pura.
+ * @param {string} search  ex: '?id=abc-123'
+ * @returns {string|null}
  */
 export function idDaQueryString(search) {
   const params = new URLSearchParams(search || '');
@@ -115,19 +57,17 @@ export function idDaQueryString(search) {
 }
 
 /**
- * Monta o novo estado do wizard a partir de uma config carregada do servidor
- * (GET /api/dashboards?id=...). Pura: nao muta `state`, nao toca DOM nem rede,
- * devolve um objeto novo pra o chamador aplicar (`Object.assign(state, ...)`).
- *
- * NAO preenche `dataset`: isso exige religar a fonte (rede), responsabilidade
- * de quem chama (fetchDataForSource). Preserva o `dataset` atual do state
- * recebido, caso ja exista (ex: o operador reconectou manualmente antes).
- * @param {object} state estado atual do wizard
- * @param {object} cfg config devolvida pelo GET (ja passou por stripSecrets)
- * @returns {object} novo objeto de estado
+ * Monta o estado do assistente a partir de uma config carregada do servidor (GET
+ * /api/dashboards?id=...). Pura: não muta `state`, não toca DOM nem rede. NÃO preenche
+ * `dataset` (isso exige religar a origem, que é rede).
+ * @param {object} state estado atual
+ * @param {object} cfg config devolvida pelo GET (já sem segredos)
+ * @returns {object} novo estado
  */
 export function prefillStateFromConfig(state, cfg) {
   const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const fonte = (c.source && typeof c.source === 'object') ? c.source : null;
+  const meta = c.goal && Number(c.goal.value) > 0 ? String(c.goal.value) : '';
   return {
     ...state,
     id: c.id || state.id || null,
@@ -136,848 +76,173 @@ export function prefillStateFromConfig(state, cfg) {
     accent: c.accent || state.accent,
     accent2: typeof c.accent2 === 'string' ? c.accent2 : '',
     logo: typeof c.logo === 'string' ? c.logo : '',
+    logoFundo: fundoValido(c.logoFundo) ? c.logoFundo : '',
+    // Presença: painel antigo (sem os campos) volta com os padrões: modo automático, saudação e
+    // fundo ligados.
+    tema: temaDoModo(c.tema) ? c.tema : 'auto',
+    saudacao: saudacaoValida(c.saudacao) ? limparSaudacao(c.saudacao) : '',
+    saudacaoLigada: c.saudacaoLigada !== false,
+    fundoAnimado: c.fundoAnimado !== false,
     colMap: (c.colMap && typeof c.colMap === 'object') ? { ...c.colMap } : {},
-    source: (c.source && typeof c.source === 'object') ? c.source : state.source,
+    source: fonte || state.source,
     heroMetric: typeof c.heroMetric === 'string' ? c.heroMetric : '',
     hiddenMetrics: Array.isArray(c.hiddenMetrics) ? c.hiddenMetrics.filter((k) => typeof k === 'string') : [],
+    labels: limparRotulos(c.labels),
+    goal: meta,
+    storage: c.storage === 'd1' ? 'd1' : '',
+    protegido: c.protected === true,
+    // O que já estava digitado no passo 2 volta junto (o link da planilha, por exemplo).
+    fonte: {
+      ...novaFonte(),
+      ...(state && state.fonte),
+      ...(fonte ? { origem: fonte.type || null } : {}),
+      ...(fonte && fonte.type === 'sheets' ? { sheetUrl: fonte.url || '', sheetGid: fonte.gid && fonte.gid !== '0' ? String(fonte.gid) : '' } : {}),
+      ...(fonte && fonte.type === 'csv' ? { arquivoNome: 'Arquivo já enviado' } : {}),
+    },
   };
 }
 
-/**
- * T7 (teste com aluno, 02/10/2026): número herói e métricas que não entram, escolhidos no
- * passo Finalizar. Devolve só o que difere do padrão do domínio (config limpa), e ignora
- * chave que não existe no template. Pura, testável sem DOM.
- * @param {object} tpl template do domínio
- * @param {string} heroi chave escolhida no seletor
- * @param {string[]} ocultas chaves marcadas como "não entra"
- * @returns {{heroMetric?:string, hiddenMetrics?:string[]}}
- */
-export function montarPersonalizacao(tpl, heroi, ocultas) {
-  const chaves = new Set(((tpl && tpl.metrics) || []).map((m) => m.key));
-  const out = {};
-  if (heroi && chaves.has(heroi) && heroi !== (tpl && tpl.primaryMetric)) out.heroMetric = heroi;
-  const lista = (Array.isArray(ocultas) ? ocultas : []).filter((k) => chaves.has(k) && k !== (heroi || (tpl && tpl.primaryMetric)));
-  if (lista.length) out.hiddenMetrics = [...new Set(lista)];
-  return out;
-}
-
-// Cor secundaria default do input color quando o usuario liga o toggle. So um
-// valor de partida do seletor; enquanto o checkbox "usar padrao" estiver marcado,
-// state.accent2 fica vazio e nada muda visualmente.
-const ACCENT2_DEFAULT = '#3cd3a4';
-
-// Guia do token do Meta Ads (T11): a pessoa gera o PROPRIO token, passo a passo.
-const META_GUIA_URL = 'https://github.com/ojuliocouto/skill-criador-dash/blob/main/references/token-meta-ads.md';
-
-const STEPS = [
-  { n: 1, label: 'Domínio' },
-  { n: 2, label: 'Fonte' },
-  { n: 3, label: 'Mapear' },
-  { n: 4, label: 'Finalizar' },
-];
-
-// ---------------------------------------------------------------------------
-// Helpers de DOM.
-// ---------------------------------------------------------------------------
-
-function el(tag, attrs = {}, children = []) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v == null) continue;
-    if (k === 'class') node.className = v;
-    else if (k === 'text') node.textContent = v;
-    else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
-    else node.setAttribute(k, v);
-  }
-  for (const c of [].concat(children)) {
-    if (c == null) continue;
-    node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-  }
-  return node;
-}
-
-function errorBox(message) {
-  return el('p', { class: 'error', text: message });
+function novaFonte() {
+  return { origem: null, sheetUrl: '', sheetGid: '', arquivoNome: '', meta: { token: '', account: '', since: '', until: '' } };
 }
 
 // ---------------------------------------------------------------------------
-// Fluxo compartilhado de admin token.
-// Quando o operador seta ADMIN_TOKEN no ambiente, as mutacoes E o preview do
-// Meta respondem 401 needsAdmin sem o header x-admin-token. Este helper mostra um
-// campo pra colar o token, guarda com setAdminToken e re-tenta a MESMA operacao
-// (que a partir daí ja mandara o header). Reaproveitado pelo save (passo 4) e
-// pelo card Meta (passo 2), para nao duplicar a logica.
+// Estado em memória. A senha e o token do Meta ficam só aqui, nunca em armazenamento.
 // ---------------------------------------------------------------------------
-
-/**
- * @param {HTMLElement} feedback  container onde o prompt é renderizado
- * @param {() => (void|Promise<void>)} retry  operação a re-tentar após colar o token
- */
-function pedirAdminToken(feedback, retry) {
-  const tokenInput = el('input', {
-    class: 'input', id: 'adminToken', type: 'password',
-    placeholder: 'Token de administrador', autocomplete: 'off',
-  });
-  const salvarBtn = el('button', { class: 'btn', type: 'button', text: 'Continuar com token' });
-  const box = el('div', { class: 'card' }, [
-    el('h3', { text: 'Este ambiente exige um token de administrador' }),
-    el('p', { class: 'hint', text: 'Cole o valor que você definiu em ADMIN_TOKEN. Rodando local, é a linha ADMIN_TOKEN=... do arquivo .dev.vars. Em produção, é o secret ADMIN_TOKEN do projeto.' }),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Token de administrador' }),
-      tokenInput,
-    ]),
-    salvarBtn,
-  ]);
-  box.style.marginTop = '16px';
-  feedback.appendChild(box);
-  const reenviar = () => {
-    const token = tokenInput.value.trim();
-    if (!token) { tokenInput.focus(); return; }
-    setAdminToken(token);
-    retry();
-  };
-  salvarBtn.addEventListener('click', reenviar);
-  tokenInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') reenviar(); });
-  tokenInput.focus();
-}
-
-/**
- * REGRESSAO (bug 2), caso defensivo: o servidor recusou a mutacao com 401
- * needsPassword mesmo depois do fluxo normal (renderPedidoSenhaEdicao) ja ter
- * pedido a senha pra ENTRAR na edicao. So acontece se a sessao perdeu o hash
- * guardado entre carregar e salvar (ex: sessionStorage limpo, aba duplicada).
- * Mesmo modelo do pedirAdminToken: pede a senha, guarda com setDashboardAuth
- * (o mesmo formato sha256Hex que o resto do wizard usa) e re-tenta a MESMA
- * operacao, que a partir dai ja mandara o header x-dash-auth correto
- * (api-client.js resolve o header sozinho a partir do que fica guardado).
- * @param {HTMLElement} feedback  container onde o prompt é renderizado
- * @param {string} id  id do dashboard protegido sendo salvo
- * @param {() => (void|Promise<void>)} retry  operação a re-tentar após digitar a senha
- */
-function pedirSenhaDashboard(feedback, id, retry) {
-  const senhaInput = el('input', {
-    class: 'input', id: 'dashAuthRetry', type: 'password',
-    placeholder: 'Senha do dashboard', autocomplete: 'off',
-  });
-  const salvarBtn = el('button', { class: 'btn', type: 'button', text: 'Continuar com a senha' });
-  const box = el('div', { class: 'card' }, [
-    el('h3', { text: 'Este dashboard é protegido por senha' }),
-    el('p', { class: 'hint', text: 'A sessão perdeu a senha guardada. Digite a senha atual para confirmar a alteração.' }),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Senha do dashboard' }),
-      senhaInput,
-    ]),
-    salvarBtn,
-  ]);
-  box.style.marginTop = '16px';
-  feedback.appendChild(box);
-  const reenviar = async () => {
-    const pw = senhaInput.value;
-    if (!pw) { senhaInput.focus(); return; }
-    setDashboardAuth(id, await sha256Hex(pw));
-    retry();
-  };
-  salvarBtn.addEventListener('click', reenviar);
-  senhaInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') reenviar(); });
-  senhaInput.focus();
-}
-
-/**
- * Caso FAIL-CLOSED: o servidor NAO tem ADMIN_TOKEN configurado. Aqui NAO adianta
- * pedir pra colar token (o servidor nao tem contra o que comparar): mostra uma
- * instrucao clara de configuracao/deploy e NAO entra em loop de prompt.
- * @param {HTMLElement} feedback  container onde a mensagem e renderizada
- */
-function mostrarAdminNaoConfigurado(feedback) {
-  const box = el('div', { class: 'card' }, [
-    el('h3', { text: 'O servidor ainda não tem ADMIN_TOKEN configurado' }),
-    el('p', { class: 'hint', text: 'Criar e gerenciar dashboards fica bloqueado até o operador definir o token no servidor (modelo fail-closed). Colar um token aqui não resolve, porque o servidor não tem contra o que comparar.' }),
-    el('p', { class: 'hint', text: 'Rode: wrangler pages secret put ADMIN_TOKEN --project-name=<seu-projeto> e faça o re-deploy. Depois recarregue esta página.' }),
-  ]);
-  box.style.marginTop = '16px';
-  feedback.appendChild(box);
-}
-
-// ---------------------------------------------------------------------------
-// Barra de passos.
-// ---------------------------------------------------------------------------
-
-function renderSteps() {
-  const bar = document.getElementById('steps');
-  bar.innerHTML = '';
-  for (const s of STEPS) {
-    const cls = ['step-chip'];
-    if (s.n === state.step) cls.push('active');
-    else if (s.n < state.step) cls.push('done');
-    const chip = el('div', { class: cls.join(' ') }, [
-      el('span', { class: 'num', text: s.n < state.step ? '✓' : String(s.n) }),
-      el('span', { text: s.label }),
-    ]);
-    bar.appendChild(chip);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Navegação.
-// ---------------------------------------------------------------------------
-
-function goTo(step) {
-  state.step = step;
-  render();
-}
-
-function actions({ onBack, onNext, nextLabel = 'Avançar', nextDisabled = false, extra = null }) {
-  const row = el('div', { class: 'row-actions' });
-  if (onBack) row.appendChild(el('button', { class: 'btn ghost', type: 'button', onclick: onBack, text: 'Voltar' }));
-  if (extra) row.appendChild(extra);
-  if (onNext) {
-    const btn = el('button', { class: 'btn', type: 'button', onclick: onNext, text: nextLabel });
-    if (nextDisabled) btn.disabled = true;
-    row.appendChild(btn);
-  }
-  return row;
-}
-
-// ---------------------------------------------------------------------------
-// Passo 1: Domínio.
-// ---------------------------------------------------------------------------
-
-const DOMAIN_DESC = {
-  marketing: 'Investimento, cliques, CTR, CPL, CPA e ROAS por canal e ao longo do tempo.',
-  vendas: 'Faturamento, número de vendas, ticket médio e ranking por vendedor e produto.',
-  suporte: 'Atendimentos, resolvidos, taxa de resolução, tempo de resposta e CSAT por canal e ao longo do tempo.',
-  financeiro: 'Entradas, saídas, saldo e margem por categoria e ao longo do tempo. Ideal para fluxo de caixa.',
-  estoque: 'Faturamento, itens vendidos, giro, produtos ativos e ranking por produto e categoria.',
+const state = {
+  step: 1,
+  id: null, // id do painel sendo EDITADO (?id= na URL). null = painel novo.
+  domain: null,
+  source: null, // { type:'sheets', url, gid } | { type:'csv', data } | { type:'meta', meta }
+  dataset: null, // DataSet { columns, rows, meta }
+  colMap: {},
+  labels: {}, // nomes trocados no passo 3 (config.labels)
+  name: '',
+  accent: DEFAULT_ACCENT,
+  accent2: '',
+  logo: '',
+  logoFundo: '',
+  tema: 'auto', // 'claro' | 'escuro' | 'auto' (acompanha o aparelho de quem abre)
+  saudacao: '', // quem o painel cumprimenta; vazio = o nome do painel
+  saudacaoLigada: true,
+  fundoAnimado: true,
+  heroMetric: '',
+  hiddenMetrics: [],
+  goal: '',
+  storage: '',
+  senha: '',
+  protegido: false,
+  connecting: false,
+  fonte: novaFonte(),
 };
 
-function renderDomain(body) {
-  body.appendChild(el('h2', { text: 'Escolha o domínio' }));
-  body.appendChild(el('p', { class: 'hint', text: 'O domínio define quais métricas e widgets o dashboard vai mostrar.' }));
+const noDom = typeof document !== 'undefined';
+const barra = noDom ? document.getElementById('steps') : null;
+const corpo = noDom ? document.getElementById('stepBody') : null;
+const portao = noDom && document.getElementById('adminGate') ? criarPortao(document.getElementById('adminGate')) : null;
 
-  const choices = el('div', { class: 'choices' });
-  for (const id of Object.keys(templates)) {
-    const tpl = templates[id];
-    const cls = ['choice', 'card'];
-    const isSelected = state.domain === id;
-    if (isSelected) cls.push('selected');
-    // aria-pressed reflete a selecao pra leitor de tela saber qual dominio esta escolhido.
-    const card = el('div', { class: cls.join(' '), role: 'button', tabindex: '0', 'aria-pressed': isSelected ? 'true' : 'false' }, [
-      el('h3', { text: tpl.label }),
-      el('p', { text: DOMAIN_DESC[id] || '' }),
-    ]);
-    const pick = () => {
-      // Limpa o colMap antigo SO quando o dominio realmente muda (calcula com o
-      // domainAtual ANTES de reatribuir state.domain, senao a comparacao nunca
-      // detecta troca nenhuma). Mesmo dominio (fluxo normal, ex: reconfigurar
-      // sem mudar nada) preserva o colMap intacto.
-      state.colMap = colMapAoTrocarDominio(state.domain, id, state.colMap);
-      state.domain = id;
-      goTo(2);
-    };
-    card.addEventListener('click', pick);
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
-    });
-    choices.appendChild(card);
+function escolherArea(id) {
+  const mudou = state.domain !== id;
+  state.colMap = colMapAoTrocarDominio(state.domain, id, state.colMap);
+  if (mudou) {
+    // Área nova: nomes trocados, número em destaque e meta eram da área anterior.
+    state.labels = {};
+    state.heroMetric = '';
+    state.hiddenMetrics = [];
+    state.goal = '';
   }
-  body.appendChild(choices);
+  state.domain = id;
+  goTo(2);
 }
 
-// ---------------------------------------------------------------------------
-// Passo 2: Fonte.
-// ---------------------------------------------------------------------------
+const ctx = { state, portao, ir: (n) => goTo(n), escolherArea, salvar };
+const DESENHAR = { 1: renderArea, 2: renderFonte, 3: renderColunas, 4: renderAparencia };
 
-function renderSource(body) {
-  body.appendChild(el('h2', { text: 'Conecte a fonte de dados' }));
-  body.appendChild(el('p', { class: 'hint', text: 'Atenção à privacidade: a planilha fica acessível por link e o dashboard publicado pode ser aberto por qualquer pessoa que tenha a URL. Use dados que você não se importa que sejam vistos por quem tiver o link.' }));
-
-  // Opção A: Google Sheets
-  const sheetsCard = el('div', { class: 'card' }, [
-    el('h3', { text: 'Google Sheets' }),
-    el('p', { class: 'hint', text: 'Cole o link da planilha. A planilha precisa estar compartilhada como "qualquer pessoa com o link".' }),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Link da planilha' }),
-      el('input', { class: 'input', id: 'sheetUrl', type: 'url', placeholder: 'https://docs.google.com/spreadsheets/d/...' }),
-    ]),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'gid da aba (opcional)' }),
-      el('input', { class: 'input', id: 'sheetGid', type: 'text', placeholder: '0' }),
-    ]),
-    el('button', { class: 'btn', type: 'button', id: 'connectSheet', text: 'Conectar planilha' }),
-  ]);
-  sheetsCard.style.marginBottom = '16px';
-
-  // Opção B: CSV
-  const csvCard = el('div', { class: 'card' }, [
-    el('h3', { text: 'Arquivo CSV' }),
-    el('p', { class: 'hint', text: 'Suba um arquivo .csv do seu computador.' }),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Arquivo' }),
-      el('input', { class: 'input', id: 'csvFile', type: 'file', accept: '.csv,text/csv' }),
-    ]),
-    el('button', { class: 'btn', type: 'button', id: 'connectCsv', text: 'Conectar CSV' }),
-  ]);
-
-  body.appendChild(sheetsCard);
-  body.appendChild(csvCard);
-
-  // Opcao C: Meta Ads (nativo), so faz sentido no dominio Marketing.
-  let metaCard = null;
-  if (state.domain === 'marketing') {
-    metaCard = el('div', { class: 'card' }, [
-      el('h3', { text: 'Meta Ads (avançado)' }),
-      el('p', { class: 'hint', text: 'Puxa os números das campanhas direto da Meta. Você precisa de um token de usuário do sistema (um usuário de robô, criado no Gerenciador de Negócios, que só lê os anúncios e não depende da sua senha), com validade Nunca e as permissões ads_read e read_insights, e do ID da conta de anúncios, o número depois de act= no endereço do Gerenciador de Anúncios. O token fica só no servidor e nunca aparece no dashboard.' }),
-      el('p', { class: 'hint' }, [
-        el('a', { href: META_GUIA_URL, target: '_blank', rel: 'noopener noreferrer', text: 'Como gerar o seu token' }),
-        ' (passo a passo, com o que fazer em cada erro da Meta).',
-      ]),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'lbl', text: 'Token de acesso' }),
-        el('input', { class: 'input', id: 'metaToken', type: 'password', placeholder: 'EAAB...', autocomplete: 'off' }),
-      ]),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'lbl', text: 'ID da conta de anúncios' }),
-        el('input', { class: 'input', id: 'metaAccount', type: 'text', placeholder: 'act_1234567890 ou 1234567890' }),
-      ]),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'lbl', text: 'De (opcional)' }),
-        el('input', { class: 'input fb-date', id: 'metaSince', type: 'text', inputmode: 'numeric', maxlength: '10', placeholder: 'dd/mm/aaaa', oninput: (ev) => { ev.target.value = mascaraDataBR(ev.target.value); } }),
-      ]),
-      el('label', { class: 'field' }, [
-        el('span', { class: 'lbl', text: 'Até (opcional)' }),
-        el('input', { class: 'input fb-date', id: 'metaUntil', type: 'text', inputmode: 'numeric', maxlength: '10', placeholder: 'dd/mm/aaaa', oninput: (ev) => { ev.target.value = mascaraDataBR(ev.target.value); } }),
-      ]),
-      el('button', { class: 'btn', type: 'button', id: 'connectMeta', text: 'Conectar Meta Ads' }),
-    ]);
-    metaCard.style.marginTop = '16px';
-    body.appendChild(metaCard);
-  }
-
-  const feedback = el('div', { id: 'sourceFeedback' });
-  body.appendChild(feedback);
-
-  // Se já conectou antes, mostra o preview de novo.
-  if (state.dataset) {
-    feedback.appendChild(preview(state.dataset));
-  } else if (state.id && state.source) {
-    // Editando um dashboard existente: a fonte foi carregada da config, mas a
-    // reconexao automatica (fetchDataForSource) falhou ou nao se aplica (ex:
-    // Meta Ads sem token no cliente por seguranca). Pede pra reconectar manual.
-    feedback.appendChild(errorBox('Não foi possível reconectar à fonte automaticamente. Reconecte abaixo.'));
-  }
-
-  const nav = actions({
-    onBack: () => goTo(1),
-    onNext: () => { if (state.dataset) goTo(3); },
-    nextDisabled: !state.dataset,
-  });
-  body.appendChild(nav);
-
-  const nextBtn = nav.querySelector('.btn:not(.ghost)');
-
-  function setConnecting(on) {
-    state.connecting = on;
-    sheetsCard.querySelector('#connectSheet').disabled = on;
-    csvCard.querySelector('#connectCsv').disabled = on;
-    if (metaCard) metaCard.querySelector('#connectMeta').disabled = on;
-  }
-
-  function onConnected(ds, source) {
-    state.dataset = ds;
-    state.source = source;
-    // Novo dataset invalida mapeamento anterior.
-    state.colMap = {};
-    feedback.innerHTML = '';
-    feedback.appendChild(preview(ds));
-    nextBtn.disabled = false;
-  }
-
-  function onError(e) {
-    feedback.innerHTML = '';
-    feedback.appendChild(errorBox(e && e.message ? e.message : 'Não foi possível conectar à fonte.'));
-    nextBtn.disabled = !state.dataset;
-  }
-
-  sheetsCard.querySelector('#connectSheet').addEventListener('click', async () => {
-    if (state.connecting) return;
-    const url = sheetsCard.querySelector('#sheetUrl').value.trim();
-    const gid = sheetsCard.querySelector('#sheetGid').value.trim() || '0';
-    feedback.innerHTML = '';
-    if (!url) { feedback.appendChild(errorBox('Cole o link da planilha antes de conectar.')); return; }
-    setConnecting(true);
-    feedback.appendChild(el('p', { class: 'hint', text: 'Conectando...' }));
-    try {
-      const ds = await fetchSheet(url, gid);
-      onConnected(ds, { type: 'sheets', url, gid });
-    } catch (e) {
-      onError(e);
-    } finally {
-      setConnecting(false);
-    }
-  });
-
-  csvCard.querySelector('#connectCsv').addEventListener('click', () => {
-    if (state.connecting) return;
-    const input = csvCard.querySelector('#csvFile');
-    const file = input.files && input.files[0];
-    feedback.innerHTML = '';
-    if (!file) { feedback.appendChild(errorBox('Selecione um arquivo CSV antes de conectar.')); return; }
-    const reader = new FileReader();
-    reader.onerror = () => { setConnecting(false); onError(new Error('Falha ao ler o arquivo.')); };
-    reader.onload = async () => {
-      const text = String(reader.result || '');
-      feedback.innerHTML = '';
-      feedback.appendChild(el('p', { class: 'hint', text: 'Conectando...' }));
-      try {
-        const ds = await uploadCsv(text);
-        onConnected(ds, { type: 'csv', data: text });
-      } catch (e) {
-        onError(e);
-      } finally {
-        setConnecting(false);
-      }
-    };
-    setConnecting(true);
-    reader.readAsText(file);
-  });
-
-  if (metaCard) {
-    // Tenta o preview do Meta. Se o ambiente exigir admin token (401 needsAdmin,
-    // mesmo caso do save), reaproveita o fluxo compartilhado: pede o token e
-    // re-tenta a MESMA chamada (que agora ja mandara o header x-admin-token).
-    async function tentarConectarMeta(params) {
-      setConnecting(true);
-      feedback.innerHTML = '';
-      feedback.appendChild(el('p', { class: 'hint', text: 'Conectando ao Meta Ads...' }));
-      try {
-        const ds = await previewMeta(params);
-        onConnected(ds, { type: 'meta', meta: params });
-      } catch (e) {
-        feedback.innerHTML = '';
-        if (e && e.adminNotConfigured) {
-          // FAIL-CLOSED: servidor sem ADMIN_TOKEN. Nao pede token (nao adianta),
-          // mostra a instrucao de configuracao/deploy e nao re-tenta em loop.
-          mostrarAdminNaoConfigurado(feedback);
-          return;
-        }
-        if (e && e.needsAdmin) {
-          pedirAdminToken(feedback, () => tentarConectarMeta(params));
-          return;
-        }
-        onError(e);
-      } finally {
-        setConnecting(false);
-      }
-    }
-
-    metaCard.querySelector('#connectMeta').addEventListener('click', () => {
-      if (state.connecting) return;
-      const token = metaCard.querySelector('#metaToken').value.trim();
-      const account = metaCard.querySelector('#metaAccount').value.trim();
-      // Datas digitadas em dd/mm/aaaa; a Graph API recebe ISO (aaaa-mm-dd).
-      const since = brParaISO(metaCard.querySelector('#metaSince').value) || undefined;
-      const until = brParaISO(metaCard.querySelector('#metaUntil').value) || undefined;
-      feedback.innerHTML = '';
-      if (!token || !account) { feedback.appendChild(errorBox('Informe o token de acesso e o ID da conta de anúncios.')); return; }
-      tentarConectarMeta({ token, account, since, until });
-    });
-  }
+function desenharPasso() {
+  limpar(corpo);
+  DESENHAR[state.step](corpo, ctx);
 }
-
-function preview(ds) {
-  const cols = ds.columns || [];
-  const rowCount = (ds.meta && ds.meta.rowCount != null) ? ds.meta.rowCount : (ds.rows ? ds.rows.length : 0);
-  const box = el('div', { class: 'card' }, [
-    el('h3', { text: 'Fonte conectada' }),
-    el('p', { class: 'hint', text: `${rowCount} linha(s) detectada(s).` }),
-    el('p', { class: 'lbl', text: `Colunas detectadas (${cols.length}):` }),
-  ]);
-  const wrap = el('div');
-  for (const c of cols) wrap.appendChild(el('span', { class: 'badge', text: c }));
-  // Espacinho entre os badges.
-  wrap.querySelectorAll('.badge').forEach((b) => { b.style.marginRight = '6px'; b.style.marginBottom = '6px'; });
-  box.appendChild(wrap);
-  box.style.marginTop = '16px';
-  return box;
-}
-
-// ---------------------------------------------------------------------------
-// Passo 3: Mapear colunas.
-// ---------------------------------------------------------------------------
-
-function renderMap(body) {
-  const tpl = getTemplate(state.domain);
-  if (!tpl) { body.appendChild(errorBox('Domínio inválido.')); return; }
-  const columns = (state.dataset && state.dataset.columns) || [];
-
-  // Pré-preenche com autoMap se ainda não houver mapeamento definido.
-  if (!state.colMap || Object.keys(state.colMap).length === 0) {
-    state.colMap = autoMap(tpl.slots, columns);
-  }
-
-  body.appendChild(el('h2', { text: 'Mapeie as colunas' }));
-  body.appendChild(el('p', { class: 'hint', text: 'Cada campo do domínio aponta para uma coluna da sua fonte. Os campos com asterisco são obrigatórios.' }));
-
-  const card = el('div', { class: 'card' });
-  for (const slot of tpl.slots) {
-    const label = el('span', { class: 'slot' }, [slot.label]);
-    if (slot.required) label.appendChild(el('span', { class: 'req', text: '*' }));
-
-    const select = el('select', { class: 'input', 'data-slot': slot.key });
-    select.appendChild(el('option', { value: '', text: '(nenhuma)' }));
-    for (const c of columns) select.appendChild(el('option', { value: c, text: c }));
-    const cur = state.colMap[slot.key];
-    select.value = cur == null ? '' : cur;
-    select.addEventListener('change', () => {
-      state.colMap[slot.key] = select.value === '' ? null : select.value;
-    });
-
-    card.appendChild(el('div', { class: 'maprow' }, [label, select]));
-  }
-  body.appendChild(card);
-
-  const feedback = el('div', { id: 'mapFeedback' });
-  body.appendChild(feedback);
-
-  body.appendChild(actions({
-    onBack: () => goTo(2),
-    onNext: () => {
-      const missing = validateRequired(tpl.slots, state.colMap);
-      feedback.innerHTML = '';
-      if (missing.length) {
-        const nomes = missing.map((m) => m.label).join(', ');
-        feedback.appendChild(errorBox(`Escolha uma coluna para os campos obrigatórios: ${nomes}.`));
-        return;
-      }
-      goTo(4);
-    },
-  }));
-}
-
-// ---------------------------------------------------------------------------
-// Passo 4: Finalizar.
-// ---------------------------------------------------------------------------
-
-function renderFinish(body) {
-  body.appendChild(el('h2', { text: 'Finalize o dashboard' }));
-
-  // Metrica principal: a escolhida no seletor de numero heroi (T7) ou a padrao do dominio.
-  // A meta opcional (meta vs realizado) segue o heroi.
-  const tpl = getTemplate(state.domain) || {};
-  const metricas = metricasDoPainel(tpl);
-  const heroiInicial = metricas.some((m) => m.key === state.heroMetric) ? state.heroMetric : tpl.primaryMetric;
-  let primaryKey = heroiInicial;
-  const labelDe = (k) => { const d = metricas.find((m) => m.key === k); return d ? d.label : 'meta'; };
-
-  // Reaplica todo o accent (primaria + secundaria) pro preview do wizard refletir
-  // o estado atual, calibrado pro tema. Centraliza pra os handlers reusarem.
-  const reaplicarAccent = () => {
-    aplicarAccent(
-      document.documentElement,
-      state.accent || '#5b62d6',
-      temaEscuroAtual(),
-      state.accent2 || undefined,
-    );
-  };
-
-  // --- Preview ao vivo do logo (ao lado do campo de URL) ---
-  const logoImg = el('img', { class: 'brand-logo', alt: 'Preview do logo' });
-  logoImg.style.display = 'none';
-  const logoPreview = el('div', {
-    class: 'logo-preview',
-    style: 'display:flex;align-items:center;gap:10px;margin-top:6px;min-height:28px',
-  }, [logoImg]);
-  const logoHint = el('span', { class: 'hint' });
-  logoPreview.appendChild(logoHint);
-  const atualizarLogoPreview = (raw) => {
-    const safe = safeLogoSrc(raw);
-    if (safe) {
-      logoImg.src = safe;
-      logoImg.style.display = 'block';
-      logoHint.textContent = '';
-    } else {
-      logoImg.style.display = 'none';
-      logoImg.removeAttribute('src');
-      logoHint.textContent = raw && raw.trim()
-        ? 'Use uma URL https:// de imagem (o link atual não será aplicado).'
-        : 'Sem logo: mostramos o ponto de marca padrão.';
-    }
-  };
-
-  const logoInput = el('input', {
-    class: 'input', id: 'dashLogo', type: 'text',
-    placeholder: 'https://.../logo.png', value: state.logo || '',
-    oninput: (ev) => { state.logo = ev.target.value.trim(); atualizarLogoPreview(ev.target.value); },
-  });
-
-  // --- Cor secundaria (opcional) com checkbox "usar padrao" ---
-  const usarPadrao = !state.accent2; // sem secundaria = usa o padrao (derivado da primaria)
-  const accent2Input = el('input', {
-    class: 'input', id: 'dashAccent2', type: 'color',
-    value: state.accent2 || ACCENT2_DEFAULT,
-  });
-  accent2Input.style.maxWidth = '80px';
-  accent2Input.disabled = usarPadrao;
-  const usarPadraoChk = el('input', { id: 'dashAccent2Default', type: 'checkbox' });
-  usarPadraoChk.checked = usarPadrao;
-  // Ao marcar "usar padrao": some a secundaria (state.accent2 = ''), desabilita o
-  // seletor e reaplica (fundo volta a derivar da primaria). Ao desmarcar: liga a
-  // secundaria com o valor atual do seletor.
-  usarPadraoChk.addEventListener('change', () => {
-    if (usarPadraoChk.checked) {
-      state.accent2 = '';
-      accent2Input.disabled = true;
-    } else {
-      accent2Input.disabled = false;
-      state.accent2 = accent2Input.value || ACCENT2_DEFAULT;
-    }
-    reaplicarAccent();
-  });
-  accent2Input.addEventListener('input', () => {
-    if (usarPadraoChk.checked) return; // ignorado enquanto no padrao
-    state.accent2 = accent2Input.value;
-    reaplicarAccent();
-  });
-
-  const fields = [
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Nome do dashboard' }),
-      el('input', { class: 'input', id: 'dashName', type: 'text', placeholder: 'Ex: Marketing setembro', value: state.name || '' }),
-    ]),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Cor de destaque' }),
-      el('input', {
-        class: 'input', id: 'dashAccent', type: 'color', value: state.accent || '#5b62d6',
-        // Ao escolher a cor, calibra --accent/--accent-fg/--accent-text/--focus-ring
-        // (+ a secundaria atual) pro tema atual (contraste WCAG) e grava em
-        // dataset.accent pra o theme.js achar no toggle. Assim o preview do wizard
-        // reflete o contraste correto.
-        oninput: (ev) => { state.accent = ev.target.value; reaplicarAccent(); },
-      }),
-    ]),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Logo (URL) (opcional)' }),
-      logoInput,
-      logoPreview,
-    ]),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Cor secundária (opcional)' }),
-      el('div', { style: 'display:flex;align-items:center;gap:10px' }, [
-        accent2Input,
-        el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim)' }, [
-          usarPadraoChk,
-          el('span', { text: 'Usar padrão (derivar da cor de destaque)' }),
-        ]),
-      ]),
-      el('span', { class: 'hint', text: 'Tinge o fundo suave do dashboard (área do gráfico e trilha dos badges).' }),
-    ]),
-  ];
-  // Sincroniza o preview do logo com o estado inicial ao montar o passo.
-  atualizarLogoPreview(state.logo || '');
-  // --- T7: numero heroi e o que NAO entra (as decisoes do passo 2.5) ---
-  const heroSelect = el('select', { class: 'input', id: 'dashHero' },
-    metricas.map((m) => el('option', { value: m.key, text: m.label })));
-  heroSelect.value = heroiInicial || '';
-  const ocultasBox = el('div', { class: 'ocultas', style: 'display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:4px' });
-  for (const m of metricas.filter((x) => x.naFaixa)) {
-    const chk = el('input', { value: m.key, type: 'checkbox', 'data-oculta': m.key });
-    chk.checked = (state.hiddenMetrics || []).includes(m.key);
-    ocultasBox.appendChild(el('label', { style: 'display:flex;align-items:center;gap:6px;font-size:13.5px' }, [chk, el('span', { text: m.label })]));
-  }
-  fields.push(el('label', { class: 'field' }, [
-    el('span', { class: 'lbl', text: 'Número herói (o card maior)' }),
-    heroSelect,
-    el('span', { class: 'hint', text: 'O número que a pessoa olharia se só pudesse ver um por dia. Vale só para este dashboard.' }),
-  ]));
-  fields.push(el('div', { class: 'field' }, [
-    el('span', { class: 'lbl', text: 'Métricas que não entram (opcional)' }),
-    ocultasBox,
-    el('span', { class: 'hint', text: 'Marque o que ninguém usa para decidir. Some da faixa de números e do funil deste dashboard.' }),
-  ]));
-
-  if (primaryKey) {
-    const goalLbl = el('span', { class: 'lbl', text: `Meta de ${labelDe(primaryKey)} (opcional)` });
-    heroSelect.addEventListener('change', () => {
-      primaryKey = heroSelect.value;
-      goalLbl.textContent = `Meta de ${labelDe(primaryKey)} (opcional)`;
-    });
-    fields.push(el('label', { class: 'field' }, [
-      goalLbl,
-      el('input', { class: 'input', id: 'dashGoal', type: 'number', min: '0', placeholder: 'Deixe em branco se não tiver meta' }),
-      el('span', { class: 'hint', text: 'Mostra o progresso (percentual da meta) no card principal.' }),
-    ]));
-  }
-  fields.push(el('label', { class: 'field' }, [
-    el('span', { class: 'lbl', text: 'Senha de acesso (opcional)' }),
-    el('input', { class: 'input', id: 'dashPassword', type: 'password', placeholder: 'Deixe em branco para dashboard aberto', autocomplete: 'new-password' }),
-    el('span', { class: 'hint', text: 'Com senha, quem abrir o link precisa digitá-la. A senha não é guardada em texto puro, só o hash.' }),
-  ]));
-  // Modo de dados: so oferece historico para fontes que suportam (canHistory no
-  // registry de fontes). Hoje: planilha e Meta suportam; CSV nao.
-  const sourceType = state.source && state.source.type;
-  const podeHistorico = !!(getSource(sourceType) && getSource(sourceType).canHistory);
-  if (podeHistorico) {
-    const modeSelect = el('select', { class: 'input', id: 'dashStorage' }, [
-      el('option', { value: 'live', text: 'Ao vivo (lê a fonte na hora)' }),
-      el('option', { value: 'd1', text: 'Histórico (guarda no banco D1 via cron)' }),
-    ]);
-    fields.push(el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Modo de dados' }),
-      modeSelect,
-      el('span', { class: 'hint', text: 'Histórico precisa do D1 e do Worker cron provisionados (o agente configura). Ao vivo não precisa de banco.' }),
-    ]));
-  }
-  const card = el('div', { class: 'card' }, fields);
-  body.appendChild(card);
-
-  // Aplica o accent atual (primaria + secundaria) ao entrar no passo, pra o
-  // preview ja sair calibrado.
-  reaplicarAccent();
-
-  const feedback = el('div', { id: 'finishFeedback' });
-  body.appendChild(feedback);
-
-  const nav = actions({
-    onBack: () => goTo(3),
-    onNext: onCreate,
-    nextLabel: 'Criar dashboard',
-  });
-  body.appendChild(nav);
-
-  const createBtn = nav.querySelector('.btn:not(.ghost)');
-
-  async function onCreate() {
-    const name = card.querySelector('#dashName').value.trim();
-    const accent = card.querySelector('#dashAccent').value || '#5b62d6';
-    const logo = card.querySelector('#dashLogo').value.trim();
-    // Secundaria so entra se o checkbox "usar padrao" estiver DESMARCADO.
-    const useDefault2 = card.querySelector('#dashAccent2Default').checked;
-    const accent2 = useDefault2 ? '' : (card.querySelector('#dashAccent2').value || '');
-    state.name = name;
-    state.accent = accent;
-    state.logo = logo;
-    state.accent2 = accent2;
-    // Garante que as variaveis CSS refletem o accent final antes de salvar.
-    reaplicarAccent();
-    feedback.innerHTML = '';
-
-    if (!name) { feedback.appendChild(errorBox('Dê um nome ao dashboard.')); return; }
-
-    const config = {
-      name,
-      domain: state.domain,
-      source: state.source,
-      colMap: state.colMap,
-      accent,
-    };
-    // Editando um dashboard existente (?id= na URL): manda o id de volta. Sem
-    // isso o servidor sempre cria um registro NOVO (P7, ver comentario acima),
-    // deixando o dashboard original orfao, publico e vazando o nome do cliente.
-    if (state.id) config.id = state.id;
-
-    // Logo (opcional): so envia se o operador preencheu. O backend valida o src;
-    // o cliente tambem valida na hora de renderizar (brand.js).
-    if (logo) config.logo = logo;
-    // Cor secundaria (opcional): so envia quando NAO esta no modo padrao.
-    if (accent2) config.accent2 = accent2;
-
-    // Numero heroi e metricas que nao entram (T7): so grava o que difere do padrao.
-    const ocultasMarcadas = [...card.querySelectorAll('[data-oculta]')].filter((c) => c.checked).map((c) => c.value);
-    Object.assign(config, montarPersonalizacao(tpl, heroSelect.value, ocultasMarcadas));
-    state.heroMetric = heroSelect.value;
-    state.hiddenMetrics = ocultasMarcadas;
-
-    // Meta opcional (meta vs realizado) na metrica principal (o heroi escolhido).
-    const goalInput = card.querySelector('#dashGoal');
-    const goalVal = goalInput ? Number(goalInput.value) : NaN;
-    if (primaryKey && Number.isFinite(goalVal) && goalVal > 0) {
-      config.goal = { metricKey: primaryKey, value: goalVal };
-    }
-
-    // Senha opcional: guarda so o hash SHA-256 (nunca a senha em texto puro).
-    const pwInput = card.querySelector('#dashPassword');
-    const pw = pwInput ? pwInput.value : '';
-    if (pw) {
-      config.auth = { hash: await sha256Hex(pw) };
-    }
-
-    // Modo de dados: historico le do D1 (via cron); ao vivo le a fonte na hora.
-    const storageInput = card.querySelector('#dashStorage');
-    if (storageInput && storageInput.value === 'd1') {
-      config.storage = 'd1';
-    }
-
-    await tentarSalvar(config);
-  }
-
-  // Envia a config. Se o backend responder 401 needsAdmin (o operador setou
-  // ADMIN_TOKEN neste ambiente), mostra um campo pra digitar o token, guarda com
-  // setAdminToken e reenvia a MESMA config. So aparece nesse caso.
-  async function tentarSalvar(config) {
-    createBtn.disabled = true;
-    feedback.innerHTML = '';
-    feedback.appendChild(el('p', { class: 'hint', text: 'Salvando...' }));
-    try {
-      const saved = await saveDashboard(config);
-      const id = saved && saved.id;
-      if (!id) throw new Error('O servidor não retornou o id do dashboard.');
-      window.location.href = `/dashboard.html?id=${encodeURIComponent(id)}`;
-    } catch (e) {
-      feedback.innerHTML = '';
-      if (e && e.adminNotConfigured) {
-        // FAIL-CLOSED: servidor sem ADMIN_TOKEN. Nao adianta pedir token; mostra a
-        // instrucao de configuracao/deploy e nao entra em loop de prompt.
-        createBtn.disabled = false;
-        mostrarAdminNaoConfigurado(feedback);
-        return;
-      }
-      if (e && e.needsAdmin) {
-        // Mesmo fluxo compartilhado do card Meta: pede o token e re-tenta o save.
-        createBtn.disabled = false;
-        pedirAdminToken(feedback, () => tentarSalvar(config));
-        return;
-      }
-      if (e && e.needsPassword) {
-        // REGRESSAO (bug 2), caso defensivo: sessao perdeu o hash da senha do
-        // dashboard entre carregar e salvar. Pede a senha (mesmo modelo do
-        // needsAdmin acima) e re-tenta o MESMO save.
-        createBtn.disabled = false;
-        pedirSenhaDashboard(feedback, state.id, () => tentarSalvar(config));
-        return;
-      }
-      feedback.appendChild(errorBox(e && e.message ? e.message : 'Não foi possível salvar o dashboard.'));
-      createBtn.disabled = false;
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Render principal.
-// ---------------------------------------------------------------------------
 
 function render() {
-  renderSteps();
-  const body = document.getElementById('stepBody');
-  body.innerHTML = '';
-  if (state.step === 1) renderDomain(body);
-  else if (state.step === 2) renderSource(body);
-  else if (state.step === 3) renderMap(body);
-  else if (state.step === 4) renderFinish(body);
+  desenharPassos(barra, state.step, (n) => goTo(n));
+  desenharPasso();
+}
+
+function goTo(step) {
+  const de = state.step;
+  state.step = step;
+  desenharPassos(barra, state.step, (n) => goTo(n));
+  trocarPasso(corpo, de, step, () => {
+    desenharPasso();
+    if (window.scrollY > 120) window.scrollTo(0, 0);
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Bootstrap: carrega ?id= (edicao) antes do primeiro render, se houver.
+// Salvar. A senha (se houver) vira SHA-256 antes de sair do navegador; o servidor guarda só um
+// derivado com sal. A chave de administrador é resolvida no lugar fixo dela (wizard/chave-admin.js).
 // ---------------------------------------------------------------------------
+async function salvar(config, senha, botao, retorno) {
+  const deNovo = () => salvar(config, senha, botao, retorno);
+  if (portao && portao.estado() === 'sem-config') { portao.semConfig(); return; }
+  if (portao && portao.estado() === 'precisa') {
+    portao.exigir('Falta a chave de administrador. Informe aqui e clique em Conferir chave: o painel é salvo em seguida.', deNovo);
+    return;
+  }
+  const envio = { ...config };
+  if (senha) envio.auth = { hash: await sha256Hex(senha) };
+  limpar(retorno);
+  ocupar(botao, state.id ? 'Salvando...' : 'Criando...');
+  try {
+    const salvo = await saveDashboard(envio);
+    if (!salvo || !salvo.id) throw new Error('O servidor não devolveu o endereço do painel.');
+    // Quem acabou de definir a senha não precisa digitá-la de novo pra abrir o próprio painel.
+    if (senha) setDashboardAuth(salvo.id, envio.auth.hash);
+    esconderPassos(barra);
+    limpar(document.getElementById('adminGate')); // o recado da chave já cumpriu o papel
+    renderSucesso(corpo, { id: salvo.id, nome: salvo.name || config.name, editando: !!state.id, comSenha: !!senha || salvo.protected === true });
+  } catch (e) {
+    liberar(botao);
+    if (e && e.adminNotConfigured && portao) { portao.semConfig(); return; }
+    if (e && e.needsAdmin && portao) {
+      portao.exigir('A chave de administrador guardada neste navegador não confere. Informe a chave certa e clique em Conferir chave: o painel é salvo em seguida.', deNovo);
+      return;
+    }
+    if (e && e.needsPassword) { pedirSenhaDoPainel(retorno, state.id, deNovo); return; }
+    const motivo = e && e.message ? e.message : 'o servidor não respondeu.';
+    retorno.appendChild(erro(`Não deu para salvar o painel: ${motivo} Confira e clique de novo. Nada do que você preencheu foi perdido.`));
+  }
+}
 
 /**
- * Carrega a config do dashboard `id`, prefila o state e religa a fonte (pra
- * ter as colunas do passo 3 sem o operador reconectar manualmente). Falha de
- * reconexao da fonte (ex: Meta Ads sem token no cliente) nao é fatal: o passo
- * 2 mostra um aviso e pede pra reconectar na mao.
- * @param {string} id
+ * Caso defensivo: o servidor recusou com "senha necessária" depois de a edição já ter pedido
+ * a senha pra entrar (a sessão perdeu a senha guardada). Pede de novo e repete o MESMO salvar.
  */
+function pedirSenhaDoPainel(retorno, id, deNovo) {
+  const entrada = el('input', { class: 'input', type: 'password', autocomplete: 'off', placeholder: 'Senha do painel' });
+  const botao = el('button', { class: 'btn ghost', type: 'button', text: 'Continuar com a senha' });
+  const tentar = async () => {
+    if (!entrada.value) { entrada.focus(); return; }
+    setDashboardAuth(id, await sha256Hex(entrada.value));
+    deNovo();
+  };
+  botao.addEventListener('click', tentar);
+  entrada.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') tentar(); });
+  limpar(retorno).appendChild(el('div', { class: 'card portao' }, [
+    el('h3', { text: 'Este painel é protegido por senha' }),
+    el('p', { class: 'portao__texto', text: 'A sessão perdeu a senha guardada. Digite a senha atual do painel para confirmar a alteração.' }),
+    el('div', { class: 'portao__linha' }, [campo({ id: 'dashAuthRetry', rotulo: 'Senha do painel', controle: entrada }), botao]),
+  ]));
+  entrada.focus();
+}
+
+// ---------------------------------------------------------------------------
+// Editar um painel existente (?id=): carrega a config, preenche o estado e religa a origem
+// (pra ter as colunas e a prévia sem a pessoa conectar de novo). Se religar falhar (Meta Ads
+// não devolve o token pro navegador, por segurança), o passo 2 pede pra conectar outra vez.
+// ---------------------------------------------------------------------------
 async function carregarEIniciar(id) {
-  const cfg = await getDashboard(id); // pode lancar .needsPassword
+  const cfg = await getDashboard(id); // pode lançar .needsPassword
   Object.assign(state, prefillStateFromConfig(state, cfg));
   if (state.source) {
     try {
@@ -986,64 +251,59 @@ async function carregarEIniciar(id) {
       state.dataset = null;
     }
   }
+  const titulo = document.querySelector('#main h1');
+  if (titulo) titulo.textContent = 'Editar painel';
+  const sub = document.querySelector('#main .subtitle');
+  if (sub) sub.textContent = `Você está alterando "${state.name || id}". Tudo já vem preenchido: mude só o que quiser e salve no último passo.`;
+  document.title = 'Editar painel';
   render();
 }
 
-/** Tela isolada (fora dos 4 passos): dashboard protegido pede a senha antes de editar. */
+/** Tela isolada (fora dos 4 passos): painel protegido pede a senha antes de editar. */
 function renderPedidoSenhaEdicao(id) {
-  document.getElementById('steps').innerHTML = '';
-  const body = document.getElementById('stepBody');
-  body.innerHTML = '';
-
-  const senhaInput = el('input', {
-    class: 'input', type: 'password', placeholder: 'Senha do dashboard', autocomplete: 'off',
-  });
-  const feedback = el('div');
-  const btn = el('button', { class: 'btn', type: 'button', text: 'Continuar' });
-
+  esconderPassos(barra);
+  const entrada = el('input', { class: 'input', type: 'password', autocomplete: 'off', placeholder: 'Senha do painel' });
+  const retorno = el('div');
+  const botao = el('button', { class: 'btn', type: 'button', text: 'Continuar' });
   const tentar = async () => {
-    const pw = senhaInput.value;
-    if (!pw) { senhaInput.focus(); return; }
-    btn.disabled = true;
-    feedback.innerHTML = '';
+    if (!entrada.value) { entrada.focus(); return; }
+    limpar(retorno);
+    ocupar(botao, 'Abrindo...');
     try {
-      setDashboardAuth(id, await sha256Hex(pw));
+      setDashboardAuth(id, await sha256Hex(entrada.value));
       await carregarEIniciar(id);
     } catch {
-      feedback.innerHTML = '';
-      feedback.appendChild(errorBox('Senha incorreta, ou não foi possível carregar o dashboard.'));
-      btn.disabled = false;
+      liberar(botao);
+      retorno.appendChild(erro('Senha incorreta, ou não foi possível carregar o painel. Confira a senha e tente de novo.'));
+      entrada.select();
     }
   };
-  btn.addEventListener('click', tentar);
-  senhaInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') tentar(); });
-
-  body.appendChild(el('div', { class: 'card' }, [
-    el('h2', { text: 'Este dashboard é protegido por senha' }),
-    el('p', { class: 'hint', text: 'Digite a senha atual para carregar a configuração e editar.' }),
-    el('label', { class: 'field' }, [
-      el('span', { class: 'lbl', text: 'Senha' }),
-      senhaInput,
-    ]),
-    btn,
-    feedback,
+  botao.addEventListener('click', tentar);
+  entrada.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') tentar(); });
+  limpar(corpo).appendChild(el('div', { class: 'card portao' }, [
+    el('h2', { text: 'Este painel é protegido por senha' }),
+    el('p', { class: 'portao__texto', text: 'Digite a senha atual para abrir a configuração e editar.' }),
+    el('div', { class: 'portao__linha' }, [campo({ id: 'senhaEdicao', rotulo: 'Senha do painel', controle: entrada }), botao]),
+    retorno,
   ]));
-  senhaInput.focus();
+  entrada.focus();
 }
 
-/** Tela isolada: a config nao pode ser carregada (404, erro de rede etc). */
+/** Tela isolada: a config não pôde ser carregada (não existe, erro de rede etc). */
 function renderErroCarregarExistente(err) {
-  document.getElementById('steps').innerHTML = '';
-  const body = document.getElementById('stepBody');
-  body.innerHTML = '';
-  body.appendChild(el('div', { class: 'card' }, [
-    el('h2', { text: 'Não foi possível carregar este dashboard' }),
-    el('p', { class: 'hint', text: (err && err.message) || 'Erro inesperado ao carregar a configuração.' }),
-    el('a', { class: 'btn', href: '/config.html', text: 'Criar um novo dashboard' }),
+  esconderPassos(barra);
+  limpar(corpo).appendChild(el('div', { class: 'card portao' }, [
+    el('h2', { text: 'Não foi possível abrir este painel para editar' }),
+    el('p', { class: 'portao__texto', text: `${(err && err.message) || 'Erro inesperado ao carregar a configuração.'} Confira o endereço ou volte à lista de painéis.` }),
+    el('div', { class: 'row-actions' }, [
+      el('a', { class: 'btn', href: '/config.html', text: 'Criar um painel novo' }),
+      el('a', { class: 'btn ghost', href: '/index.html', text: 'Ver meus painéis' }),
+    ]),
   ]));
 }
 
 async function bootstrap() {
+  if (portao) portao.iniciar(); // em paralelo: a pessoa fica sabendo da chave logo no começo
   const id = idDaQueryString(window.location.search);
   if (!id) { render(); return; }
   state.id = id;
@@ -1056,6 +316,6 @@ async function bootstrap() {
 }
 
 // Só inicializa a UI quando há DOM (evita rodar sob node:test).
-if (typeof document !== 'undefined' && document.getElementById('steps')) {
+if (noDom && barra && corpo) {
   bootstrap();
 }

@@ -24,7 +24,27 @@ function larguraPara(col) {
 const M = { top: 12, right: 14, bottom: 26, left: 48 };
 
 /**
- * @param {{title?:string}} props
+ * Largura do quadro do desenho (viewBox). Em tela larga vale o `col` da célula. Em tela
+ * ESTREITA a célula ocupa a largura toda seja qual for o `col`, então quem manda é a largura
+ * real da tela: no celular, um quadro de 1400 encolhido pra 318 px virava uma tirinha de 55 px
+ * de altura com o eixo ilegível (print de 05/10/2026). Sem largura de tela (node, chamada
+ * antiga) o comportamento é o de sempre.
+ * @param {number} [col]            largura da célula no grid de 12 colunas
+ * @param {number} [larguraDaTela]  largura da janela em px
+ * @returns {number}
+ */
+export function larguraDoDesenho(col, larguraDaTela) {
+  const tela = Number(larguraDaTela);
+  if (Number.isFinite(tela) && tela > 0) {
+    if (tela <= 620) return 360;
+    if (tela <= 760) return W;
+    if (tela <= 900) return 900;
+  }
+  return larguraPara(col);
+}
+
+/**
+ * @param {{title?:string, col?:number, screenWidth?:number}} props
  * @param {{date:string, value:number}[]} points
  * @returns {string} HTML
  */
@@ -77,7 +97,7 @@ export function render(props = {}, points) {
   // area de plotagem (dentro das margens dos eixos).
   const plotX = M.left;
   const plotY = M.top;
-  const Wc = larguraPara(props && props.col);
+  const Wc = larguraDoDesenho(props && props.col, props && props.screenWidth);
   const plotW = Wc - M.left - M.right;
   const plotH = H - M.top - M.bottom;
   const n = list.length;

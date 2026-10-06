@@ -10,15 +10,22 @@
 // no registry por completude: o toHtml dele devolve string vazia, ja que kpi nunca
 // entra pelo caminho "single".
 //
-// ctx = { template, dataset, colMap, computed, findMetricDef, card }
+// ctx = { template, dataset, colMap, computed, mapped, findMetricDef, card, estado }
 //   - card(title, innerHtml, extraClass) embrulha o HTML num .card (vem do dashboard.js)
 //   - findMetricDef(template, key) acha a MetricDef pra herdar label/format
+//   - mapped (key -> boolean) diz se a métrica tem coluna por trás (vem de computeAllMapped)
+//   - estado (opcional) guarda o que a pessoa digitou e precisa sobreviver ao repaint dos
+//     filtros. Hoje: estado.meta[id] = texto do campo da calculadora de meta.
 
 import { render as renderKpi } from './kpi.js';
 import { render as renderTimeseries } from './timeseries.js';
 import { render as renderFunnel } from './funnel.js';
 import { render as renderTable } from './table.js';
 import { render as renderRanking } from './ranking.js';
+import { render as renderResumo } from './resumo.js';
+import { render as renderMeta, totaisDaMeta } from './meta.js';
+import { resumir } from '../lib/resumo.js';
+import { apresentacaoDasColunas } from '../lib/colunas.js';
 import { groupBy, timeSeries } from '../lib/metrics.js';
 import { esc } from './_util.js';
 
@@ -94,7 +101,8 @@ export const registry = {
       const points = timeSeries(dataset.rows, colMap, props.dateSlot, props.valueSlot, agg);
       const title = props.title || 'Evolução no tempo';
       // repassa o span da celula: a proporcao do grafico depende da largura que ele vai ocupar
-      return card(null, renderTimeseries({ title, col: item && item.col }, points), 'chart');
+      // e a largura da tela: em tela estreita a célula ocupa tudo e o col deixa de valer
+      return card(null, renderTimeseries({ title, col: item && item.col, screenWidth: ctx.larguraDaTela }, points), 'chart');
     },
   },
 
@@ -192,12 +200,50 @@ export const registry = {
   table: {
     render: renderTable,
     toHtml(item, ctx) {
-      const { dataset, card } = ctx;
+      const { dataset, card, template, colMap } = ctx;
       const props = (item && item.props) || {};
       const title = props.title || 'Dados';
+      // Apresentação por coluna (rótulo do slot, data brasileira, R$) quando a coluna está
+      // mapeada. O dado da fonte não muda; só o jeito de mostrar.
+      const columnMeta = apresentacaoDasColunas(template, colMap, dataset.columns);
       return card(
         title,
-        renderTable({ title: '' }, { columns: dataset.columns, rows: dataset.rows }),
+        renderTable({ title: '', columnMeta }, { columns: dataset.columns, rows: dataset.rows }),
+      );
+    },
+  },
+
+  // resumo: tabela agregada por dimensão (canal) ou período (dia, semana, mes) com TOTAL.
+  // A agregação mora em lib/resumo.js e usa o mesmo motor de métricas do resto do painel.
+  resumo: {
+    render: renderResumo,
+    toHtml(item, ctx) {
+      const { template, dataset, colMap, card } = ctx;
+      const props = (item && item.props) || {};
+      const dados = resumir({
+        rows: dataset.rows, colMap, template,
+        groupBy: props.groupBy, metrics: props.metrics, limit: props.limit, orderBy: props.orderBy,
+      });
+      // Sem a coluna do agrupamento (ou sem linha, ou sem métrica mapeada) não há tabela:
+      // pula o widget em vez de deixar um cartão vazio, igual ao ranking.
+      if (!dados.ok) return '';
+      return card(props.title || `Resumo por ${dados.dimLabel}`, renderResumo({ title: '' }, dados));
+    },
+  },
+
+  // meta: calculadora de meta em cima das médias do período filtrado. O valor digitado mora
+  // em ctx.estado.meta (o dashboard.js guarda), pra sobreviver ao repaint dos filtros.
+  meta: {
+    render: renderMeta,
+    toHtml(item, ctx) {
+      const { computed, mapped, card, estado } = ctx;
+      const props = (item && item.props) || {};
+      const id = props.id || `meta-${props.targetKey || 'alvo'}`;
+      const digitado = estado && estado.meta ? estado.meta[id] : undefined;
+      const totais = totaisDaMeta(props, computed, mapped);
+      return card(
+        props.title || 'Calculadora de meta',
+        renderMeta({ ...props, title: '' }, { id, valor: digitado, totais }),
       );
     },
   },

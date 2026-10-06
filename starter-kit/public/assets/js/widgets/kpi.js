@@ -75,8 +75,14 @@ export function render(props = {}, value) {
   // Sem coluna mapeada o valor e 0 por fallback: desenhar a serie disso mostraria um
   // grafico de dado que nao existe. Mesma regra que ja vale pra trend e goal.
   const sparkHtml = !unmapped && hero ? sparkSvg(spark) : '';
+  // Contagem visual do indicador (dashboard.js): o texto final já sai aqui, pronto pra leitor de
+  // tela e pra quem copia. O valor e o formato vão em atributos só pra animação saber até onde
+  // contar. Indicador sem coluna não conta (seria animar um zero que não existe).
+  const contaAttrs = !unmapped && Number.isFinite(Number(value))
+    ? ` data-conta-valor="${esc(Number(value))}" data-conta-formato="${esc(format)}"`
+    : '';
   return (
-    `<div class="kpi${hero ? ' kpi--hero' : ''}${hero && heroCompacto ? ' kpi--hero-compacto' : ''}${unmapped ? ' is-unmapped' : ''}"${unmapped ? ' data-estado="nao-mapeada"' : ''}>` +
+    `<div class="kpi${hero ? ' kpi--hero' : ''}${hero && heroCompacto ? ' kpi--hero-compacto' : ''}${unmapped ? ' is-unmapped' : ''}"${unmapped ? ' data-estado="nao-mapeada"' : ''}${contaAttrs}>` +
       `<div class="kpi__label">${esc(label)}</div>` +
       `<div class="kpi__value">${esc(valor)}</div>` +
       sparkHtml +

@@ -3,15 +3,14 @@
 // "usuário do sistema" sem explicação na tela.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { fonteDoAssistente } from './apoio/fonte-do-assistente.js';
 
-const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../public/assets/js/config-wizard.js'), 'utf8');
+// O formulário do Meta Ads mora em wizard/fonte-meta.js desde que o assistente foi quebrado em módulos.
+const src = fonteDoAssistente();
 const GUIA = 'https://github.com/ojuliocouto/skill-criador-dash/blob/main/references/token-meta-ads.md';
 
 test('Meta Ads: rótulo "Token de acesso", nunca "Access token"', () => {
-  assert.ok(src.includes("text: 'Token de acesso'"), 'rótulo em português');
+  assert.ok(src.includes("rotulo: 'Token de acesso'"), 'rótulo em português (agora um <label for> de verdade, via campo())');
   assert.ok(!/['"`]Access token/.test(src), 'nenhum texto visível com "Access token"');
 });
 
