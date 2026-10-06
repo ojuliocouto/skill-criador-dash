@@ -10,7 +10,7 @@ o que tem que reprovar.
 Nao depende do ambiente: o unico caso que exigiria ferramenta instalada e pulado com aviso
 quando ela nao esta la.
 
-    python3 scripts/test-checar-ferramentas.py
+    node scripts/py.mjs test-checar-ferramentas.py
 """
 import importlib.util
 import pathlib
@@ -35,10 +35,39 @@ checa("MCP inexistente nao pode ser 'conectado'", est != "conectado", est)
 
 checa("skill inexistente nao pode existir", not chk.skill_existe("skill-que-nao-existe-xyz"))
 
+# O instalador (`npx skills add ... -g`) grava na pasta de config do Claude, que pode vir de
+# CLAUDE_CONFIG_DIR; sem `-g` ele grava em ./.claude/skills da pasta atual. O verificador tem
+# que achar a skill nos dois lugares, senao o aluno fica com "critico faltando" pra sempre.
+import os
+import tempfile
+
+with tempfile.TemporaryDirectory() as _tmp:
+    _base = pathlib.Path(_tmp)
+    (_base / "cfg" / "skills" / "skill-de-teste-cfg").mkdir(parents=True)
+    (_base / "proj" / ".claude" / "skills" / "skill-de-teste-proj").mkdir(parents=True)
+    _env_antes, _cwd_antes = os.environ.get("CLAUDE_CONFIG_DIR"), os.getcwd()
+    try:
+        os.environ["CLAUDE_CONFIG_DIR"] = str(_base / "cfg")
+        checa("acha skill na pasta de CLAUDE_CONFIG_DIR", chk.skill_existe("skill-de-teste-cfg"))
+        os.chdir(_base / "proj")
+        checa("acha skill de projeto em ./.claude/skills", chk.skill_existe("skill-de-teste-proj"))
+    finally:
+        os.chdir(_cwd_antes)
+        if _env_antes is None:
+            os.environ.pop("CLAUDE_CONFIG_DIR", None)
+        else:
+            os.environ["CLAUDE_CONFIG_DIR"] = _env_antes
+
+_fonte_chk = (AQUI / "checar-ferramentas.py").read_text(encoding="utf-8")
+_linhas_add = [l for l in _fonte_chk.splitlines() if "skills add " in l]
+checa("todo `skills add` instala global, sem pergunta e por copia (-g -y --copy)",
+      bool(_linhas_add) and all("-g -y --copy" in l for l in _linhas_add),
+      f"{sum('-g -y --copy' not in l for l in _linhas_add)} linha(s) sem as opcoes")
+
 ok, _ = chk.roda("comando-que-nao-existe-xyz", timeout=5)
 checa("binario ausente vira ok=False (nao excecao)", ok is False)
 
-ok, saida = chk.roda("python3 -c \"import time; time.sleep(5)\"", timeout=1)
+ok, saida = chk.roda([sys.executable, "-c", "import time; time.sleep(5)"], timeout=1)
 checa("timeout vira ok=False, com a saida explicando", ok is False and "timeout" in saida.lower(), saida[:40])
 
 # As quatro classificacoes: sao elas que separam "responde" de "esta configurado".

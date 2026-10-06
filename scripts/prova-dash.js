@@ -24,7 +24,10 @@ const path = require('path');
 // Homebrew (/opt/homebrew/lib/node_modules) nem pelo nvm.
 function npmRootGlobal() {
   try {
-    const r = require('child_process').spawnSync('npm', ['root', '-g'], { encoding: 'utf8', timeout: 20000 });
+    // No Windows o npm é um .cmd: sem shell o spawnSync não o encontra (ENOENT ou EINVAL).
+    const r = require('child_process').spawnSync('npm', ['root', '-g'], {
+      encoding: 'utf8', timeout: 20000, shell: process.platform === 'win32', windowsHide: true,
+    });
     const pasta = (r.stdout || '').trim();
     return r.status === 0 && pasta ? pasta : null;
   } catch (_) {
@@ -98,7 +101,17 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
   if (!pw) { console.error('Playwright não resolve. npm i -g playwright'); process.exit(1); }
   fs.mkdirSync(outDir, { recursive: true });
 
-  const browser = await pw.chromium.launch();
+  let browser;
+  try {
+    browser = await pw.chromium.launch();
+  } catch (e) {
+    // Linux sem as bibliotecas do Chromium é a falha mais comum: a mensagem original some no meio de
+    // um monte de texto, então diga o que fazer.
+    console.error('Não consegui abrir o Chromium do Playwright: ' + String(e.message).split('\n')[0]);
+    console.error('Instale o navegador: npx playwright install chromium');
+    if (process.platform === 'linux') console.error('No Linux faltando biblioteca (libnss3, libatk...): npx playwright install --with-deps chromium (pede sudo)');
+    process.exit(1);
+  }
   const falhas = [];
   const avisos = [];
 

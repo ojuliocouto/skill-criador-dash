@@ -16,8 +16,9 @@ let falhas = 0;
 const checa = (nome, ok, det = '') => { console.log(`${ok ? 'ok   ' : 'FALHA'} ${nome}${det ? ' -> ' + det : ''}`); if (!ok) falhas++; };
 
 const prefixo = fs.mkdtempSync(path.join(os.tmpdir(), 'npm-global-falso-'));
-// npm root -g = <prefix>/lib/node_modules no macOS e no Linux
-const raiz = path.join(prefixo, 'lib', 'node_modules', 'playwright');
+// npm root -g = <prefix>/lib/node_modules no macOS e no Linux, e <prefix>\\node_modules no Windows
+const pastaGlobal = process.platform === 'win32' ? path.join(prefixo, 'node_modules') : path.join(prefixo, 'lib', 'node_modules');
+const raiz = path.join(pastaGlobal, 'playwright');
 fs.mkdirSync(raiz, { recursive: true });
 const MARCA = path.join(prefixo, 'chromium-de-mentira');
 fs.writeFileSync(MARCA, 'x');

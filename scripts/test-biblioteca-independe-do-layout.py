@@ -13,7 +13,7 @@ os templates (tira um KPI e troca o herói, como um aluno faria) e exige:
   1. a suíte da biblioteca continua 100% verde;
   2. a suíte do layout padrão percebe a mudança (senão ela não confere nada).
 
-    python3 scripts/test-biblioteca-independe-do-layout.py
+    node scripts/py.mjs test-biblioteca-independe-do-layout.py
 """
 import pathlib
 import re
@@ -43,7 +43,7 @@ MUTACAO = """
 
 
 def rodar(cwd, padrao):
-    r = subprocess.run(["node", "--test", padrao], cwd=cwd, capture_output=True, text=True, timeout=600)
+    r = subprocess.run(["node", "--test", padrao], cwd=cwd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600)
     saida = r.stdout + r.stderr
     falhas = re.findall(r"^not ok \d+ - (.+)$", saida, re.MULTILINE)
     total = re.search(r"^# tests (\d+)", saida, re.MULTILINE)

@@ -29,7 +29,7 @@ class Preflight(unittest.TestCase):
         with tempfile.TemporaryDirectory() as pasta:
             arquivo = pathlib.Path(pasta) / 'wrangler.toml'
             for texto, bloqueia in [('id = "<SEU_KV_NAMESPACE_ID>"', True), ('# id = "<SEU_KV_NAMESPACE_ID>"\nname = "controle"', False)]:
-                arquivo.write_text(texto)
+                arquivo.write_text(texto, encoding='utf-8')
                 problemas = []
                 with contextlib.redirect_stdout(io.StringIO()):
                     pre.check_toml(arquivo, problemas, 'wrangler.toml', False)
@@ -38,8 +38,8 @@ class Preflight(unittest.TestCase):
     def rodar_main(self, *flags):
         # T6: no passo 1 o aluno não tem KV nenhum; o placeholder do wrangler.toml é esperado.
         with tempfile.TemporaryDirectory() as pasta:
-            (pathlib.Path(pasta) / 'wrangler.toml').write_text('name = "meu-dashboard"\nid = "<SEU_KV_NAMESPACE_ID>"\n')
-            (pathlib.Path(pasta) / '.dev.vars').write_text('ADMIN_TOKEN=teste\n')
+            (pathlib.Path(pasta) / 'wrangler.toml').write_text('name = "meu-dashboard"\nid = "<SEU_KV_NAMESPACE_ID>"\n', encoding='utf-8')
+            (pathlib.Path(pasta) / '.dev.vars').write_text('ADMIN_TOKEN=teste\n', encoding='utf-8')
             saida = io.StringIO()
             with patch.object(pre, 'check_node', lambda problemas: None), \
                  patch.object(pre, 'check_wrangler', lambda problemas, avisos: None), \

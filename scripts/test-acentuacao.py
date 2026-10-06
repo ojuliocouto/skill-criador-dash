@@ -7,7 +7,7 @@ que ele esta certo". Varre as strings dos scripts (.py pelo tokenize; prova-dash
 literais fora de comentário) e reprova palavra sem acento. Docstring e comentário ficam de
 fora: não aparecem pra ninguém. A lista de palavras é a mesma do teste do starter-kit.
 
-    python3 scripts/test-acentuacao.py
+    node scripts/py.mjs test-acentuacao.py
 """
 import io
 import json
@@ -15,6 +15,12 @@ import pathlib
 import re
 import sys
 import tokenize
+
+for _fluxo in (sys.stdout, sys.stderr):  # console cp1252 ou ASCII não pode derrubar o teste num acento
+    try:
+        _fluxo.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError, OSError):
+        pass
 
 AQUI = pathlib.Path(__file__).resolve().parent
 MAPA = json.loads((AQUI.parent / "starter-kit" / "test" / "fixtures" / "sem-acento.json").read_text(encoding="utf-8"))
