@@ -1,0 +1,95 @@
+{
+  "nome": "padrao",
+  "descricao": "Abre o painel, passa o mouse nos números, troca de aba duas vezes, volta à primeira, filtra e rola. Serve a qualquer painel de fábrica sem editar: o que não existir (abas, filtro) é pulado.",
+  "duracao_minima_s": 11,
+  "passos": [
+    {
+      "acao": "abrir"
+    },
+    {
+      "acao": "esperar_seletor",
+      "seletor": ".kpi__value"
+    },
+    {
+      "acao": "esperar",
+      "ms": 2000
+    },
+    {
+      "acao": "print",
+      "nome": "abriu"
+    },
+    {
+      "acao": "mover_mouse",
+      "seletor": ".kpi"
+    },
+    {
+      "acao": "esperar",
+      "ms": 400
+    },
+    {
+      "acao": "print",
+      "nome": "numeros"
+    },
+    {
+      "acao": "clicar",
+      "seletor": ".abas [role=\"tab\"] >> nth=1",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 500
+    },
+    {
+      "acao": "print",
+      "nome": "segunda aba"
+    },
+    {
+      "acao": "clicar",
+      "seletor": ".abas [role=\"tab\"] >> nth=2",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 500
+    },
+    {
+      "acao": "print",
+      "nome": "terceira aba"
+    },
+    {
+      "acao": "clicar",
+      "seletor": ".abas [role=\"tab\"] >> nth=0",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 500
+    },
+    {
+      "acao": "escolher",
+      "seletor": "#filterbar select",
+      "indice": 1,
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 600
+    },
+    {
+      "acao": "print",
+      "nome": "filtro aplicado"
+    },
+    {
+      "acao": "rolar",
+      "y": 500
+    },
+    {
+      "acao": "esperar",
+      "ms": 400
+    },
+    {
+      "acao": "print",
+      "nome": "rolou"
+    }
+  ]
+}

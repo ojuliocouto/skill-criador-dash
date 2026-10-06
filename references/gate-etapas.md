@@ -59,7 +59,8 @@ Campos do perfil `dash`:
 Todas as etapas também exigem `arquivos`: lista de arquivos não vazios dentro do projeto.
 No perfil `dash`, "Não" não é prova: `conta_confirmada` começando com "Não" bloqueia a etapa 4, e
 a etapa 6 só passa com a URL `https://` do dashboard publicado em `prova_publicada` e o PNG do
-`prova-dash.js` (ex: `prova/dash-desktop.png`) em `arquivos`. Sem conta da pessoa, o roteiro para
+`prova-dash.js` (ex: `prova/dash-desktop.png`) e os vídeos de prova do desktop e do celular
+(`prova/video-desktop.webm` e `prova/video-mobile.webm`, de `gravar-video.js`) em `arquivos`. Sem conta da pessoa, o roteiro para
 na etapa 4 e a entrega fica pendente, declarada como tal.
 Para `passe_de_gosto`, use `{"antes": 0, "depois": 0, "inspecao": "Itens efetivamente inspecionados"}`.
 A contagem final precisa ser zero. Para campos sem pendência, escreva `"Nenhuma"`.
@@ -143,14 +144,15 @@ feito de verdade. `arquivos` aponta arquivos reais e não vazios dentro de `~/me
 ```
 
 `evidencias/etapa-6.json` (`prova_publicada` precisa ter a URL `https://` do dashboard publicado, e
-`arquivos` precisa ter o PNG do `prova-dash.js` rodado contra essa URL):
+`arquivos` precisa ter o PNG do `prova-dash.js` rodado contra essa URL e os dois vídeos do
+`gravar-video.js`, `prova/video-desktop.webm` e `prova/video-mobile.webm`; sem os vídeos o registro é recusado):
 
 ```json
 {
   "prova_publicada": "https://<NOME-DO-PROJETO>.pages.dev/dashboard.html?id=<ID>",
   "passe_de_gosto": {"antes": 4, "depois": 0, "inspecao": "tells de painel da Fase 3, nos dois temas"},
   "pendencias": "Nenhuma",
-  "arquivos": ["prova/dash-desktop.png", "prova/dash-mobile.png"]
+  "arquivos": ["prova/dash-desktop.png", "prova/dash-mobile.png", "prova/video-desktop.webm", "prova/video-mobile.webm", "prova/prancha-desktop.png", "prova/prancha-mobile.png"]
 }
 ```
 

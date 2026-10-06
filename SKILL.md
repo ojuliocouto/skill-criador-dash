@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.5.2
+version: 3.6.0
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -423,6 +423,24 @@ node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-DO-DASHBOARD>" [-
 
 - **Depois de verde, OLHE os dois PNG.** O script prova que há número na tela, não que o número está
   certo nem que a tela está boa. Cheque KPIs, funil, tendência, a cor de marca e os DOIS temas.
+
+- **VÍDEO DE PROVA (bloqueia o registro da etapa 6).** Movimento não se julga em imagem parada. Toda
+  entrega traz um vídeo de 10 a 15 s do painel publicado (abrir, trocar de aba, filtrar), no desktop
+  (1440x900) e no celular (390x844):
+```
+node ~/.claude/skills/criador-dash/scripts/gravar-video.js "<URL-DO-DASHBOARD>" --saida prova [--senha <SENHA>]
+```
+  Usa a gravação nativa do Playwright (o mesmo navegador de teste do `prova-dash.js`): sem ffmpeg seu e
+  sem ferramenta só de Mac, e a pasta de saída pode ter espaço e acento. O roteiro é
+  `scripts/roteiro-padrao.json` (abrir, esperar, mover o mouse, clicar nas abas, escolher no filtro, rolar):
+  serve ao painel de fábrica sem editar nada, e o que não existir no seu painel (abas, filtro) é pulado.
+  Roteiro próprio: `--roteiro meu-roteiro.json` (ações em `scripts/video/roteiro.cjs`). Grava
+  `prova/video-desktop.webm` e `prova/video-mobile.webm` (WebM, cerca de 1 MB cada) e, porque quem revisa
+  lê imagem e não vídeo, uma PRANCHA de 6 quadros tirados durante o mesmo roteiro:
+  `prova/prancha-desktop.png`, `prova/prancha-mobile.png` e os PNG soltos em `prova/quadros/`.
+  **Leia as duas pranchas** (há número no painel? a aba trocou? o filtro mudou os números?). Os primeiros
+  segundos do vídeo podem estar em branco enquanto a página carrega: é o carregamento, não defeito.
+  Liste os dois vídeos em `arquivos` da etapa 6: **sem eles o `gate-etapas.py` recusa o registro.**
 
 ### 6.1 GATE DE USO: ferramenta viva não se pula
 

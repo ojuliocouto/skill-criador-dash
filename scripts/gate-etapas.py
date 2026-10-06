@@ -37,6 +37,7 @@ DASH = {
     "7": ("contexto",),
 }
 REGISTRO = ".etapas-verificadas.json"
+EXTENSOES_DE_VIDEO = (".webm", ".mp4")
 
 
 def digest(p):
@@ -66,6 +67,14 @@ def validar_dash(etapa, doc):
         if not any(str(a).lower().endswith(".png") for a in arquivos):
             raise ValueError("Etapa 6: liste em arquivos o PNG do prova-dash.js rodado contra a URL publicada "
                              "(ex: prova/dash-desktop.png).")
+        # 3.6.0: o movimento não se julga em imagem parada. A entrega traz o vídeo de prova do desktop e do
+        # celular (gravar-video.js grava video-desktop.webm e video-mobile.webm), junto dos prints.
+        nomes = [Path(str(a)).name.lower() for a in arquivos]
+        for perfil in ("desktop", "mobile"):
+            if not any(perfil in n and n.endswith(EXTENSOES_DE_VIDEO) for n in nomes):
+                raise ValueError(f"Etapa 6: falta o vídeo de prova do {perfil}. Grave com: node scripts/gravar-video.js "
+                                 f"\"<URL-DO-DASHBOARD>\" --saida prova (gera prova/video-desktop.webm e prova/video-mobile.webm), "
+                                 f"e liste os dois em arquivos.")
 
 
 def validar(projeto, arquivo, etapa, campos, perfil):
