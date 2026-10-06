@@ -13,6 +13,27 @@ Required, before you run any command below:
 - **Claude Code**, installed and signed in. This repository is a Claude Code skill: `SKILL.md` is the script an AI coding agent follows to walk you through the build. You can still read and run the starter-kit code without Claude Code, but the guided experience assumes it.
 - **Your data**, as a Google Sheet or a CSV file. If you use a Google Sheet, share it as "Anyone with the link" before pasting the link; without that sharing setting the connector cannot read it.
 
+- **Python 3.8 or newer**, for the guided-flow scripts (tool checker, preflight, step gates). You never call it by name: every script runs through `node scripts/py.mjs <script>.py`, which finds the right Python command for your system on its own (its name differs between Windows, macOS and Linux) and turns on UTF-8 mode.
+- **Playwright with Chromium** (`npm i -g playwright && npx playwright install chromium`), for the proof screenshot of the published dashboard.
+- **The `frontend-design` skill**, for the visual plan: `npx -y skills add anthropics/skills --skill frontend-design --agent claude-code -g -y --copy`. The `-g` matters: without it the skill is installed into the current folder instead of your user-level skills folder.
+
+### Windows, macOS and Linux
+
+The skill runs on all three.
+
+| | Windows | macOS | Linux (Debian/Ubuntu, Fedora) |
+|---|---|---|---|
+| Node 22+ | `winget install -e --id OpenJS.NodeJS.LTS` | `brew install node` | installer or `nvm` from nodejs.org |
+| Python 3.8+ | `winget install -e --id Python.Python.3.12` | `brew install python` | `sudo apt install python3` / `sudo dnf install python3` |
+| Git | `winget install -e --id Git.Git` (ships Git Bash) | Apple Command Line Tools | `sudo apt install git` / `sudo dnf install git` |
+
+- **Windows: run everything from Git Bash (or WSL), not plain PowerShell.** The commands in this guide are bash (`cp -R`, `~/`, quoted `curl`).
+- After installing anything, open a NEW terminal so the PATH is refreshed.
+- A path with spaces or accents (`C:\Users\João Silva`) must be quoted in every command.
+- Linux: if Chromium opens and closes at once, run `npx playwright install --with-deps chromium`.
+
+What was verified: the test suites pass with the Python launcher finding each of the possible Python command names alone, or none of them, with a cp1252/ASCII locale, with a project folder containing spaces and accents, and with CRLF line endings. What was NOT verified: a run on a real Windows machine.
+
 Optional, only if you need it:
 
 - A **Meta Ads** access token (Business Manager System User, never expires, `ads_read` + `read_insights`) and ad account id, only for the native Meta Ads connector (Marketing domain). Step-by-step guide (Portuguese): `references/token-meta-ads.md`.
@@ -154,7 +175,7 @@ walkthrough. In short, once you are inside `starter-kit/`:
 npm test                      # 500+ unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
-Run `python3 ../scripts/preflight.py --starter-kit .` (from inside `starter-kit/`) to check your environment at any time.
+Run `node ../scripts/py.mjs preflight.py --starter-kit .` (from inside `starter-kit/`) to check your environment at any time.
 
 Behind the wizard: the dashboard (`dashboard.html`) reads `?id=`, loads the config from KV, fetches
 the data through the connector, runs `computeAll` plus the template layout, and renders the widgets.
@@ -302,7 +323,7 @@ MIT.
 
 ## Ferramentas e gates do roteiro guiado
 
-Antes do Passo 1, execute `python3 scripts/checar-ferramentas.py` na raiz da skill.
+Antes do Passo 1, execute `node scripts/py.mjs checar-ferramentas.py` na raiz da skill.
 Além de Node 22+, wrangler e starter-kit, o roteiro exige Python 3.9+ e Playwright.
 O 21st.dev é opcional e nunca bloqueia: o código dele é pago e vem em React, e o
 starter-kit é HTML puro. O roteiro guiado bloqueia só se faltar uma ferramenta crítica.
@@ -327,11 +348,11 @@ Dashboards personalizados precisam preservar esse marcador nos valores de métri
 ```bash
 node scripts/test-prova-dash.cjs
 node scripts/test-resolver-playwright.cjs
-python3 scripts/test-skill-md.py
-python3 scripts/test-biblioteca-independe-do-layout.py
-python3 scripts/test-preflight.py
-python3 scripts/test-uso-ferramentas.py
-python3 scripts/test-gate-etapas.py
+node scripts/py.mjs test-skill-md.py
+node scripts/py.mjs test-biblioteca-independe-do-layout.py
+node scripts/py.mjs test-preflight.py
+node scripts/py.mjs test-uso-ferramentas.py
+node scripts/py.mjs test-gate-etapas.py
 ```
 
 Datas brasileiras com hora preservam o dia informado. Status de venda são reconhecidos

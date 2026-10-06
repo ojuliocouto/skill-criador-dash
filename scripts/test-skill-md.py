@@ -5,7 +5,7 @@
 Cada teste nasce de uma travada real do teste com aluno de 02/10/2026
 (relatórios em sandbox-aluno-dash-20261002/relatorios/RELATORIO-dash.md).
 
-    python3 scripts/test-skill-md.py
+    node scripts/py.mjs test-skill-md.py
 """
 import pathlib
 import re
@@ -93,7 +93,7 @@ class Roteiro(unittest.TestCase):
         soltos = re.findall(r"(?<!~/meu-dash/)projetos/YYYYMMDD", SKILL)
         self.assertFalse(soltos, "projetos/YYYYMMDD sem a raiz ~/meu-dash/")
         gi = RAIZ / "starter-kit" / ".gitignore"
-        self.assertTrue(gi.exists() and "projetos/" in gi.read_text(),
+        self.assertTrue(gi.exists() and "projetos/" in gi.read_text(encoding='utf-8'),
                         "a cópia do starter-kit precisa levar o .gitignore com projetos/")
 
     def test_t14_quickstart_em_portugues_no_proprio_roteiro(self):

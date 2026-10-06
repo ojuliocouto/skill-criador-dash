@@ -17,10 +17,10 @@ confere de novo, agora: arquivo que precisa existir e ter tamanho, ou trecho que
 encontrado no codigo. Registro cuja evidencia sumiu vale como nao registrado.
 
 Uso:
-    python3 scripts/uso-ferramentas.py registrar <ferramenta> --arquivo <path> [--detalhe "..."]
-    python3 scripts/uso-ferramentas.py registrar <ferramenta> --no-codigo "<trecho>" --em <dir>
-    python3 scripts/uso-ferramentas.py registrar <ferramenta> --detalhe "..." --sem-artefato
-    python3 scripts/uso-ferramentas.py checar [--projeto <dir>]
+    node scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --arquivo <path> [--detalhe "..."]
+    node scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --no-codigo "<trecho>" --em <dir>
+    node scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --detalhe "..." --sem-artefato
+    node scripts/py.mjs uso-ferramentas.py checar [--projeto <dir>]
 """
 import argparse
 import datetime
@@ -29,6 +29,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plataforma  # noqa: E402  (portabilidade Windows/macOS/Linux)
+
+plataforma.texto_console()
 
 RAIZ = Path(__file__).resolve().parent.parent
 REGISTRO = ".ferramentas-usadas.json"
@@ -86,6 +91,25 @@ def salvar(projeto, dados):
         json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _trecho_no_codigo(valor, base):
+    """True se `valor` (texto fixo) aparece em algum arquivo de texto sob `base`."""
+    alvo = str(valor).encode("utf-8")
+    base = Path(base)
+    arquivos = [base] if base.is_file() else (p for p in base.rglob("*") if p.is_file())
+    for arq in arquivos:
+        if arq.name == REGISTRO:
+            continue
+        try:
+            dados = arq.read_bytes()
+        except OSError:
+            continue
+        if b"\0" in dados[:8192]:
+            continue  # binario
+        if alvo in dados:
+            return True
+    return False
+
+
 def evidencia_vale(ev, projeto):
     """Confere a evidencia DE NOVO, agora. Registro cujo artefato sumiu nao conta.
 
@@ -111,13 +135,12 @@ def evidencia_vale(ev, projeto):
         base = Path(ev.get("em") or projeto)
         if not base.exists():
             return False, f"pasta de busca não existe: {base}"
-        # grep -r: nao depende de extensao nem de encoding do arquivo.
-        # --exclude do proprio registro: sem isso o gate se AUTO-VALIDA, porque o trecho
+        # Busca em Python puro (o `grep` nao existe no Windows): recursiva, texto fixo,
+        # sem depender de extensao nem de encoding, e pulando arquivo binario (como o grep -I).
+        # O proprio registro fica FORA da busca: sem isso o gate se AUTO-VALIDA, porque o trecho
         # procurado tambem esta gravado dentro do .ferramentas-usadas.json. Pego em teste:
         # apaguei o componente do codigo e o gate continuou dizendo "usada".
-        r = subprocess.run(["grep", "-rqIF", f"--exclude={REGISTRO}", "--", valor, str(base)],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
+        if not _trecho_no_codigo(valor, base):
             return False, f"o trecho registrado não está mais no código: {valor[:60]!r}"
         return True, f"trecho encontrado no código ({valor[:40]!r})"
     if tipo == "declarado":
@@ -134,7 +157,7 @@ def estado_das_ferramentas():
         return None, f"não achei {checador}"
     try:
         r = subprocess.run([sys.executable, str(checador), "--json"],
-                           capture_output=True, text=True, timeout=600)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
         linhas = json.loads(r.stdout)
         if r.returncode != 0 or any(l.get("critico") and not l.get("ok") for l in linhas):
             return None, "gate de entrada reprovado; resolva as ferramentas críticas antes da entrega"

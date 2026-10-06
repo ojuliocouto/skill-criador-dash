@@ -14,12 +14,12 @@ class Etapas(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.pasta = pathlib.Path(self.temp.name)
-        (self.pasta / 'briefing.txt').write_text('Documento de controle com informações confirmadas')
+        (self.pasta / 'briefing.txt').write_text('Documento de controle com informações confirmadas', encoding='utf-8')
         self.doc = {'briefing': dict.fromkeys(['nicho', 'local', 'publico', 'oferta', 'preco', 'acao'], 'Informado'), 'inventario': ['Fonte'], 'secoes': ['Hero'], 'arquivos': ['briefing.txt']}
 
     def rodar(self, *args):
-        (self.pasta / 'etapa.json').write_text(json.dumps(self.doc))
-        r = subprocess.run([sys.executable, str(SCRIPT), '--projeto', str(self.pasta), *args], capture_output=True, text=True)
+        (self.pasta / 'etapa.json').write_text(json.dumps(self.doc), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--projeto', str(self.pasta), *args], capture_output=True, text=True, encoding='utf-8', errors='replace')
         return r.returncode
 
     def test_positivo_e_releitura(self):
@@ -35,7 +35,7 @@ class Etapas(unittest.TestCase):
 
     def test_artefato_alterado_reprova(self):
         self.assertEqual(self.rodar('registrar', '0', '--arquivo', 'etapa.json'), 0)
-        (self.pasta / 'briefing.txt').write_text('Conteúdo diferente')
+        (self.pasta / 'briefing.txt').write_text('Conteúdo diferente', encoding='utf-8')
         self.assertEqual(self.rodar('checar', '0'), 1)
 
     def test_artefato_ausente_reprova(self):
@@ -59,14 +59,14 @@ class EtapasDash(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.pasta = pathlib.Path(self.temp.name)
-        (self.pasta / 'nota.txt').write_text('evidência real')
+        (self.pasta / 'nota.txt').write_text('evidência real', encoding='utf-8')
         (self.pasta / 'dash-desktop.png').write_bytes(b'\x89PNG prova')
 
     def registrar(self, etapa, doc):
         arq = self.pasta / f'etapa-{etapa}.json'
-        arq.write_text(json.dumps({'arquivos': ['nota.txt'], **doc}))
+        arq.write_text(json.dumps({'arquivos': ['nota.txt'], **doc}), encoding='utf-8')
         r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta),
-                            'registrar', etapa, '--arquivo', arq.name], capture_output=True, text=True)
+                            'registrar', etapa, '--arquivo', arq.name], capture_output=True, text=True, encoding='utf-8', errors='replace')
         return r.returncode
 
     def ate(self, ultima):
@@ -87,9 +87,9 @@ class EtapasDash(unittest.TestCase):
         doc = {'prova_publicada': prova, 'pendencias': 'Nenhuma', 'arquivos': arquivos,
                'passe_de_gosto': {'antes': 3, 'depois': 0, 'inspecao': 'tells da Fase 3'}}
         arq = self.pasta / 'etapa-6.json'
-        arq.write_text(json.dumps(doc))
+        arq.write_text(json.dumps(doc), encoding='utf-8')
         r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta),
-                            'registrar', '6', '--arquivo', arq.name], capture_output=True, text=True)
+                            'registrar', '6', '--arquivo', arq.name], capture_output=True, text=True, encoding='utf-8', errors='replace')
         return r.returncode
 
     def test_etapa_6_nao_aceita_nao_publicada(self):

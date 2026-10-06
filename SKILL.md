@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.4.0
+version: 3.5.0
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -46,6 +46,53 @@ que ela aparecer:
 - **fail-closed**: "na dúvida, bloqueia". Sem o `ADMIN_TOKEN` configurado, ninguém cria nem
   apaga dashboard, nem o dono. É de propósito: protege o painel de quem tem o link.
 
+## Funciona em Windows, macOS e Linux
+
+Esta skill roda nos três. Quem executa os comandos é você, o agente, então confira isto uma vez,
+antes do Passo 0.
+
+**1. Descubra o sistema.** Rode `node -p "process.platform"`: `win32` é Windows, `darwin` é macOS,
+`linux` é Linux. Se o `node` nem existir, instale primeiro (tabela abaixo) e rode de novo.
+
+**2. O que precisa estar instalado** (o Passo 0 confere e, se faltar, você conduz a instalação):
+
+| | Windows | macOS | Linux (Debian/Ubuntu e Fedora) |
+|---|---|---|---|
+| **Node 22+** (traz o `npm`) | `winget install -e --id OpenJS.NodeJS.LTS` | `brew install node` ou o instalador em nodejs.org | instalador ou `nvm` (nodejs.org); os pacotes `apt install nodejs npm` e `dnf install nodejs` só servem se vierem na versão 22 ou maior |
+| **Python 3.8+** | `winget install -e --id Python.Python.3.12` | `brew install python` ou o instalador em python.org | `sudo apt install python3` (Debian/Ubuntu), `sudo dnf install python3` (Fedora) |
+| **Git e o Git Bash** | `winget install -e --id Git.Git` (traz o Git Bash) | já vem com as Ferramentas de Linha de Comando da Apple | `sudo apt install git` ou `sudo dnf install git` |
+
+Sem `winget` (Windows antigo) ou sem `brew` (Mac): use os instaladores em nodejs.org, python.org e
+git-scm.com. Depois de instalar qualquer coisa, abra um terminal NOVO, senão o PATH não atualiza.
+
+**3. Windows: rode pelo Git Bash (ou pelo WSL).** Os comandos deste roteiro são de bash
+(`cp -R`, `cd`, `curl` com aspas, `~/`). No PowerShell puro eles não funcionam como estão escritos.
+Marque "Add python.exe to PATH" se instalar o Python pelo instalador gráfico.
+
+**4. Python: use SEMPRE o lançador, nunca `python3` solto.** No Windows `python3`
+quase nunca existe; no macOS e no Linux às vezes só existe ele. Por isso todo script desta skill roda assim:
+
+```
+node ~/.claude/skills/criador-dash/scripts/py.mjs <nome-do-script>.py <argumentos>
+```
+
+O `py.mjs` procura `python3`, depois `python`, depois `py -3`, confirma que é Python 3 de verdade e
+liga o modo UTF-8 (sem ele o Windows quebra em palavra com acento). Para saber qual Python a
+máquina tem: `node ~/.claude/skills/criador-dash/scripts/py.mjs --descobrir`. Se ele disser que não
+achou, instale pela tabela acima e tente de novo.
+
+**5. As diferenças que importam:**
+
+- **Pasta com espaço ou acento** (`C:\Users\João Silva`): ponha o caminho entre aspas em todo comando.
+- **Linux, Playwright:** se o Chromium abrir e fechar na hora, faltam bibliotecas do sistema. Rode
+  `npx playwright install --with-deps chromium` (pede `sudo`).
+- **Linux, `npm i -g`:** se der `EACCES` (sem permissão), não use `sudo npm`: rode
+  `npm config set prefix ~/.npm-global` e ponha `~/.npm-global/bin` no PATH.
+- **Variável de ambiente** (`CLOUDFLARE_API_TOKEN`): no Git Bash e no macOS/Linux é `unset NOME`;
+  no PowerShell é `Remove-Item Env:NOME`.
+- **Fim de linha do Windows (CRLF):** a suíte de testes dá o mesmo resultado com CRLF (conferido
+  convertendo a cópia inteira), e a skill acompanha um `.gitattributes`. Nada a fazer.
+
 ## Pastas: onde fica cada coisa (defina antes do primeiro comando)
 
 | Nome no roteiro | Caminho | O que é |
@@ -62,7 +109,7 @@ cd ~/meu-dash
 
 Daí em diante, todo comando roda de dentro de `~/meu-dash`, e todo caminho relativo do roteiro
 (`evidencias/`, `prova/`, `projetos/`, `.dev.vars`, `public/`) é relativo a ela. Os scripts da
-skill são chamados pelo caminho completo (`python3 ~/.claude/skills/criador-dash/scripts/...`).
+skill são chamados pelo caminho completo (`node ~/.claude/skills/criador-dash/scripts/py.mjs <script>.py ...`, ver a seção anterior).
 Se a pessoa preferir outro nome de pasta, troque `~/meu-dash` em todos os comandos.
 
 ## Protocolo de operação (leia antes de tudo)
@@ -95,7 +142,7 @@ responder, não existe Passo 1.** Não é um checklist que você lê e segue mes
 checklist é pulado, gate não.
 
 ```
-python3 ~/.claude/skills/criador-dash/scripts/checar-ferramentas.py
+node ~/.claude/skills/criador-dash/scripts/py.mjs checar-ferramentas.py
 ```
 
 O verificador não pergunta se a ferramenta está instalada: ele MANDA cada uma fazer alguma
@@ -122,14 +169,14 @@ antes de mandar comando.
 
 | Ferramenta | Para quê | Como conduzir |
 |---|---|---|
-| **Node 22+** | o wrangler 4.x não roda em versão mais velha; com Node 18/20 nem os testes nem o deploy funcionam | `nvm install 22` ou `brew install node`. Confira com `node -v`. |
+| **Node 22+** | o wrangler 4.x não roda em versão mais velha; com Node 18/20 nem os testes nem o deploy funcionam | Instale pela tabela da seção "Funciona em Windows, macOS e Linux" (Windows `winget install -e --id OpenJS.NodeJS.LTS`, macOS `brew install node`, Linux o instalador de nodejs.org ou `nvm`). Confira com `node -v`. |
 | **wrangler** | publicar no Cloudflare (Pages, KV, D1) | `npm i -g wrangler`. Se o comando não for achado depois de instalar, o bin global do npm não está no PATH (`npm prefix -g` mostra a pasta). |
-| **Login Cloudflare** | é a conta DA PESSOA que recebe o dashboard | `wrangler login`, depois `wrangler whoami` pra confirmar a conta. **Um `CLOUDFLARE_API_TOKEN` exportado no shell SOBREPÕE o login e pode publicar na conta errada:** o verificador denuncia; se for indevido, `unset CLOUDFLARE_API_TOKEN`. |
+| **Login Cloudflare** | é a conta DA PESSOA que recebe o dashboard | `wrangler login`, depois `wrangler whoami` pra confirmar a conta. **Um `CLOUDFLARE_API_TOKEN` exportado no shell SOBREPÕE o login e pode publicar na conta errada:** o verificador denuncia; se for indevido, tire a variável (Git Bash, macOS e Linux: `unset CLOUDFLARE_API_TOKEN`; PowerShell: `Remove-Item Env:CLOUDFLARE_API_TOKEN`). |
 | **Peças do starter-kit** | é a biblioteca testada de onde o dashboard é montado | o verificador roda o `npm test` sozinho. Peça quebrada (`npm run test:biblioteca` vermelho) não vira dashboard de ninguém: conserte antes. |
-| **Playwright** | prova de tela: abre o dashboard publicado e confere que ele mostra número | `npm i -g playwright && npx playwright install chromium` (~265 MB; a versão leve é `--only-shell`, ~94 MB). |
+| **Playwright** | prova de tela: abre o dashboard publicado e confere que ele mostra número | `npm i -g playwright && npx playwright install chromium` (~265 MB; a versão leve é `--only-shell`, ~94 MB). No Linux, se o navegador não abrir: `npx playwright install --with-deps chromium`. |
 | **magic (21st.dev), opcional** | inspiração de componente; nunca bloqueia o passo 0 | O código do componente é pago e vem em React + Tailwind, e o starter-kit é HTML montado em string: não encaixa direto. Aluno sem chave pula e segue. Quem já tem a chave pode usar só como referência visual. |
-| **skill frontend-design** (obrigatória) | plano visual do painel antes do código (passo 2.5) | `npx -y skills add anthropics/skills --skill frontend-design --agent claude-code` |
-| **skill design-taste-frontend** (opcional, só leitura de apoio) | ela se declara fora de escopo pra dashboard; serve de apoio pra tipografia e hierarquia | `npx skills add Leonxlnx/taste-skill` |
+| **skill frontend-design** (obrigatória) | plano visual do painel antes do código (passo 2.5) | `npx -y skills add anthropics/skills --skill frontend-design --agent claude-code -g -y --copy` |
+| **skill design-taste-frontend** (opcional, só leitura de apoio) | ela se declara fora de escopo pra dashboard; serve de apoio pra tipografia e hierarquia | `npx skills add Leonxlnx/taste-skill -g -y --copy` |
 | **skills de acabamento (opcionais)** | acabamento e microinteração | `high-end-visual-design`, `animate` |
 
 **Regra que nasceu daqui, e vale pra qualquer ferramenta que esta skill venha a usar:** toda
@@ -145,7 +192,7 @@ com `--antes-do-deploy`, o `wrangler.toml`, o `.dev.vars` e o projeto ANTES do d
 
 ### 1. Onboarding e checklist
 
-Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 1 --arquivo evidencias/etapa-1.json`.
+Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 1 --arquivo evidencias/etapa-1.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Nunca presuma que a pessoa leu o README. Explique em 3 frases:
 - "Eu vou construir com você o seu dashboard, na sua conta Cloudflare, do jeito da sua operação."
@@ -157,7 +204,7 @@ as frases prontas estão no Glossário, no topo deste roteiro.
 
 Rode o preflight, que checa o ambiente de uma vez e diz o que falta:
 ```
-python3 ~/.claude/skills/criador-dash/scripts/preflight.py --starter-kit ~/meu-dash
+node ~/.claude/skills/criador-dash/scripts/py.mjs preflight.py --starter-kit ~/meu-dash
 ```
 Neste passo, o aviso de placeholder no `wrangler.toml` é esperado até o passo 4
 (`<SEU_KV_NAMESPACE_ID>`): a pessoa ainda não criou KV nenhum. Ele não bloqueia agora; vira bloqueio só quando o
@@ -218,7 +265,7 @@ outro servidor usando a porta 8788 (talvez um `npm run dev` antigo aberto em out
 
 ### 2. Descoberta da operação
 
-Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2 --arquivo evidencias/etapa-2.json`.
+Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2 --arquivo evidencias/etapa-2.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Que área medir: Marketing, Vendas, Suporte, ou mais de uma (um dashboard por área; junte num grupo com abas).
 - Onde os dados vivem: planilha, CRM, Meta Ads, WhatsApp, sistema com API etc.
@@ -226,7 +273,7 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
 
 ### 2.5 DIREÇÃO DO PAINEL (antes de montar qualquer widget)
 
-Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2.5 --arquivo evidencias/etapa-2.5.json`.
+Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2.5 --arquivo evidencias/etapa-2.5.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 
 O painel nasce feio quando ninguém decidiu o que ele responde. Esta é a fase de concepção do
@@ -271,7 +318,7 @@ Registre o uso (`uso-ferramentas.py registrar "skill frontend-design" ...`, ver 
 
 ### 3. Escolher o modo de dados
 
-Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 3 --arquivo evidencias/etapa-3.json`.
+Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 3 --arquivo evidencias/etapa-3.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados"):
 - AO VIVO: lê a fonte na hora, só KV pra config, setup mínimo. Bom pra maioria.
@@ -279,10 +326,10 @@ Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados")
 
 ### 4. Provisionar a infra DELA
 
-Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 4 --arquivo evidencias/etapa-4.json`.
+Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 4 --arquivo evidencias/etapa-4.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Pergunte qual conta Cloudflare usar e siga `references/infra.md` na ordem (o passo do wrangler.toml é
-BLOQUEANTE: rode `python3 ~/.claude/skills/criador-dash/scripts/preflight.py --starter-kit ~/meu-dash --antes-do-deploy` antes do deploy):
+BLOQUEANTE: rode `node ~/.claude/skills/criador-dash/scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy` antes do deploy):
 - KV `DASHBOARDS_KV` (sempre) e `DASHBOARD_CACHE` (opcional).
 - Modo histórico: D1 + `db/schema.sql` + Worker cron (`workers/snapshot/`).
 - Projeto Pages + domínio customizado.
@@ -290,7 +337,7 @@ BLOQUEANTE: rode `python3 ~/.claude/skills/criador-dash/scripts/preflight.py --s
 
 ### 5. Montar o dashboard
 
-Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 5 --arquivo evidencias/etapa-5.json`.
+Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 5 --arquivo evidencias/etapa-5.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Escolha o domínio pronto (Marketing, Vendas, Suporte, Financeiro, Estoque) ou crie um novo (`references/extensao.md`).
 - Conecte a fonte: planilha (gviz CSV), upload CSV, Meta Ads (token; card só no domínio Marketing) ou
@@ -343,7 +390,7 @@ montar o resto. Replicar padrão errado é o jeito mais caro de errar. <<<**
 
 ### 6. Deploy e verificação
 
-Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 6 --arquivo evidencias/etapa-6.json`.
+Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 6 --arquivo evidencias/etapa-6.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Publique na conta DA PESSOA (`wrangler pages deploy public --project-name=<NOME>`).
 - O gate da etapa 6 só fecha com a URL `https://` publicada em `prova_publicada` e o PNG do
@@ -380,7 +427,7 @@ node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-DO-DASHBOARD>" [-
 ### 6.1 GATE DE USO: ferramenta viva não se pula
 
 ```bash
-python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash checar
+node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar
 ```
 
 **A regra, e ela não tem exceção:** toda ferramenta que o Passo 0 mediu como RESPONDENDO
@@ -401,19 +448,19 @@ você apagou depois: o gate pega).
 Registre conforme for usando, não no fim de memória.
 
 Cada comando vai inteiro, sem variável de atalho: no zsh (o terminal padrão do Mac) um
-atalho guardado numa variável (`U="python3 ..."`) e chamado depois quebra com
+atalho guardado numa variável (`U="node ... py.mjs ..."`) e chamado depois quebra com
 `no such file or directory`, porque o zsh não divide a variável em palavras.
 
 ```bash
 # artefato no disco
-python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash registrar Playwright --arquivo prova/dash-desktop.png --detalhe "prova de tela lida"
-python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash registrar "skill frontend-design" --arquivo evidencias/plano-visual.md --detalhe "plano visual antes do código"
+node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash registrar Playwright --arquivo prova/dash-desktop.png --detalhe "prova de tela lida"
+node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash registrar "skill frontend-design" --arquivo evidencias/plano-visual.md --detalhe "plano visual antes do código"
 ```
 
 **Não se aplica a este painel? DISPENSE, com motivo, e o motivo vai na entrega:**
 
 ```bash
-python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash dispensar "skill animate" --motivo "este painel não tem série temporal: o widget de tendência não entra"
+node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash dispensar "skill animate" --motivo "este painel não tem série temporal: o widget de tendência não entra"
 ```
 
 Dispensa exige motivo de verdade (o script recusa "não usei") e sai marcada no relatório e no
@@ -425,10 +472,10 @@ erro de cobrar direção de arte pra corrigir o nome de uma coluna:
 
 ```bash
 # CRIAR, CLONAR e MELHORAR: cobra tudo que estiver vivo
-python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash checar --caminho criar
+node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar --caminho criar
 
 # EDITAR (mudança pontual): cobra só a PROVA do ponto alterado
-python3 ~/.claude/skills/criador-dash/scripts/uso-ferramentas.py --projeto ~/meu-dash checar --caminho editar
+node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar --caminho editar
 ```
 
 Exigir passe de gosto pra trocar um rótulo não melhora nada, e gate impossível de passar
@@ -443,7 +490,7 @@ está faltando. Nenhuma explicação substitui rodar de novo verde. <<<**
 
 ### 7. Encerramento
 
-Ao concluir, execute `python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 7 --arquivo evidencias/etapa-7.json`.
+Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 7 --arquivo evidencias/etapa-7.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Salve o contexto do projeto da pessoa em `~/meu-dash/projetos/YYYYMMDD-descricao.md` (crie a
 pasta com `mkdir -p ~/meu-dash/projetos`). Ela fica de fora do git pelo `~/meu-dash/.gitignore`,

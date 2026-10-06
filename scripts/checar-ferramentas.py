@@ -15,31 +15,31 @@ A licao: "esta instalada" e "aparece na lista" NAO sao verificacao. Verificacao 
 ferramenta fazer alguma coisa e conferir se voltou.
 
 Uso:
-    python3 scripts/checar-ferramentas.py                # tabela + saida != 0 se faltar critico
-    python3 scripts/checar-ferramentas.py --json         # para consumo por agente
-    python3 scripts/checar-ferramentas.py --sem-testes   # pula `npm test` (mais rapido)
+    node scripts/py.mjs checar-ferramentas.py                # tabela + saida != 0 se faltar critico
+    node scripts/py.mjs checar-ferramentas.py --json         # para consumo por agente
+    node scripts/py.mjs checar-ferramentas.py --sem-testes   # pula `npm test` (mais rapido)
 """
 import json
 import os
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plataforma  # noqa: E402  (portabilidade Windows/macOS/Linux)
+
+plataforma.texto_console()
 
 RAIZ = Path(__file__).resolve().parent.parent
 STARTER = RAIZ / "starter-kit"
 
 
 def roda(cmd, timeout=25, cwd=None):
-    """Executa e devolve (ok, saida). Nunca levanta: timeout e binario ausente viram ok=False."""
-    try:
-        p = subprocess.run(cmd, shell=True, capture_output=True, text=True,
-                           timeout=timeout, cwd=str(cwd) if cwd else None)
-        return p.returncode == 0, (p.stdout + p.stderr).strip()
-    except subprocess.TimeoutExpired:
-        return False, f"timeout depois de {timeout}s"
-    except Exception as e:  # binario ausente, permissao, etc
-        return False, repr(e)
+    """Executa e devolve (ok, saida). Nunca levanta: timeout e binario ausente viram ok=False.
+
+    Sem shell e em UTF-8 (ver plataforma.roda), igual no Windows, no macOS e no Linux.
+    """
+    return plataforma.roda(cmd, timeout=timeout, cwd=cwd)
 
 
 def estado_mcp(nome):
@@ -69,11 +69,21 @@ def estado_mcp(nome):
     return "ausente", f"'{nome}' não aparece em `claude mcp list`"
 
 
-def skill_existe(nome):
+def pastas_de_skills():
+    """Onde o Claude Code procura skill: a pasta de config (que pode vir de CLAUDE_CONFIG_DIR),
+    as pastas globais conhecidas e a pasta do projeto atual (./.claude/skills)."""
+    bases = []
+    cfg = os.environ.get("CLAUDE_CONFIG_DIR")
+    if cfg:
+        bases.append(Path(cfg) / "skills")
     for base in ("~/.claude/skills", "~/.agents/skills", "~/.claude-hubx/skills"):
-        if (Path(os.path.expanduser(base)) / nome).exists():
-            return True
-    return False
+        bases.append(Path(os.path.expanduser(base)))
+    bases.append(Path.cwd() / ".claude" / "skills")
+    return bases
+
+
+def skill_existe(nome):
+    return any((base / nome).exists() for base in pastas_de_skills())
 
 
 def versao_node():
@@ -90,7 +100,7 @@ def checagens(pular_testes=False):
     major, txt = versao_node()
     yield ("Node 22+", "wrangler 4.x não roda em versão mais velha", True,
            major is not None and major >= 22, txt,
-           "instale o Node 22 ou mais novo (nvm install 22 / brew install node)")
+           "instale o Node 22 ou mais novo: " + (plataforma.como_instalar("node") or "https://nodejs.org"))
 
     ok, saida = roda("npx --no-install wrangler --version", timeout=60, cwd=STARTER)
     if not ok:
@@ -107,7 +117,8 @@ def checagens(pular_testes=False):
         detalhe = "CLOUDFLARE_API_TOKEN exportado no shell SOBREPOE o login. " + detalhe
     yield ("Login Cloudflare", "conta onde o dashboard vai ser publicado", False,
            ok and "not authenticated" not in saida.lower(), detalhe,
-           "wrangler login (e `unset CLOUDFLARE_API_TOKEN` se o token do shell for de outra conta)")
+           "wrangler login (e tire o CLOUDFLARE_API_TOKEN do shell se ele for de outra conta: "
+           + plataforma.remover_variavel_dica("CLOUDFLARE_API_TOKEN") + ")")
 
     if not pular_testes:
         ok, saida = roda("npm test", timeout=300, cwd=STARTER)
@@ -118,10 +129,12 @@ def checagens(pular_testes=False):
 
     # O prova-dash.js acha o Playwright global sozinho, pela pasta do `npm root -g` (T10):
     # nada de caminho fixo da maquina do dono.
-    ok, saida = roda(f'node "{RAIZ}/scripts/prova-dash.js" --check')
+    ok, saida = roda(["node", str(RAIZ / "scripts" / "prova-dash.js"), "--check"])
     yield ("Playwright", "prova de tela: o dash publicado abre e mostra número", True, ok,
            saida.splitlines()[0][:110] if saida else "",
-           "npm i -g playwright && npx playwright install chromium")
+           "npm i -g playwright && npx playwright install chromium"
+           + ("  (no Linux, se o Chromium abrir e fechar na hora: npx playwright install --with-deps chromium, pede sudo)"
+              if plataforma.sistema() == "linux" else ""))
 
     # O servidor do 21st.dev ja teve DOIS nomes: "magic" (stdio, via npx) e "21st" (HTTP).
     # Procurar so pelo antigo reprova um servidor conectado com o nome novo, que foi
@@ -144,17 +157,17 @@ def checagens(pular_testes=False):
 
     # O comando vai LITERAL: quem cai aqui esta com a ferramenta faltando e precisa copiar
     # e colar. Placeholder do tipo "<fonte>" nao instala nada, so parece que instrui.
-    TASTE = "npx skills add Leonxlnx/taste-skill"
+    TASTE = "npx skills add Leonxlnx/taste-skill -g -y --copy"
     # T3 (02/10/2026): a design-taste-frontend se declara fora de escopo pra dashboard. Vira
     # leitura de apoio opcional; o pre-voo anti-slop e a lista de tells em direcao-de-arte.md.
     # A frontend-design (plano visual antes do codigo, passo 2.5) e a obrigatoria.
     for s, papel, critico, fix in [
         ("design-taste-frontend", "opcional: leitura de apoio pra tipografia e hierarquia", False, TASTE),
         ("frontend-design", "plano visual do painel antes do código (passo 2.5)", True,
-         "npx -y skills add anthropics/skills --skill frontend-design --agent claude-code"),
+         "npx -y skills add anthropics/skills --skill frontend-design --agent claude-code -g -y --copy"),
         ("high-end-visual-design", "acabamento premium do painel", False, TASTE),
         ("animate", "microinteracao (hover, entrada de card, transicao de filtro)", False,
-         "npx -y skills add https://github.com/delphi-ai/animate-skill --agent claude-code"),
+         "npx -y skills add https://github.com/delphi-ai/animate-skill --agent claude-code -g -y --copy"),
     ]:
         yield (f"skill {s}", papel, critico, skill_existe(s), "", fix)
 

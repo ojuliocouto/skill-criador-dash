@@ -1,7 +1,7 @@
 """Bloqueia avanço sem artefatos de etapas anteriores ou após sua alteração.
 
-Uso: python3 scripts/gate-etapas.py --projeto DIR registrar ETAPA --arquivo JSON
-     python3 scripts/gate-etapas.py --projeto DIR checar ETAPA
+Uso: node scripts/py.mjs gate-etapas.py --projeto DIR registrar ETAPA --arquivo JSON
+     node scripts/py.mjs gate-etapas.py --projeto DIR checar ETAPA
 O JSON contém campos obrigatórios e uma lista `arquivos` de evidências do projeto.
 Valida presença, sequência e integridade. Julgamento de qualidade continua nas lentes.
 """
@@ -12,6 +12,11 @@ import re
 import sys
 import unicodedata
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plataforma  # noqa: E402  (portabilidade Windows/macOS/Linux)
+
+plataforma.texto_console()
 
 PAGINAS = {
     "0": ("briefing", "inventario", "secoes"),
@@ -64,7 +69,7 @@ def validar_dash(etapa, doc):
 
 
 def validar(projeto, arquivo, etapa, campos, perfil):
-    doc = json.loads(arquivo.read_text())
+    doc = json.loads(arquivo.read_text(encoding="utf-8"))
     if not isinstance(doc, dict):
         raise ValueError("A evidência da etapa precisa ser um objeto JSON.")
     for campo in campos:
@@ -116,7 +121,7 @@ def main():
         if args.etapa not in etapas:
             raise ValueError("Etapa desconhecida para este perfil.")
         alvo = projeto / REGISTRO
-        registro = json.loads(alvo.read_text()) if alvo.exists() else {}
+        registro = json.loads(alvo.read_text(encoding="utf-8")) if alvo.exists() else {}
         if not isinstance(registro, dict):
             raise ValueError("Registro de etapas inválido.")
         ordem = list(etapas)
@@ -133,7 +138,7 @@ def main():
             # Corrigir uma etapa invalida as seguintes; um resultado antigo não prova a versão nova.
             registro = {e: registro[e] for e in ordem[:indice]}
             registro[args.etapa] = {"hashes": hashes}
-            alvo.write_text(json.dumps(registro, ensure_ascii=False, indent=2))
+            alvo.write_text(json.dumps(registro, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"PASSA: etapa {args.etapa}, sequência e integridade conferidas.")
         return 0
     except (OSError, ValueError, KeyError, TypeError) as e:

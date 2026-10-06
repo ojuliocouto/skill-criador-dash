@@ -67,8 +67,8 @@ Para trabalho futuro, como métricas após tráfego, registre o plano e a limita
 Não coloque tokens, senhas ou identificadores de conta em evidências destinadas ao Git.
 
 ```bash
-python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --projeto ~/meu-dash registrar 0 --arquivo evidencias/etapa-0.json
-python3 ~/.claude/skills/criador-dash/scripts/gate-etapas.py --projeto ~/meu-dash checar 0
+node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash registrar 0 --arquivo evidencias/etapa-0.json
+node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash checar 0
 ```
 
 No dashboard, acrescente `--perfil dash` e comece pela etapa 1. O gate de ferramentas

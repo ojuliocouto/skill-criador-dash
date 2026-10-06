@@ -6,10 +6,10 @@ Automatiza o checklist do SKILL.md (passo 1) e o passo BLOQUEANTE do provisionam
 passa mas a API responde 500 "Binding DASHBOARDS_KV nao configurado" em runtime).
 
 Uso:
-  python3 scripts/preflight.py --starter-kit ~/meu-dash                     # passo 1: ambiente
-  python3 scripts/preflight.py --starter-kit ~/meu-dash --antes-do-deploy   # passo 4: bloqueia placeholder
-  python3 scripts/preflight.py --starter-kit starter-kit --history   # inclui checks do modo historico
-  python3 scripts/preflight.py --starter-kit starter-kit --run-tests # roda a suite npm test no final
+  node scripts/py.mjs preflight.py --starter-kit ~/meu-dash                     # passo 1: ambiente
+  node scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy   # passo 4: bloqueia placeholder
+  node scripts/py.mjs preflight.py --starter-kit starter-kit --history   # inclui checks do modo historico
+  node scripts/py.mjs preflight.py --starter-kit starter-kit --run-tests # roda a suite npm test no final
 
 Sai com codigo 0 se tudo ok, 1 se houver bloqueio. Nao muda nada: so le e reporta.
 """
@@ -22,6 +22,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import plataforma  # noqa: E402  (portabilidade Windows/macOS/Linux)
+
+plataforma.texto_console()
+
 PLACEHOLDERS = ["<SEU_KV_NAMESPACE_ID>", "<SEU_KV_CACHE_ID>", "<SEU_D1_ID>", "<NOME-DO-PROJETO>"]
 DEFAULT_PROJECT_NAME = "meu-dashboard"
 
@@ -33,7 +38,8 @@ BLOQUEIO = "[BLOQUEIO]"
 def run(cmd: list) -> str:
     """Roda um comando e devolve stdout (vazio se falhar)."""
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        cmd = [shutil.which(cmd[0]) or cmd[0]] + list(cmd[1:])  # npm/npx/wrangler viram .cmd no Windows
+        out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         return (out.stdout or "").strip()
     except (OSError, subprocess.TimeoutExpired):
         return ""
@@ -42,13 +48,13 @@ def run(cmd: list) -> str:
 def check_node(problemas: list) -> None:
     node = shutil.which("node")
     if not node:
-        problemas.append("Node não encontrado. Instale em nodejs.org (sem Node não roda wrangler nem os testes).")
+        problemas.append("Node não encontrado. Instale: " + plataforma.como_instalar("node") + " (sem Node não roda wrangler nem os testes).")
         print(f"{BLOQUEIO} Node: não encontrado")
         return
     versao = run(["node", "-v"])
     major = re.fullmatch(r"v(\d+)\.\d+\.\d+", versao)
     if not major or int(major[1]) < 22:
-        problemas.append("Node 22+ é requisito deste roteiro. Rode nvm install 22 ou instale em nodejs.org.")
+        problemas.append("Node 22+ é requisito deste roteiro. Instale o 22 ou mais novo: " + plataforma.como_instalar("node"))
         print(f"{BLOQUEIO} Node: versão incompatível ou não verificável")
         return
     print(f"{OK} Node: {versao}")
@@ -130,7 +136,8 @@ def check_dev_vars(starter: Path, avisos: list) -> None:
 def run_tests(starter: Path, problemas: list) -> None:
     print("\nRodando a suite (npm test)...")
     try:
-        out = subprocess.run(["npm", "test"], cwd=starter, capture_output=True, text=True, timeout=600)
+        out = subprocess.run([shutil.which("npm") or "npm", "test"], cwd=starter, capture_output=True,
+                             text=True, encoding="utf-8", errors="replace", timeout=600)
         resumo = [l for l in (out.stdout + out.stderr).splitlines() if re.match(r"^. (tests|pass|fail) ", l)]
         for l in resumo:
             print("  " + l.strip())
