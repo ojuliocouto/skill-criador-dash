@@ -2,6 +2,7 @@
 // Puro fetch, sem dependências. ESM.
 
 import { getSource, sourceTypes } from '../sources/index.js';
+import { interpretarChecagem } from './admin-check.js';
 
 // ---- Admin token (trava global opcional de mutacao) ----
 // Se o operador setar env.ADMIN_TOKEN, os POST/DELETE de /api/dashboards exigem
@@ -25,6 +26,25 @@ export function adminHeader() {
     if (t) return { 'x-admin-token': t };
   } catch { /* ignora */ }
   return {};
+}
+
+/**
+ * Confere a chave de administrador SEM mutar nada (POST /api/admin-check). A chave vai só no
+ * header, nunca na URL nem no corpo, e esta função não guarda nada: quem guarda é setAdminToken,
+ * depois de a chave conferir. Sem argumento, confere a chave já guardada.
+ * @param {string} [token]
+ * @returns {Promise<'sem-config'|'precisa'|'confere'|'espere'|'indisponivel'>} nunca lança erro
+ */
+export async function checarChaveAdmin(token) {
+  const headers = token ? { 'x-admin-token': String(token) } : adminHeader();
+  try {
+    const res = await fetch('/api/admin-check', { method: 'POST', headers });
+    let corpo = null;
+    try { corpo = JSON.parse(await res.text()); } catch { corpo = null; }
+    return interpretarChecagem(res.status, corpo);
+  } catch {
+    return 'indisponivel';
+  }
 }
 
 async function jsonOrThrow(res) {

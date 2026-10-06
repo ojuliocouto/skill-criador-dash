@@ -31,11 +31,16 @@ export function safeLogoSrc(src) {
  * @param {unknown} logo src do logo vindo da config (pode ser invalido)
  * @returns {string} HTML do interior do .brand (mark do logo/dot + .name)
  */
-export function brandInnerHtml(name, logo) {
+export function brandInnerHtml(name, logo, fundo) {
   const safe = safeLogoSrc(logo);
   const nome = name || 'Dashboard';
+  // fundo ('claro' | 'escuro', medido quando o logo foi enviado): o logo vai numa plaquinha da
+  // cor que dá contraste com ele, então não some nem no tema claro nem no escuro. Sem fundo
+  // conhecido (logo por URL) fica como sempre foi.
+  const img = safe ? `<img class="brand-logo" alt="${esc(nome)}" src="${esc(safe)}" />` : '';
+  const comPlaca = fundo === 'claro' || fundo === 'escuro';
   const mark = safe
-    ? `<img class="brand-logo" alt="${esc(nome)}" src="${esc(safe)}" />`
+    ? (comPlaca ? `<span class="brand-placa brand-placa--${fundo}">${img}</span>` : img)
     : `<span class="dot"></span>`;
   return `${mark}<span class="name">${esc(nome)}</span>`;
 }

@@ -3,6 +3,10 @@ import { listDashboards, deleteDashboard, setDashboardAuth } from './lib/api-cli
 import { esc } from './lib/html.js';
 import { safeLogoSrc } from './lib/brand.js';
 import { sha256Hex } from './lib/auth.js';
+import { esqueletoDaListaHtml } from './lib/esqueleto.js';
+import { erroHtml, explicarFalha } from './lib/estado-de-erro.js';
+import { comecarProgresso, terminarProgresso } from './lib/carregamento.js';
+import { animar, menosMovimento, DURACAO } from './lib/movimento.js';
 
 const lista = document.getElementById('lista');
 
@@ -21,15 +25,11 @@ function renderVazio() {
     </div>`;
 }
 
-function renderErro(msg) {
-  lista.innerHTML = `
-    <div class="card">
-      <p class="error">Não foi possível carregar os dashboards: ${esc(msg)}</p>
-      <div class="row-actions">
-        <button class="btn ghost" id="retry">Tentar novamente</button>
-      </div>
-    </div>`;
-  const btn = document.getElementById('retry');
+// Falha ao buscar a lista: o que aconteceu, o que fazer e "Tentar de novo". Nunca tela vazia.
+function renderErro(err) {
+  const falha = explicarFalha(err, 'painel');
+  lista.innerHTML = erroHtml({ ...falha, titulo: 'Não deu para carregar os seus painéis', oQueFazer: 'Clique em Tentar de novo. Se continuar, confira a sua internet.' });
+  const btn = lista.querySelector('[data-tentar]');
   if (btn) btn.addEventListener('click', carregar);
 }
 
@@ -69,7 +69,33 @@ function renderLista(dashboards) {
   lista.querySelectorAll('[data-excluir]').forEach((btn) => {
     btn.addEventListener('click', () => excluir(btn.getAttribute('data-excluir'), btn));
   });
+  // Os itens entram em sequência curta (só transform e opacity; com movimento reduzido, parados).
+  lista.querySelectorAll('.list-item').forEach((item, i) => {
+    animar(item, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }],
+      { duration: DURACAO.entrada, delay: Math.min(i, 8) * 40, fill: 'backwards' });
+  });
 }
+
+// Abrir um painel a partir da lista: a lista sai subindo um pouco e só então a página troca; o
+// painel entra com a abertura dele (saudação ou carregamento). Clique com tecla de atalho (nova
+// aba) e movimento reduzido navegam direto, como sempre.
+const principal = document.getElementById('main');
+lista.addEventListener('click', (ev) => {
+  const link = ev.target && ev.target.closest ? ev.target.closest('a[href^="/dashboard"]') : null;
+  if (!link || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  if (menosMovimento() || !principal) return;
+  ev.preventDefault();
+  comecarProgresso();
+  animar(principal, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px)' }],
+    { duration: DURACAO.toque, easing: 'ease-in', fill: 'forwards' });
+  setTimeout(() => { window.location.href = link.href; }, DURACAO.toque);
+});
+// Voltou pela seta do navegador com a página guardada: desfaz a saída.
+window.addEventListener('pageshow', (ev) => {
+  if (!ev.persisted || !principal || !principal.getAnimations) return;
+  for (const a of principal.getAnimations()) a.cancel();
+  terminarProgresso();
+});
 
 // BECO SEM SAIDA (aula 24/08, bug 3): dashboard protegido por senha nunca
 // podia ser excluido pela interface. O DELETE devolvia 401 needsPassword e a
@@ -144,7 +170,8 @@ async function excluir(id, btn) {
 }
 
 async function carregar() {
-  lista.innerHTML = '<div class="card"><p class="hint">Carregando...</p></div>';
+  lista.innerHTML = esqueletoDaListaHtml();
+  comecarProgresso();
   try {
     const dashboards = await listDashboards();
     if (!Array.isArray(dashboards) || dashboards.length === 0) {
@@ -153,7 +180,9 @@ async function carregar() {
     }
     renderLista(dashboards);
   } catch (err) {
-    renderErro(err.message);
+    renderErro(err);
+  } finally {
+    terminarProgresso();
   }
 }
 

@@ -5,9 +5,13 @@
 // - Sempre devolve Cache-Control: no-store ao browser.
 // - Enriquece o <head> da PAGINA do dashboard com titulo/descricao/OpenGraph do
 //   dashboard (preview de link): o crawler nao roda JS, entao vem do servidor.
+// - Marca no <html> da pagina do painel o modo (claro ou escuro) que o dono escolheu, quem a
+//   saudacao cumprimenta e a cor da marca, pra o primeiro quadro pintado ja sair certo
+//   (functions/lib/abertura-do-painel.mjs).
 
 import { buildMeta, metaTagsHtml } from './lib/og.mjs';
 import { needsAuth } from './lib/auth-config.mjs';
+import { marcasIniciais } from './lib/abertura-do-painel.mjs';
 
 // So expomos GET para cross-origin (leitura). POST/DELETE ficam de fora do CORS:
 // mutacao e same-origin (as proprias paginas), entao o browser bloqueia mutacao
@@ -22,14 +26,18 @@ const CORS = {
 const CACHE_TTL = 300; // segundos
 
 // Hash SHA-256 do UNICO <script> inline das paginas (o anti-flash de tema no
-// <head>, byte a byte identico em index/config/dashboard.html). Com o hash no
+// <head>, byte a byte identico em index/config/dashboard/group.html). Ele resolve o modo
+// inicial (escolha do visitante naquele painel, depois o modo do dono marcado aqui em
+// data-modo, depois a escolha geral e o sistema) e liga a saudacao de abertura (data-saudar)
+// uma vez por sessao. A mesma decisao, em funcao pura e com teste de paridade, esta em
+// public/assets/js/lib/tema-inicial.js. Com o hash no
 // script-src, o CSP libera exatamente esse inline SEM precisar de 'unsafe-inline'.
 // Os demais scripts sao <script type="module" src="/assets/..."> cobertos por
 // 'self'. Nao ha handlers inline (onclick=), eval ou new Function nas paginas.
 // IMPORTANTE: se o texto do <script> anti-flash mudar, este hash precisa ser
 // recalculado, senao o inline para de rodar (o tema pisca). Comando:
 //   node -e "import('node:crypto').then(c=>console.log('sha256-'+c.createHash('sha256').update(CONTEUDO,'utf8').digest('base64')))"
-const ANTI_FLASH_SCRIPT_HASH = "'sha256-s81Hgk0mA2pQZt3tfYry+Pma8+DQ6+PEFZO+zskz388='";
+const ANTI_FLASH_SCRIPT_HASH = "'sha256-DEY5t4EM9FFH5OAwSDW5Yy4SwaKhxDwlwvD/Wv4OQwk='";
 
 // Headers de seguranca (defesa em profundidade) aplicados a TODAS as respostas.
 // - X-Content-Type-Options: impede o browser de "adivinhar" (sniff) o tipo do conteudo.
@@ -101,11 +109,41 @@ async function maybeInjectDashboardMeta(request, env, response) {
     }
     const meta = buildMeta(config, { id, origin: url.origin, isProtected });
     const tags = metaTagsHtml(meta);
-    return new HTMLRewriter()
+    // Presenca: modo inicial, saudacao, cor e logotipo ja no HTML (sem piscar o modo errado e
+    // com a saudacao no primeiro quadro). Painel protegido so entrega o modo.
+    const marcas = marcasIniciais(config, { protegido: isProtected });
+    const reescritor = new HTMLRewriter()
       .on('title', { element(el) { el.setInnerContent(meta.title); } })
       .on('link[rel="icon"]', { element(el) { el.setAttribute('href', meta.faviconHref); } })
       .on('head', { element(el) { el.append(tags, { html: true }); } })
-      .transform(response);
+      .on('html', {
+        element(el) {
+          if (marcas.tema) {
+            el.setAttribute('data-theme', marcas.tema);
+            el.setAttribute('data-modo', marcas.modo);
+          }
+          if (marcas.saudacao) el.setAttribute('data-saudacao', marcas.saudacao);
+          // accent ja passou pela regex de hex: nada alem da cor entra no atributo style.
+          if (marcas.accent) el.setAttribute('style', `--accent:${marcas.accent}`);
+        },
+      });
+    if (marcas.saudacao) {
+      // setInnerContent sem { html: true } escapa o texto: o nome nunca vira marcacao.
+      reescritor.on('.saudacao__nome', { element(el) { el.setInnerContent(marcas.saudacao); } });
+      // Nome comprido: a tela de abertura já nasce com a letra no porte certo.
+      if (marcas.porte) reescritor.on('.saudacao', { element(el) { el.setAttribute('class', `saudacao saudacao--${marcas.porte}`); } });
+    }
+    if (marcas.saudacao && marcas.logo) {
+      reescritor
+        .on('.saudacao__logo', {
+          element(el) {
+            el.removeAttribute('hidden');
+            el.setAttribute('class', `saudacao__logo${marcas.logoFundo === 'escuro' ? ' saudacao__logo--escuro' : ''}`);
+          },
+        })
+        .on('.saudacao__logo-img', { element(el) { el.setAttribute('src', marcas.logo); } });
+    }
+    return reescritor.transform(response);
   } catch {
     return response; // qualquer falha: serve o HTML original, sem enriquecer
   }

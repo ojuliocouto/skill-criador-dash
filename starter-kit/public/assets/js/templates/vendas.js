@@ -37,6 +37,8 @@ function somaValor(rows, colMap) {
 export const template = {
   id: 'vendas',
   label: 'Vendas',
+  // Frase do cartão da área no assistente (passo 1). Palavra comum, sem jargão.
+  descricao: 'Negócios fechados: quanto vendeu, quem vendeu e o quê.',
   // Metrica sugerida para a meta opcional (meta vs realizado).
   primaryMetric: 'faturamento',
   // Slot semantico do eixo de TEMPO (usado pela tendencia no dashboard.js).
@@ -45,8 +47,12 @@ export const template = {
     { key: 'data', label: 'Data', required: true, aliases: ['data', 'dia', 'date'] },
     { key: 'vendedor', label: 'Vendedor', required: false, aliases: ['vendedor', 'vendedora', 'responsavel', 'sdr', 'closer', 'seller'] },
     { key: 'produto', label: 'Produto', required: false, aliases: ['produto', 'item', 'plano', 'oferta'] },
-    { key: 'valor', label: 'Valor', required: true, aliases: ['valor', 'preco', 'faturamento', 'receita', 'total', 'amount'] },
-    { key: 'status', label: 'Status', required: false, aliases: ['status', 'situacao', 'stage', 'etapa'] },
+    // format: 'currency' declara que a coluna é dinheiro (a tabela "Dados" mostra com R$). Aqui
+    // precisa ser explícito: nenhuma métrica SOMA este slot direto (num_vendas só conta linhas).
+    { key: 'valor', label: 'Valor', required: true, format: 'currency', aliases: ['valor', 'preco', 'faturamento', 'receita', 'total', 'amount'] },
+    // semColuna: o que muda quando a coluna falta (o assistente mostra no passo das colunas).
+    { key: 'status', label: 'Status', required: false, aliases: ['status', 'situacao', 'stage', 'etapa'],
+      semColuna: 'Sem ela, todo negócio conta como venda ganha.' },
   ],
   metrics: [
     // Base: total de negocios registrados (todas as linhas).

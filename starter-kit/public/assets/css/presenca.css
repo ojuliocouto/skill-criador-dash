@@ -1,0 +1,305 @@
+/* PRESENÇA do painel: fundo vivo na cor da marca, saudação de abertura, carregamento e as
+   transições de modo claro e escuro. Estende o main.css (mesmos tokens de cor, curva e duração).
+
+   Por que um arquivo à parte: o main.css e o assistente.css têm trava contra gradiente e contra
+   animação em loop (test/movimento.test.js). O dono pediu fundo animado e saudação, então eles
+   moram aqui, com a trava deles em test/presenca.test.js:
+     - só transform e opacity animam (o traço usa stroke-dashoffset; a troca de modo usa
+       clip-path dentro da transição de página do navegador);
+     - nenhum desfoque (filter ou backdrop-filter): nada é recalculado a cada quadro;
+     - loop sem fim só no fundo e no carregamento, e o fundo pausa fora da aba visível;
+     - gradiente só nas manchas do fundo, no brilho do esqueleto e na cortina da saudação;
+     - com "reduzir movimento": sem saudação, fundo parado, esqueleto sem brilho.
+
+   O motivo visual é um só, a linha da marca: ela deriva no fundo como curva de gráfico, se
+   desenha embaixo do nome na saudação, é a barra de progresso no topo e a folha que revela o
+   painel. */
+
+/* Tempos da saudação (espelhados em lib/saudacao.js, com teste de paridade). */
+:root {
+  --saud-texto: 440ms;          /* cada peça (logotipo, "Olá,", nome) sobe e aparece */
+  --saud-linha-inicio: 300ms;   /* a linha da marca começa a se desenhar */
+  --saud-linha: 900ms;          /* e leva isto pra se completar: é o tempo de ler o nome */
+  --saud-revelar: 1300ms;       /* a cortina começa a descer */
+  --saud-cortina: 560ms;        /* e leva isto pra sair da tela */
+  --saud-folha-atraso: 90ms;    /* a folha na cor da marca desce logo atrás */
+  --saud-pular: 220ms;          /* saída curta no clique ou na tecla */
+  /* Blocos do esqueleto: um tom do próprio texto, bem apagado. */
+  --esq-cor: color-mix(in srgb, var(--text) 10%, transparent);
+  --esq-brilho: color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+.so-leitor { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* ---------- Fundo vivo ----------
+   Camada fixa atrás de tudo (z-index -1: acima do fundo da página, abaixo do conteúdo). Duas
+   manchas largas e duas camadas de curvas finas. As cores chegam prontas em --fundo-a,
+   --fundo-b e --fundo-linha (lib/fundo-cor.js calibra a intensidade pelo contraste do texto).
+   Cada peça é uma camada própria da placa de vídeo e só anda por transform. */
+.fundo {
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; contain: strict;
+  opacity: 0; transition: opacity 900ms var(--ease-saida);
+}
+.fundo--pronto { opacity: 1; }
+/* Dentro de um trecho da página (a prévia do assistente): ocupa o trecho, não a janela. */
+.fundo--local { position: absolute; z-index: 0; }
+.fundo__brilho { position: absolute; width: 84vmax; height: 84vmax; border-radius: 50%; will-change: transform; }
+.fundo__brilho--a {
+  left: -26vmax; top: -34vmax;
+  background: radial-gradient(closest-side, var(--fundo-a, transparent), transparent);
+  animation: fundo-deriva-a 64s linear -9s infinite;
+}
+.fundo__brilho--b {
+  right: -30vmax; bottom: -38vmax;
+  background: radial-gradient(closest-side, var(--fundo-b, transparent), transparent);
+  animation: fundo-deriva-b 82s linear -30s infinite;
+}
+.fundo__linhas {
+  position: absolute; left: -10%; top: 0; width: 120%; height: 100%; overflow: visible; will-change: transform;
+  animation: fundo-onda-a 46s linear -6s infinite;
+}
+.fundo__linhas--2 { animation: fundo-onda-b 58s linear -21s infinite; }
+.fundo__linha { fill: none; stroke: var(--fundo-linha, transparent); stroke-width: 1.5px; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.fundo__linha--fina { stroke-width: 1px; opacity: 0.6; }
+/* Cada camada percorre um circuito fechado em velocidade constante (linear): o movimento nunca
+   para nem dá tranco nas pontas, e o atraso negativo faz a página já abrir no meio do caminho. */
+@keyframes fundo-deriva-a {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  25% { transform: translate3d(18vmax, 5vmax, 0) scale(1.12); }
+  50% { transform: translate3d(25vmax, 19vmax, 0) scale(1.22); }
+  75% { transform: translate3d(7vmax, 15vmax, 0) scale(1.08); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes fundo-deriva-b {
+  0% { transform: translate3d(0, 0, 0) scale(1.15); }
+  25% { transform: translate3d(-16vmax, -4vmax, 0) scale(1.02); }
+  50% { transform: translate3d(-24vmax, -18vmax, 0) scale(0.92); }
+  75% { transform: translate3d(-6vmax, -14vmax, 0) scale(1.06); }
+  100% { transform: translate3d(0, 0, 0) scale(1.15); }
+}
+@keyframes fundo-onda-a {
+  0% { transform: translate3d(-5%, 2%, 0) scaleY(1); }
+  25% { transform: translate3d(0%, -4%, 0) scaleY(1.1); }
+  50% { transform: translate3d(5%, 1%, 0) scaleY(1.16); }
+  75% { transform: translate3d(0%, 5%, 0) scaleY(1.05); }
+  100% { transform: translate3d(-5%, 2%, 0) scaleY(1); }
+}
+@keyframes fundo-onda-b {
+  0% { transform: translate3d(6%, -2%, 0) scaleY(1.1); }
+  25% { transform: translate3d(0%, 4%, 0) scaleY(1); }
+  50% { transform: translate3d(-6%, 0%, 0) scaleY(0.92); }
+  75% { transform: translate3d(0%, -5%, 0) scaleY(1.04); }
+  100% { transform: translate3d(6%, -2%, 0) scaleY(1.1); }
+}
+/* Aba do navegador escondida: o movimento para (lib/fundo.js liga e desliga a classe). */
+.fundo--pausado .fundo__brilho, .fundo--pausado .fundo__linhas { animation-play-state: paused; }
+/* Movimento desligado pelo dono do painel: o fundo fica, parado. */
+.fundo--parado .fundo__brilho, .fundo--parado .fundo__linhas { animation: none; }
+.fundo--local .fundo__brilho { width: 84cqmax; height: 84cqmax; }
+
+/* ---------- Saudação de abertura ----------
+   Tela cheia com o logotipo e "Olá, <nome>". São duas folhas: a da frente, escura nos dois
+   modos (como a faixa do painel), e a de trás, na cor da marca. Quando a linha embaixo do nome
+   se completa, a da frente desce, a da marca desce logo atrás e o painel aparece de cima pra
+   baixo, com as peças dele entrando em sequência (o dashboard.js desenha o painel no instante em
+   que a cortina começa a descer).
+
+   Tudo é coreografado por CSS a partir do primeiro quadro: a página já sai do servidor com o
+   nome e o script inline só liga o atributo data-saudar. Se o JavaScript falhar, a cortina sai
+   sozinha do mesmo jeito (no fim, as folhas ficam fora da tela e invisíveis). */
+.saudacao {
+  display: none; position: fixed; inset: 0; z-index: 1000; overflow: hidden; pointer-events: none;
+  container-type: size;
+}
+html[data-saudar] .saudacao { display: block; }
+.saudacao--local { display: block; position: absolute; }
+.saudacao__marca, .saudacao__folha { position: absolute; inset: 0; will-change: transform; }
+.saudacao__marca {
+  background: var(--accent-solido, var(--accent));
+  animation: saud-desce var(--saud-cortina) var(--ease-vai-volta) calc(var(--saud-revelar) + var(--saud-folha-atraso)) both;
+}
+.saudacao__folha {
+  pointer-events: auto; cursor: pointer;
+  display: grid; place-items: center; background: #0a0c10; color: #f1f3f6;
+  animation: saud-desce var(--saud-cortina) var(--ease-vai-volta) var(--saud-revelar) both;
+}
+@keyframes saud-desce { from { transform: translateY(0); } to { transform: translateY(100%); visibility: hidden; } }
+@keyframes saud-pula { from { transform: translateY(0); } to { transform: translateY(100%); visibility: hidden; } }
+/* Clique ou tecla: sai na hora, numa descida curta. */
+.saudacao--pular .saudacao__folha { pointer-events: none; animation: saud-pula var(--saud-pular) var(--ease-vai-volta) both; }
+.saudacao--pular .saudacao__marca { animation: saud-pula var(--saud-pular) var(--ease-vai-volta) 50ms both; }
+
+/* Luz da marca atrás do texto: parada, pintada uma vez. */
+.saudacao__brilho {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(62vmax 46vmax at 50% 44%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 72%),
+    radial-gradient(40vmax 30vmax at 88% 104%, color-mix(in srgb, var(--accent-2, var(--accent)) 22%, transparent), transparent 70%);
+}
+.saudacao__centro {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: clamp(18px, 3.4vh, 34px);
+  width: min(92%, 1180px); padding: 24px 0; text-align: center;
+  animation: saud-some calc(var(--saud-cortina) * 0.55) ease-in var(--saud-revelar) both;
+}
+@keyframes saud-some { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-28px); } }
+.saudacao--pular .saudacao__centro { animation: none; }
+.saudacao__logo {
+  display: block; background: #fff; border-radius: 12px; padding: 12px 18px; line-height: 0;
+  animation: saud-logo var(--saud-texto) var(--ease-saida) both;
+}
+.saudacao__logo[hidden] { display: none; }
+.saudacao__logo--escuro { background: #0c0e12; box-shadow: inset 0 0 0 1px #3a414d; }
+.saudacao__logo-img { display: block; height: clamp(38px, 7vh, 62px); width: auto; max-width: min(60vw, 280px); object-fit: contain; }
+@keyframes saud-logo { from { opacity: 0; transform: scale(0.86); } to { opacity: 1; transform: none; } }
+/* O texto sobe de dentro de uma máscara (a palavra aparece de baixo pra cima, sem fade). */
+.saudacao__frase {
+  margin: 0; font-family: var(--font); font-weight: 640; letter-spacing: -0.045em; line-height: 1.04; text-wrap: balance;
+  font-size: clamp(40px, 9vw, 116px);
+  font-size: clamp(40px, 9cqw, 116px);
+}
+.saudacao--media .saudacao__frase { font-size: clamp(34px, 6.6vw, 84px); font-size: clamp(34px, 6.6cqw, 84px); }
+.saudacao--longa .saudacao__frase { font-size: clamp(28px, 4.8vw, 62px); font-size: clamp(28px, 4.8cqw, 62px); }
+.saudacao__mascara { display: inline-block; overflow: hidden; vertical-align: bottom; padding: 0.06em 0.05em 0.14em; margin: 0 -0.05em; max-width: 100%; }
+.saudacao__ola, .saudacao__nome { display: inline-block; animation: saud-sobe var(--saud-texto) var(--ease-saida) both; }
+/* "Olá," na cor da marca, clareada pro fundo escuro (o JS grava a cor calibrada em --saud-ola). */
+.saudacao__ola { color: var(--saud-ola, color-mix(in srgb, var(--accent) 60%, white)); animation-delay: 70ms; }
+.saudacao__nome { animation-delay: 160ms; }
+@keyframes saud-sobe { from { transform: translateY(112%); } to { transform: translateY(0); } }
+/* A linha da marca: se desenha da esquerda pra direita enquanto a pessoa lê o nome. */
+.saudacao__linha {
+  display: block; width: min(62%, 460px); height: 3px; border-radius: 3px;
+  background: var(--saud-ola, color-mix(in srgb, var(--accent) 60%, white));
+  transform-origin: left center;
+  animation: saud-linha var(--saud-linha) var(--ease-vai-volta) var(--saud-linha-inicio) both;
+}
+@keyframes saud-linha { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* Dentro da prévia do assistente o texto fica no alto (a moldura pode ser bem mais alta que a tela). */
+.saudacao--local .saudacao__folha { place-items: start center; }
+.saudacao--local .saudacao__centro { margin-top: clamp(40px, 16cqh, 150px); }
+
+/* ---------- Carregamento ----------
+   Barra fina no topo, na cor da marca, e o esqueleto no formato do painel. */
+.progresso { position: fixed; left: 0; right: 0; top: 0; z-index: 900; height: 3px; overflow: hidden; pointer-events: none; transition: opacity 260ms var(--ease-saida) 180ms; }
+.progresso[hidden] { display: none; }
+.progresso__barra {
+  display: block; width: 100%; height: 100%; background: var(--accent-fill-calc, var(--accent));
+  transform-origin: left center; transform: scaleX(0.9);
+  /* Avança rápido no começo e vai freando, sem nunca fingir que chegou. */
+  animation: progresso-avanca 9s cubic-bezier(0.08, 0.72, 0.2, 1) both;
+}
+@keyframes progresso-avanca { from { transform: scaleX(0.03); } to { transform: scaleX(0.9); } }
+.progresso--fim { opacity: 0; }
+.progresso--fim .progresso__barra { animation: progresso-fecha 200ms var(--ease-saida) both; }
+@keyframes progresso-fecha { from { transform: scaleX(0.9); } to { transform: scaleX(1); } }
+
+/* Esqueleto: as grades são as do painel (faixa, abas, indicadores, cartões); aqui só os blocos.
+   Cada bloco é uma "linha de texto" vazia: fica no meio da altura de linha de quem o contém,
+   então o conjunto tem a mesma altura do conteúdo que vai entrar. */
+.esqueleto { position: relative; }
+.esqueleto .section { margin-top: 34px; }
+.esq-barra { position: relative; display: inline-block; vertical-align: middle; overflow: hidden; height: 10px; max-width: 100%; border-radius: 5px; background: var(--esq-cor); }
+.esq-barra::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 15%, var(--esq-brilho) 50%, transparent 85%);
+  transform: translateX(-100%); animation: esq-brilho 1500ms var(--ease-vai-volta) infinite;
+}
+@keyframes esq-brilho { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.esq-barra--titulo { height: 20px; width: min(300px, 52vw); border-radius: 6px; }
+.esq-barra--valor { height: 18px; border-radius: 6px; }
+.esq-barra--campo { display: block; height: 36px; border-radius: 10px; }
+.esq-barra--botao { display: block; height: 29.6px; width: 104px; border-radius: 8px; }
+/* Lugar da linha de tendência do indicador em destaque: a mesma caixa (30 px + 11 de margem) com
+   um traço fino no meio. */
+.esq-barra--traco { display: block; width: 100%; height: 30px; margin: 11px 0 0; border-radius: 0; background: linear-gradient(var(--esq-cor), var(--esq-cor)) center / 100% 2px no-repeat; }
+.esq-barra--traco::after { content: none; }
+/* A faixa é escura nos dois modos: os blocos dela usam o claro da faixa. */
+.esq-faixa { --esq-cor: rgba(255, 255, 255, 0.11); --esq-brilho: rgba(255, 255, 255, 0.1); }
+.esq-faixa .faixa__nome { font-size: 24px; line-height: 1.2; }
+.esq-aba, .esq-aba:hover { cursor: default; background: transparent; }
+.esq-abas .esq-aba:first-child { background: var(--bg-elev-2); }
+.esq-kpi:hover { background: var(--bg-elev); }
+.esq-cartao { display: flex; flex-direction: column; }
+.esq-linha-tabela { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+.esq-linha-tabela:last-child { border-bottom: 0; }
+.esq-filtro .fb-reset { width: 128px; }
+@media (max-width: 620px) {
+  .esq-faixa .faixa__nome { font-size: 20px; }
+  .esq-filtro .fb-reset { width: 100%; }
+}
+/* Lista de painéis carregando: linhas no formato de um item da lista. */
+.esq-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.esq-item:last-child { border-bottom: 0; }
+.esq-item__textos { display: flex; flex-direction: column; gap: 12px; min-width: 0; flex: 1; }
+
+/* Estado de erro: o que aconteceu, o que fazer e o botão de tentar de novo. */
+.estado-erro { max-width: 640px; margin: 24px auto 0; padding: 26px 28px; }
+.estado-erro__titulo { margin: 0 0 8px; font-size: 20px; }
+.estado-erro__mensagem { margin: 0 0 6px; color: var(--bad); font-size: 14.5px; overflow-wrap: anywhere; }
+.estado-erro__fazer { margin: 0; color: var(--text-dim); font-size: 14.5px; line-height: 1.55; }
+.estado-erro__acoes { margin-top: 20px; flex-wrap: wrap; }
+.estado-erro .btn:not(.ghost) { background: var(--accent-solido, var(--accent)); color: #fff; }
+
+/* ---------- Idade dos números e o botão Atualizar (na faixa do painel) ---------- */
+.faixa__lado { display: flex; align-items: center; gap: 14px 26px; flex-wrap: wrap; justify-content: flex-end; }
+/* Largura fixa: o texto muda ("Atualizado há 3 min", "Buscando os números...") sem empurrar o período ao lado. */
+.dados-estado { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; width: 212px; max-width: 100%; text-align: right; }
+.dados-estado__texto { color: var(--faixa-texto-dim); font-size: 12.5px; font-variant-numeric: tabular-nums; min-height: 19px; }
+.dados-estado__texto.is-erro { color: #ffb4ab; }
+.dados-estado__botao {
+  appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  font-family: var(--font); font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--faixa-texto);
+  background: transparent; border: 1px solid color-mix(in srgb, var(--faixa-texto) 28%, transparent); border-radius: 8px;
+  padding: 6px 12px; cursor: pointer;
+  transition: transform var(--dur-toque) var(--ease-saida), opacity var(--dur-toque) var(--ease-saida);
+}
+.dados-estado__botao:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--faixa-texto) 55%, transparent); }
+.dados-estado__botao:active { transform: scale(0.97); }
+.dados-estado__botao:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.dados-estado__botao.is-loading { cursor: progress; opacity: 0.85; }
+/* Buscando: o ícone gira e o botão não muda de largura (o texto dele continua o mesmo). */
+.dados-estado__icone { display: block; flex-shrink: 0; }
+.dados-estado__botao.is-loading .dados-estado__icone { animation: gira 800ms linear infinite; }
+/* Fora da faixa (aba de um grupo, que não tem faixa): mesma peça, com as cores da página. */
+.dados-estado--solto { flex-direction: row; align-items: center; justify-content: flex-end; gap: 12px; margin: 10px 0 0; width: auto; }
+.dados-estado--solto .dados-estado__texto { color: var(--text-dim); }
+.dados-estado--solto .dados-estado__texto.is-erro { color: var(--bad); }
+.dados-estado--solto .dados-estado__botao { color: var(--text); border-color: var(--border); }
+.dados-estado--solto .dados-estado__botao:focus-visible { outline-color: var(--focus-ring, var(--accent-text)); }
+/* Celular: o período em cima e, embaixo, a idade dos números à esquerda com o botão à direita. */
+@media (max-width: 620px) {
+  .faixa__lado { width: 100%; flex-direction: column; align-items: stretch; gap: 12px; }
+  .dados-estado { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; text-align: left; min-height: 30px; }
+  /* Aviso comprido (falha ao atualizar) quebra em duas linhas que cabem na altura do botão: a faixa não cresce. */
+  .dados-estado__texto { min-height: 0; line-height: 1.2; }
+  .dados-estado__botao { flex-shrink: 0; }
+}
+
+/* ---------- Troca de modo claro e escuro ----------
+   Com a transição de página do navegador (View Transitions): o modo novo abre num círculo a
+   partir do botão. Sem ela: um véu na cor do fundo novo aparece e some (lib/transicao.js). */
+html.modo-trocando::view-transition-old(root),
+html.modo-trocando::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+html.modo-trocando::view-transition-new(root) { animation: modo-abre var(--dur-modo) var(--ease-vai-volta) both; }
+@keyframes modo-abre {
+  from { clip-path: circle(0px at var(--modo-x, 50%) var(--modo-y, 0px)); }
+  to { clip-path: circle(var(--modo-raio, 150vmax) at var(--modo-x, 50%) var(--modo-y, 0px)); }
+}
+.modo-veu { position: fixed; inset: 0; z-index: 950; pointer-events: none; opacity: 0; }
+
+/* Abrir um painel a partir da lista: a lista sai subindo um pouco (index-page.js, só transform e
+   opacity) e o painel entra com a abertura dele (saudação ou esqueleto que vira conteúdo). A
+   transição entre páginas do navegador (@view-transition) ficou DE FORA de propósito: no
+   Chromium sem janela ela travava a captura de tela logo depois da navegação (medido em
+   05/10/2026 com o roteiro de criação), e quebraria os roteiros de verificação da casa. */
+
+/* ---------- Reduzir movimento ----------
+   Sem saudação, fundo parado, esqueleto sem brilho, troca de modo e de página imediatas. A
+   regra global do main.css zera animation e transition de todo elemento; pseudo-elemento não é
+   pego por ela, então entra aqui. */
+@media (prefers-reduced-motion: reduce) {
+  .saudacao { display: none !important; }
+  .fundo { opacity: 1; }
+  .fundo *, .esq-barra::after, .dados-estado__icone, .progresso__barra,
+  *::before, *::after { animation: none !important; transition: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

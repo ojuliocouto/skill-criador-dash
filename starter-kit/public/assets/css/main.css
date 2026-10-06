@@ -18,7 +18,11 @@
   font-weight: 100 900; font-style: normal; font-display: swap;
 }
 
-:root {
+/* Os tokens do modo escuro valem na página (:root) e em qualquer TRECHO marcado com
+   data-theme="dark" (a prévia e as amostras de modo do assistente mostram o painel num modo
+   diferente do da página). Quem marca um trecho aplica a cor da marca no MESMO elemento
+   (aplicarAccent), senão o --accent dele voltaria pra cor padrão declarada aqui. */
+:root, [data-theme="dark"] {
   --accent: #5b62d6;              /* cor de destaque (branding). Trocada por dashboard. */
   --accent-fg: #fff;              /* texto sobre o accent. Resolvido em runtime pela luminancia. */
   /* accent-soft segue a cor de destaque automaticamente (nao fica um roxo fixo generico) */
@@ -57,7 +61,9 @@
      folgado. Em runtime o dashboard.js sobrescreve com uma cor calibrada pro
      accent da marca; aqui fica o default seguro. */
   --focus-ring: var(--accent-text);
-  --topbar-bg: rgba(12, 14, 18, 0.72);
+  /* Quase opaco e sem desfoque: a barra fica sobre o fundo em movimento, e desfoque de fundo
+     ali seria recalculado a cada quadro. */
+  --topbar-bg: rgba(12, 14, 18, 0.9);
   --radius: 10px;
   --radius-sm: 7px;
   /* Sombra tingida (nao preto puro) e minima: elevacao discreta de ferramenta. */
@@ -79,7 +85,7 @@
   --text-dim: #586173;
   /* Escurecido de #8b93a1 (reprovava AA, ~2.9:1) pra 6.13:1 sobre --bg-elev e 5.67:1 sobre --bg. */
   --text-faint: #5b6270;
-  --topbar-bg: rgba(255, 255, 255, 0.8);
+  --topbar-bg: rgba(255, 255, 255, 0.92);
   --shadow: 0 1px 3px rgba(23, 31, 48, 0.08);
   /* Tons escurecidos de good/bad so no claro: os originais (verde/vermelho claros)
      reprovam no contraste WCAG AA sobre fundo branco. */
@@ -94,6 +100,9 @@
   --focus-ring: var(--accent-text);
   color-scheme: light;
 }
+
+/* Trecho com modo próprio: o texto herda a cor do modo do TRECHO, não a da página em volta. */
+[data-theme="dark"], [data-theme="light"] { color: var(--text); }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -113,14 +122,18 @@ body {
 a { color: var(--accent-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 20px 64px; }
+/* overflow-x: clip: conteúdo que desliza de lado numa transição (troca de aba) nunca alarga a página. */
+.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 20px 64px; overflow-x: clip; }
 
 /* Header */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
   gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--border);
-  background: var(--topbar-bg); backdrop-filter: blur(10px);
+  background: var(--topbar-bg);
   position: sticky; top: 0; z-index: 10;
+  /* Altura de quando os botões já entraram (o painel preenche a barra depois de carregar): a
+     barra nasce desse tamanho e o conteúdo abaixo não desce quando eles chegam. */
+  min-height: 78.75px;
 }
 .topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -0.01em; }
 .topbar .brand .dot { width: 9px; height: 9px; border-radius: 2px; background: var(--accent-fill-calc, var(--accent)); }
@@ -130,7 +143,7 @@ a:hover { text-decoration: underline; }
 .topbar .brand small { color: var(--text-dim); font-weight: 500; }
 .topbar .actions { display: flex; gap: 8px; flex-shrink: 0; }
 @media (max-width: 620px) {
-  .topbar { padding: 12px 16px; gap: 10px; }
+  .topbar { padding: 12px 16px; gap: 10px; min-height: 63px; }
   .topbar .brand { font-size: 14px; min-width: 0; }
   .topbar .brand .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .topbar .brand small { display: none; }
@@ -153,7 +166,11 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
    da borda vira linha), em vez de N cards soltos com barrinha colorida (tell de IA
    e cara de template). Le como um bloco de metricas de ferramenta. Robusto na
    quebra: toda celula tem fundo, entao os gaps viram sempre linhas limpas. */
-.grid.kpis { grid-template-columns: repeat(var(--kpi-cols, 4), minmax(0, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.grid.kpis { grid-template-columns: repeat(var(--kpi-cols, 4), minmax(0, 1fr)); gap: 1px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); position: relative; isolation: isolate; }
+/* O fundo que vira as linhas entre as celulas mora num pseudo-elemento atras delas (e nao no
+   proprio painel): na entrada ele aparece por ultimo, entao celula que ainda nao entrou nao deixa
+   um bloco cinza no lugar (visto no quadro a quadro de 05/10/2026). */
+.grid.kpis::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--border); }
 .grid.two { grid-template-columns: 1fr 1fr; }
 /* Faixa de KPI responsiva: a contagem explicita (--kpi-cols) so vale onde ela CABE. Abaixo
    disso o card fica ilegivel, entao a faixa volta a se auto-organizar e o heroi perde o span
@@ -246,7 +263,8 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 /* Faixa estreita: o span 2 do heroi espremeria os vizinhos abaixo do minimo legivel. */
 @media (max-width: 1100px) { .kpi--hero { grid-column: span 1; } }
 @media (prefers-reduced-motion: no-preference) {
-  .kpi--hero .kpi__spark polyline { stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: spark-in 0.7s ease-out forwards; }
+  /* Só na entrada (primeira carga e troca de aba): repintar por filtro não redesenha a linha. */
+  .anima-entrada .kpi--hero .kpi__spark polyline { stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: spark-in 0.7s ease-out forwards; }
   /* 3000: o traco e medido em pixel de tela (non-scaling-stroke); 200 cortava a linha no heroi largo. */
   @keyframes spark-in { to { stroke-dashoffset: 0; } }
 }
@@ -419,3 +437,302 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Faixa de marca (cabeçalho do corpo do dashboard), abas do template, tabela resumida e
+   calculadora de meta. Estende o design system de cima: mesmos tokens, mesma tipografia, cor
+   de destaque trocável. Regras de gosto que este bloco respeita (há teste em
+   test/cabecalho.test.js): rótulo em caixa normal e sem espaçamento de letra positivo, nenhum
+   gradiente, brilho ou vidro, e cor diferente só com motivo (verde bom, vermelho ruim, destaque
+   na aba ativa). */
+
+/* A faixa é escura nos DOIS temas (no claro ela ancora o topo da página; no escuro é uma
+   superfície um degrau acima do fundo), então tem tokens próprios em vez de herdar --text. */
+:root, [data-theme="dark"] {
+  --faixa-bg: #1b1f27;
+  --faixa-borda: #2b313b;
+  --faixa-texto: #f1f3f6;
+  --faixa-texto-dim: #a9b1be;
+}
+[data-theme="light"] {
+  --faixa-bg: #1a1d24;
+  --faixa-borda: #1a1d24;
+  --faixa-texto: #f4f5f7;
+  --faixa-texto-dim: #b3bac6;
+}
+
+.faixa {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 28px;
+  background: var(--faixa-bg); color: var(--faixa-texto);
+  border: 1px solid var(--faixa-borda); border-radius: var(--radius); padding: 22px 26px;
+}
+.faixa__marca { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.faixa__textos { min-width: 0; }
+.faixa__nome { margin: 0; color: var(--faixa-texto); font-size: 24px; font-weight: 620; letter-spacing: -0.025em; line-height: 1.2; overflow-wrap: anywhere; }
+.faixa__dominio { margin: 4px 0 0; color: var(--faixa-texto-dim); font-size: 14px; }
+/* Logo sobre plaquinha clara: a maioria dos logos é desenhada pra fundo claro e sumiria na faixa. */
+.faixa__logo { flex-shrink: 0; display: block; background: #fff; border-radius: 8px; padding: 7px 10px; line-height: 0; }
+/* Altura fixa e largura automática: SVG sem largura própria (só viewBox) colapsava pra zero
+   quando a imagem só tinha max-height. */
+.faixa__logo-img { display: block; height: 32px; width: auto; max-width: 140px; object-fit: contain; }
+.faixa__periodo { display: flex; flex-direction: column; gap: 3px; text-align: right; }
+.faixa__periodo-rotulo { color: var(--faixa-texto-dim); font-size: 12.5px; }
+.faixa__periodo-valor { font-size: 15px; font-weight: 560; font-variant-numeric: tabular-nums; }
+@media (max-width: 620px) {
+  .faixa { padding: 18px; }
+  .faixa__nome { font-size: 20px; }
+  .faixa__periodo { text-align: left; }
+}
+
+/* Abas do template em pílula. A ativa leva a cor de destaque com texto BRANCO: o fundo é o
+   --accent-solido (color.js escurece a cor de destaque só o necessário pro branco passar em
+   4,5:1), porque texto escuro sobre bloco de cor saturada é reprovado. Quebram linha em tela
+   estreita em vez de rolar: toda aba fica visível. */
+.abas {
+  display: flex; flex-wrap: wrap; gap: 4px; width: fit-content; max-width: 100%;
+  margin: 12px 0 0; padding: 5px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow);
+}
+.aba {
+  appearance: none; border: 0; background: transparent; color: var(--text-dim);
+  font-family: var(--font); font-size: 13.5px; font-weight: 560; letter-spacing: -0.005em; line-height: 1.3;
+  padding: 8px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.aba:hover { color: var(--text); background: var(--bg-elev-2); }
+.aba[aria-selected="true"] { background: var(--accent-solido, var(--accent)); color: #fff; }
+.aba:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: 2px; }
+@media (max-width: 620px) {
+  .abas { width: 100%; gap: 2px; border-radius: 16px; }
+  .aba { flex: 1 1 auto; padding: 8px 8px; font-size: 13px; text-align: center; border-radius: 11px; }
+}
+.faixa + .filterbar, .abas + .filterbar { margin-top: 18px; }
+#dashbody[role="tabpanel"]:focus-visible { outline-offset: 6px; border-radius: var(--radius); }
+
+/* Resumo: tabela agregada com linha de TOTAL. O cartão é um container: quando ele fica estreito
+   demais pras colunas, a tabela vira blocos empilhados (um por linha, rótulo em cima do valor)
+   em vez de rolar de lado. A largura de corte depende de quantas colunas a tabela tem
+   (resumo--p até 4 métricas, --m até 8, --g de 9 em diante). */
+.resumo { container-type: inline-size; container-name: resumo; }
+.resumo__scroll { overflow-x: auto; }
+.resumo__title { font-size: 13.5px; font-weight: 560; color: var(--text-dim); letter-spacing: -0.01em; margin: 0 0 16px; }
+.resumo__el th, .resumo__el td { padding: 10px 12px; }
+.resumo__el .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.resumo__el thead th { vertical-align: bottom; line-height: 1.3; }
+.resumo__el thead th.num { white-space: normal; }
+.resumo__el tbody th, .resumo__el tfoot th { color: var(--text); font-size: 13px; font-weight: 500; white-space: nowrap; }
+/* A última linha do corpo não desenha a própria borda de baixo: quem separa o corpo do total é
+   a borda de cima do total (na tabela colapsada, a borda da célula de cima ganharia). */
+.resumo__el tbody tr:last-child th { border-bottom: 0; }
+.resumo__el tfoot th, .resumo__el tfoot td { font-weight: 700; color: var(--text); background: var(--bg-elev-2); border-top: 1px solid var(--text-faint); border-bottom: 0; }
+.resumo__el td.is-good { color: var(--good); }
+.resumo__el td.is-bad { color: var(--bad); }
+.resumo__el td.is-vazio { color: var(--text-faint); }
+.resumo__nota { color: var(--text-faint); font-size: 12.5px; margin: 12px 0 0; }
+.resumo__empty { color: var(--text-faint); text-align: center; padding: 30px 0; }
+@container resumo (max-width: 480px) {
+  .resumo--p .resumo__el, .resumo--p .resumo__el tbody, .resumo--p .resumo__el tfoot { display: block; }
+  .resumo--p .resumo__el thead { display: none; }
+  .resumo--p .resumo__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .resumo--p .resumo__el tbody tr:hover { background: transparent; }
+  .resumo--p .resumo__el tbody tr:last-child { border-bottom: 0; }
+  .resumo--p .resumo__el tr > th { grid-column: 1 / -1; padding: 0; border: 0; background: transparent; font-size: 14px; font-weight: 600; }
+  .resumo--p .resumo__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; }
+  .resumo--p .resumo__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .resumo--p .resumo__el tfoot tr { border-bottom: 0; margin-top: 10px; padding: 14px; background: var(--bg-elev-2); border-radius: var(--radius-sm); }
+}
+@container resumo (max-width: 740px) {
+  .resumo--m .resumo__el, .resumo--m .resumo__el tbody, .resumo--m .resumo__el tfoot { display: block; }
+  .resumo--m .resumo__el thead { display: none; }
+  .resumo--m .resumo__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .resumo--m .resumo__el tbody tr:hover { background: transparent; }
+  .resumo--m .resumo__el tbody tr:last-child { border-bottom: 0; }
+  .resumo--m .resumo__el tr > th { grid-column: 1 / -1; padding: 0; border: 0; background: transparent; font-size: 14px; font-weight: 600; }
+  .resumo--m .resumo__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; }
+  .resumo--m .resumo__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .resumo--m .resumo__el tfoot tr { border-bottom: 0; margin-top: 10px; padding: 14px; background: var(--bg-elev-2); border-radius: var(--radius-sm); }
+}
+@container resumo (max-width: 1120px) {
+  .resumo--g .resumo__el, .resumo--g .resumo__el tbody, .resumo--g .resumo__el tfoot { display: block; }
+  .resumo--g .resumo__el thead { display: none; }
+  .resumo--g .resumo__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .resumo--g .resumo__el tbody tr:hover { background: transparent; }
+  .resumo--g .resumo__el tbody tr:last-child { border-bottom: 0; }
+  .resumo--g .resumo__el tr > th { grid-column: 1 / -1; padding: 0; border: 0; background: transparent; font-size: 14px; font-weight: 600; }
+  .resumo--g .resumo__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; }
+  .resumo--g .resumo__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .resumo--g .resumo__el tfoot tr { border-bottom: 0; margin-top: 10px; padding: 14px; background: var(--bg-elev-2); border-radius: var(--radius-sm); }
+}
+
+/* Calculadora de meta: um campo e três respostas. Sem dado suficiente, o texto apagado diz
+   isso por extenso (nunca um zero com cara de número). */
+.meta { display: flex; flex-direction: column; gap: 16px; }
+.meta__title { font-size: 13.5px; font-weight: 560; color: var(--text-dim); letter-spacing: -0.01em; margin: 0; }
+.meta__rotulo { display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 6px; }
+.meta__input { max-width: 220px; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meta__lista { margin: 0; }
+.meta__item { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.meta__item:first-child { border-top: 1px solid var(--border); }
+.meta__item dt { color: var(--text-dim); font-size: 13.5px; }
+.meta__item dd { margin: 0; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meta__item dd.meta__sem-dado { color: var(--text-faint); font-size: 13px; font-weight: 400; white-space: normal; }
+.meta__medias, .meta__aviso { margin: 12px 0 0; color: var(--text-faint); font-size: 12.5px; line-height: 1.5; }
+.meta__aviso { margin-top: 0; color: var(--text-dim); font-size: 13.5px; }
+
+/* Faixa de indicadores em tela média: flex com quebra em vez de grid com auto-fit. No grid, 7
+   indicadores em 5 colunas deixavam a segunda linha com 2 cards e um bloco cinza do lado (o
+   fundo da faixa, que é a cor da borda, aparecendo). No flex os cards da última linha crescem e
+   ocupam a linha inteira. As linhas de 1px entre os cards continuam vindo do gap. */
+@media (max-width: 1100px) {
+  .grid.kpis { display: flex; flex-wrap: wrap; }
+  .grid.kpis > * { flex: 1 1 190px; min-width: 0; }
+}
+@media (max-width: 560px) {
+  .grid.kpis > * { flex-basis: 100%; }
+}
+
+/* Tablet: a regra geral transforma cartão de 4 colunas em meia largura, o que quebra o par
+   "8 + 4" (tabela resumida + calculadora): 8 + 6 não cabe e o segundo cai pra linha de baixo.
+   Quando o de 4 vem logo depois de um de 8, ele continua com 4. */
+@media (max-width: 1040px) and (min-width: 901px) {
+  .dash-cell.span-8 + .dash-cell.span-4 { grid-column: span 4; }
+}
+
+/* Ranking: todas as linhas dividem as MESMAS colunas (subgrid). Antes cada linha era um grid
+   próprio e a coluna do valor tinha a largura do próprio texto, então a trilha de "59" acabava
+   mais à direita que a de "177" e as barras deixavam de ser comparáveis entre si. */
+@supports (grid-template-columns: subgrid) {
+  .ranking { display: grid; grid-template-columns: minmax(0, 130px) 1fr auto; gap: 12px; }
+  .ranking__row { grid-column: 1 / -1; grid-template-columns: subgrid; }
+  .ranking__title, .ranking__empty { grid-column: 1 / -1; }
+  .ranking__value { text-align: right; }
+  @media (max-width: 620px) { .ranking { grid-template-columns: minmax(0, 100px) 1fr auto; } }
+}
+
+/* Plaquinha do logotipo. O assistente mede a luminância do logo enviado e grava o fundo que dá
+   contraste (config.logoFundo): logo claro vai em placa escura, o resto na placa clara. Assim o
+   logo não some na faixa escura nem na barra do topo, em nenhum dos dois temas. */
+.faixa__logo--escuro { background: #0c0e12; box-shadow: inset 0 0 0 1px #3a414d; }
+.brand-placa { display: block; flex-shrink: 0; border-radius: 6px; padding: 3px 7px; line-height: 0; }
+.brand-placa--claro { background: #fff; box-shadow: inset 0 0 0 1px var(--border); }
+.brand-placa--escuro { background: #0c0e12; box-shadow: inset 0 0 0 1px #3a414d; }
+.brand-placa .brand-logo { max-height: 24px; }
+
+/* Escopo de cor: um trecho da página com cor de destaque PRÓPRIA (a prévia ao vivo do
+   assistente, que mostra a cor escolhida sem repintar o assistente inteiro). aplicarAccent
+   grava as variáveis calibradas no próprio elemento; as três abaixo são as derivadas que o
+   :root declara com var(--accent) e que, herdadas, viriam já resolvidas com a cor da página.
+   Redeclaradas aqui, resolvem com a cor do escopo. Há teste de paridade (test/previa.test.js). */
+.escopo-de-cor {
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 40%, transparent);
+  --accent-graph: var(--accent-graph-calc, color-mix(in srgb, var(--accent) 70%, var(--text) 30%));
+}
+
+/* MOVIMENTO */
+/* Microinteração com propósito, no painel e no assistente. Regras deste bloco (há teste em
+   test/movimento.test.js): só transform, opacity e stroke-dashoffset animam; curvas e durações
+   são os tokens abaixo; o estilo base de todo elemento é o estado FINAL (a animação parte de um
+   "from" e chega nele), então com prefers-reduced-motion, onde a regra global lá em cima zera
+   animation e transition, tudo aparece pronto na hora. Nada de gradiente, brilho ou vidro
+   aqui. O fundo vivo, a saudação e o carregamento (pedidos pelo dono, com loop no fundo)
+   moram no presenca.css, com a trava deles em test/presenca.test.js. */
+:root {
+  --ease-saida: cubic-bezier(0.22, 1, 0.36, 1);     /* sai rápido, chega suave: entrada e resposta */
+  --ease-vai-volta: cubic-bezier(0.65, 0, 0.35, 1);  /* acelera e freia: deslize de um lugar a outro */
+  --dur-toque: 140ms;    /* resposta a clique, hover, erro */
+  --dur-troca: 200ms;    /* troca de aba, de passo, de prévia */
+  --dur-entrada: 360ms;  /* entrada de conteúdo */
+  --dur-revelar: 560ms;  /* cortina da saudação e abertura do painel */
+  --dur-modo: 520ms;     /* troca de modo claro e escuro */
+}
+
+/* Botão: sobe um fio no hover, afunda de leve ao pressionar. O brilho do hover (regra de cima)
+   continua, sem transição. */
+.btn { transition: transform var(--dur-toque) var(--ease-saida), opacity var(--dur-toque) var(--ease-saida); }
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { transform: none; }
+/* Carregando: o texto vira o estado de progresso e o botão NÃO muda de largura (o JS trava a
+   largura antes de trocar o texto, ver wizard/dom.js). O anel gira só enquanto carrega. */
+.btn.is-loading { opacity: 0.85; cursor: progress; justify-content: center; }
+.btn.is-loading:disabled { opacity: 0.85; }
+.btn.is-loading::before {
+  content: ""; width: 13px; height: 13px; flex-shrink: 0; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: gira 700ms linear infinite;
+}
+@keyframes gira { to { transform: rotate(360deg); } }
+
+/* Abas do painel: marcador que desliza até a aba ativa (dashboard.js posiciona e anima por
+   transform). Com o marcador presente, o fundo da aba ativa passa a ser ele. */
+.abas--marcador { position: relative; }
+.abas__marcador {
+  position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 999px;
+  background: var(--accent-solido, var(--accent)); transform-origin: 0 0; pointer-events: none;
+}
+.abas--marcador .aba { position: relative; z-index: 1; }
+.abas--marcador .aba[aria-selected="true"], .abas--marcador .aba[aria-selected="true"]:hover { background: transparent; color: #fff; }
+@media (max-width: 620px) { .abas__marcador { border-radius: 11px; } }
+
+/* Entrada do painel (primeira carga e troca de aba; dashboard.js põe a classe no corpo antes
+   de desenhar e tira nos redesenhos por filtro). Sequência curta: indicadores, depois cartões,
+   depois linhas de tabela. */
+/* A entrada parte de um deslocamento que quem chama pode mudar: sobe 10 px por padrão; na troca
+   de aba o corpo vem do lado pra onde a pessoa foi (--entrada-x), sem subir. */
+@keyframes sobe { from { opacity: 0; transform: translate(var(--entrada-x, 0px), var(--entrada-y, 10px)); } to { opacity: 1; transform: none; } }
+@keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cresce { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes desenha { from { stroke-dashoffset: 3000; } to { stroke-dashoffset: 0; } }
+/* --entrada-base: atraso somado a todas as peças. É zero numa entrada comum; na abertura do
+   painel (logo depois da saudação) o dashboard.js põe um valor pra as peças entrarem em
+   sequência com a cortina: faixa, abas, filtros e só então o corpo. */
+.anima-entrada .kpi, .anima-entrada .dash-cell { animation: sobe var(--dur-entrada) var(--ease-saida) both; animation-delay: var(--entrada-base, 0ms); }
+/* A moldura da faixa de indicadores aparece junto com a primeira célula; as linhas entre as
+   células (o pseudo-elemento de fundo) só depois da última, sem deixar bloco cinza no caminho. */
+.anima-entrada .grid.kpis { animation: aparece var(--dur-entrada) var(--ease-saida) var(--entrada-base, 0ms) both; }
+.anima-entrada .grid.kpis::before { animation: aparece var(--dur-troca) var(--ease-saida) calc(var(--entrada-base, 0ms) + 300ms) both; }
+.anima-entrada .kpi:nth-child(2) { animation-delay: calc(var(--entrada-base, 0ms) + 35ms); }
+.anima-entrada .kpi:nth-child(3) { animation-delay: calc(var(--entrada-base, 0ms) + 70ms); }
+.anima-entrada .kpi:nth-child(4) { animation-delay: calc(var(--entrada-base, 0ms) + 105ms); }
+.anima-entrada .kpi:nth-child(5) { animation-delay: calc(var(--entrada-base, 0ms) + 140ms); }
+.anima-entrada .kpi:nth-child(6) { animation-delay: calc(var(--entrada-base, 0ms) + 175ms); }
+.anima-entrada .kpi:nth-child(7) { animation-delay: calc(var(--entrada-base, 0ms) + 210ms); }
+.anima-entrada .kpi:nth-child(n+8) { animation-delay: calc(var(--entrada-base, 0ms) + 245ms); }
+.anima-entrada .dash-cell:nth-child(1) { animation-delay: calc(var(--entrada-base, 0ms) + 120ms); }
+.anima-entrada .dash-cell:nth-child(2) { animation-delay: calc(var(--entrada-base, 0ms) + 170ms); }
+.anima-entrada .dash-cell:nth-child(3) { animation-delay: calc(var(--entrada-base, 0ms) + 220ms); }
+.anima-entrada .dash-cell:nth-child(n+4) { animation-delay: calc(var(--entrada-base, 0ms) + 270ms); }
+.anima-entrada tbody tr { animation: aparece 240ms var(--ease-saida) both; animation-delay: calc(var(--entrada-base, 0ms) + 420ms); }
+.anima-entrada tbody tr:nth-child(1) { animation-delay: calc(var(--entrada-base, 0ms) + 200ms); }
+.anima-entrada tbody tr:nth-child(2) { animation-delay: calc(var(--entrada-base, 0ms) + 225ms); }
+.anima-entrada tbody tr:nth-child(3) { animation-delay: calc(var(--entrada-base, 0ms) + 250ms); }
+.anima-entrada tbody tr:nth-child(4) { animation-delay: calc(var(--entrada-base, 0ms) + 275ms); }
+.anima-entrada tbody tr:nth-child(5) { animation-delay: calc(var(--entrada-base, 0ms) + 300ms); }
+.anima-entrada tbody tr:nth-child(6) { animation-delay: calc(var(--entrada-base, 0ms) + 325ms); }
+.anima-entrada tbody tr:nth-child(7) { animation-delay: calc(var(--entrada-base, 0ms) + 350ms); }
+.anima-entrada tbody tr:nth-child(8) { animation-delay: calc(var(--entrada-base, 0ms) + 375ms); }
+.anima-entrada tbody tr:nth-child(9) { animation-delay: calc(var(--entrada-base, 0ms) + 400ms); }
+/* Barras de ranking, de funil e de meta crescem a partir da esquerda. */
+.anima-entrada .ranking__bar, .anima-entrada .funnel__bar, .anima-entrada .kpi__goal-fill {
+  transform-origin: left center; animation: cresce 400ms var(--ease-saida) calc(var(--entrada-base, 0ms) + 220ms) both;
+}
+/* A linha do gráfico se desenha; a área e os pontos aparecem em seguida. 3000 e não o
+   comprimento do traço: com non-scaling-stroke o traço é medido em pixel de tela. */
+@media (prefers-reduced-motion: no-preference) {
+  .anima-entrada .chart__line { stroke-dasharray: 3000; animation: desenha 400ms var(--ease-saida) calc(var(--entrada-base, 0ms) + 240ms) both; }
+}
+.anima-entrada .chart__area, .anima-entrada .chart__point { animation: aparece 300ms var(--ease-saida) calc(var(--entrada-base, 0ms) + 420ms) both; }
+
+/* Abertura do painel (primeira carga, com ou sem saudação): a faixa, as abas e os filtros
+   também entram, antes do corpo. --abertura-base é o instante da primeira peça; o corpo começa
+   200 ms depois dela. Fora da abertura estas peças não se mexem. */
+.anima-abertura .faixa { animation: sobe var(--dur-entrada) var(--ease-saida) var(--abertura-base, 0ms) both; }
+.anima-abertura .abas { animation: sobe var(--dur-entrada) var(--ease-saida) calc(var(--abertura-base, 0ms) + 70ms) both; }
+.anima-abertura .filterbar, .anima-abertura .dados-estado--solto { animation: sobe var(--dur-entrada) var(--ease-saida) calc(var(--abertura-base, 0ms) + 130ms) both; }
+.anima-abertura #dashbody { --entrada-base: calc(var(--abertura-base, 0ms) + 200ms); }
+.anima-abertura #dashmeta { animation: aparece var(--dur-entrada) var(--ease-saida) calc(var(--abertura-base, 0ms) + 700ms) both; }
+
+/* Contagem do indicador: o texto final fica no lugar, invisível, enquanto um visor em posição
+   absoluta mostra o número do quadro (dashboard.js). Nada muda de tamanho nem empurra vizinho. */
+.kpi__value.is-contando { position: relative; color: transparent; }
+.kpi__conta { position: absolute; left: 0; top: 0; color: var(--text); white-space: nowrap; user-select: none; pointer-events: none; }

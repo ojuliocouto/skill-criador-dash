@@ -25,15 +25,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-
 import { sourceTypes, getSource } from '../public/assets/js/sources/index.js';
+import { fonteDoAssistente } from './apoio/fonte-do-assistente.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const WIZARD_PATH = join(__dirname, '../public/assets/js/config-wizard.js');
-const wizardSrc = readFileSync(WIZARD_PATH, 'utf8');
+// O assistente virou orquestrador + um módulo por passo (public/assets/js/wizard/): os cartões
+// de origem moram em wizard/passo-fonte.js e wizard/fonte-meta.js. O teste lê todos juntos.
+const wizardSrc = fonteDoAssistente();
 
 // Fontes que NAO sao um card de conexao no passo 2:
 //   - 'd1' e o modo HISTORICO (leitura do proprio banco), escolhido no passo 4

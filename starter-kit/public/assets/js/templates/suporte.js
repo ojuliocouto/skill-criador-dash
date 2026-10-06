@@ -6,6 +6,8 @@
 export const template = {
   id: 'suporte',
   label: 'Suporte',
+  // Frase do cartão da área no assistente (passo 1). Palavra comum, sem jargão.
+  descricao: 'Atendimento: quantos pedidos chegaram e quantos foram resolvidos.',
   // Metrica sugerida para a meta opcional (meta vs realizado).
   primaryMetric: 'atendimentos',
   // Slot semantico do eixo de TEMPO (usado pela tendencia no dashboard.js).

@@ -2,6 +2,7 @@
 // segue o idioma do NAVEGADOR, não o lang="pt-BR" da página, então em Chrome em inglês (e no
 // Chromium da prova) a data aparece no formato americano. Agora o campo é próprio: dd/mm/aaaa.
 import { test } from 'node:test';
+import { fonteDoAssistente } from './apoio/fonte-do-assistente.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -36,6 +37,6 @@ test('filtro do painel: campo de data próprio em dd/mm/aaaa, nunca input type=d
 });
 
 test('wizard: datas do Meta Ads também em dd/mm/aaaa', () => {
-  const src = readFileSync(join(aqui, '../public/assets/js/config-wizard.js'), 'utf8');
+  const src = fonteDoAssistente(); // todos os módulos do assistente (o formulário do Meta saiu do arquivo único)
   assert.ok(!/type:\s*'date'/.test(src), 'sem input nativo de data no wizard');
 });

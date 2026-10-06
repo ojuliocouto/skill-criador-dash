@@ -120,6 +120,10 @@ Sheets/CSV/Meta ja estao ligados nos 5. Um handler solto, sem esses pontos, nunc
  * @property {function} [compute] (ctx) => number   para agg 'derived' (ex: ROAS = receita/investimento)
  * @property {[string,string]} [ratioOf]  para agg 'ratio': [numeradorKey, denominadorKey]
  * @property {'higher'|'lower'} [betterWhen]  direcao boa (pinta a tendencia verde/vermelho no KPI)
+ * @property {string} [denominator]  só pra 'derived' que é TAXA (ex: ROAS): chave da métrica cujo zero
+ *                                   torna a taxa inexistente. Marca a métrica como comparável com o
+ *                                   total na tabela resumida e evita "0" com cara de número certo.
+ *                                   Em 'ratio' isso é implícito (o segundo item de ratioOf).
  */
 
 // computeMetric recebe tambem `computed` (metricas ja calculadas): ratio/derived
@@ -162,7 +166,15 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
  *                                  assumir 'data'. Fallback seguro pra 'data' se ausente.
  * @property {SlotDef[]} slots      slots semânticos que o usuário mapeia para colunas
  * @property {MetricDef[]} metrics  métricas do domínio (usam os slots)
- * @property {LayoutItem[]} layout  ordem/tipo de widgets a renderizar
+ * @property {LayoutItem[]} layout  ordem/tipo de widgets a renderizar (layout plano)
+ * @property {TabDef[]} [tabs]      OPCIONAL. Divide o painel em abas, cada uma com o seu layout.
+ *                                  Sem `tabs`, o painel renderiza pelo `layout`, como sempre.
+ */
+/**
+ * @typedef {Object} TabDef
+ * @property {string} id        vai pro hash da URL (#canais). Minúsculo, sem espaço.
+ * @property {string} label     nome da aba em palavra comum ("Visão geral", "Canais")
+ * @property {LayoutItem[]} layout  widgets desta aba (mesmo formato do layout plano)
  */
 /**
  * @typedef {Object} SlotDef
@@ -170,11 +182,14 @@ export function fmtInteger(n) {}      // 1234 -> "1.234"
  * @property {string} label     'Data', 'Investimento' ...
  * @property {boolean} required
  * @property {string[]} aliases nomes de cabeçalho comuns p/ auto-detecção (lowercase, sem acento)
+ * @property {'currency'} [format]  opcional: declara que a coluna é dinheiro. Só precisa quando
+ *                                  nenhuma métrica de soma em moeda aponta pro slot (ex: vendas.valor).
  */
 /**
  * @typedef {Object} LayoutItem
- * @property {'kpi'|'timeseries'|'funnel'|'table'|'ranking'} widget
+ * @property {'kpi'|'timeseries'|'funnel'|'table'|'ranking'|'resumo'|'meta'} widget
  * @property {Object} props   ex: { metricKey:'investimento' } ou { dateSlot:'data', valueSlot:'valor' }
+ * @property {number} [col]   largura no grid de 12 colunas (3 a 8); ausente = largura toda
  */
 
 // autoMap vive em `public/assets/js/lib/automap.js` (nao no template): e generico.
@@ -190,7 +205,11 @@ Templates prontos: `marketing.js`, `vendas.js`, `suporte.js`, `financeiro.js`, `
 - **Marketing** slots: data, canal, investimento, impressoes, cliques, leads, conversoes, receita.
   Métricas: investimento (sum), impressoes (sum), cliques (sum), CTR (ratio cliques/impressoes),
   CPC (ratio invest/cliques), leads (sum), CPL (ratio invest/leads), conversoes (sum),
-  CPA (ratio invest/conversoes), ROAS (derived receita/investimento).
+  CPA (ratio invest/conversoes), taxa_lead (ratio leads/cliques), taxa_conversao (ratio
+  conversoes/leads), ROAS (derived receita/investimento, com `denominator: 'investimento'`).
+  É o único domínio com `tabs` hoje: Visão geral (indicadores, resumo por canal, calculadora de
+  meta), Canais (resumo completo e rankings), Evolução (resumo por semana e gráficos no tempo),
+  Funil (funil e taxas entre etapas por canal) e Dados (tabela linha a linha).
 - **Vendas** slots: data, vendedor, produto, valor, status.
   Métricas: num_vendas (count), vendas_ganhas (derived: conta linhas com status "ganho"),
   faturamento (derived: soma do valor SO das ganhas), ticket_medio (derived: faturamento/ganhas),
@@ -210,6 +229,25 @@ Templates prontos: `marketing.js`, `vendas.js`, `suporte.js`, `financeiro.js`, `
 `autoMap` normaliza (lowercase, remove acento) tanto os aliases quanto os `columns` e casa por
 inclusão. Slot sem match vira `null` (usuário mapeia na mão no wizard).
 
+### Abas dentro do dashboard (`template.tabs`)
+
+Não confundir com o GRUPO (Contrato 7, `kind: 'group'`), que junta vários dashboards num link e
+guarda a aba em `?tab=`. Aqui é o mesmo painel, a mesma fonte e o mesmo filtro; só muda a seção.
+
+- A lógica pura mora em `public/assets/js/lib/abas.js`: `abasDoTemplate`, `abaDoHash`, `resolverAba`,
+  `layoutDaAba`, `proximaAba` (teclado), `barraDeAbasHtml` (papéis ARIA) e `abasVisiveis`.
+- A aba ativa mora no HASH da URL (`#canais`), então o link de uma aba pode ser mandado pra alguém.
+  Sem hash (ou com hash desconhecido) abre a primeira aba.
+- O estado de tela (aba ativa e o que foi digitado na calculadora de meta) fica em `baseCtx.ui` no
+  `dashboard.js`, fora do `#dashbody`: o corpo é trocado inteiro a cada mudança de filtro, e a aba e
+  a meta precisam sobreviver a isso.
+- Acessibilidade: `role="tablist"` na barra, `role="tab"` + `aria-selected` + roving tabindex em cada
+  aba, `role="tabpanel"` + `aria-labelledby` no corpo. Setas andam entre as abas, Home e End vão pras pontas.
+- Aba que não teria nada pra mostrar com o mapeamento do painel (ex: "Canais" sem a coluna de canal)
+  não entra na barra. Se nenhuma sobrar, o painel cai no `layout` plano.
+- A personalização por dashboard (`heroMetric`, `hiddenMetrics`) vale em cada aba e no layout plano.
+- Num grupo, o dashboard-filho mostra as próprias abas abaixo das abas do grupo.
+
 ---
 
 ## Contrato 6: Widget (`public/assets/js/widgets/<nome>.js`)
@@ -223,8 +261,26 @@ export function render(props, data) {} // -> string HTML (o kit padroniza string
 - `kpi.js`: card com label + valor formatado + (opcional) variação.
 - `timeseries.js`: gráfico de linha (SVG puro, sem lib externa). Recebe `[{date,value}]`.
 - `funnel.js`: funil vertical com % entre etapas. Recebe `[{label,value}]`.
-- `table.js`: tabela paginada simples. Recebe `{columns, rows}`.
+- `table.js`: tabela paginada simples. Recebe `{columns, rows}`. Com `props.columnMeta` (montado por
+  `lib/colunas.js` a partir do template) apresenta a coluna mapeada com o rótulo do slot no cabeçalho,
+  data em dd/mm/aaaa e dinheiro com R$. O valor cru da fonte não muda, só a apresentação.
 - `ranking.js`: barras horizontais ordenadas. Recebe `[{key,value}]`.
+- `resumo.js`: tabela agregada com linha de TOTAL. Props do layout: `groupBy` (um slot de dimensão, ex
+  `'canal'`, OU um período em cima do slot de data: `'dia'`, `'semana'`, `'mes'`), `metrics` (chaves de
+  métrica do template; aceita `{ key, label }` pra trocar o título da coluna), `title`, e os opcionais
+  `orderBy` (métrica que ordena as linhas) e `limit`. A agregação mora em `lib/resumo.js` (`resumir`)
+  e o agrupamento por período em `lib/periodo.js`. REGRA: cada linha recalcula as métricas com o MESMO
+  motor (`computeAllMapped`) em cima das linhas do grupo, e o total em cima de todas as linhas
+  filtradas. Taxa (CPL, CPA, CTR, ROAS) de total nunca é soma nem média das linhas. Taxa com
+  denominador zero aparece como "sem dado". Célula de taxa melhor ou pior que o total (folga de 1%)
+  sai em verde ou vermelho. Em cartão estreito a tabela vira blocos empilhados (container query),
+  sem rolagem lateral da página.
+- `meta.js`: calculadora de meta. Props: `label` (rótulo do campo), `unit`, `title` e as chaves de
+  métrica `targetKey`, `costKey`, `leadKey`, `revenueKey`. A conta é a função pura `calcularMeta`:
+  investimento necessário = meta x custo por conversão; leads necessários = meta / taxa de lead pra
+  conversão; receita esperada = meta x receita por conversão, tudo pelas médias do período filtrado.
+  Sem dado suficiente (divisão por zero, coluna não mapeada) mostra "Sem dado suficiente no período",
+  nunca NaN, Infinity ou R$ 0,00. O `dashboard.js` troca só a área de resultado a cada tecla.
 
 Widgets NÃO conhecem template nem conector: `render(props, data)` recebe dados já prontos e devolve HTML.
 
@@ -253,6 +309,10 @@ nao o widget. Adicionar um widget = criar `widgets/<nome>.js` (render puro) + um
   hiddenMetrics: ['CTR'],                             // opcional: métricas que não entram neste dashboard
   auth: { salt, verifier, iterations, algo },         // opcional: senha (verifier PBKDF2-SHA256 salgado; ver abaixo)
   storage: 'd1',                                      // opcional: modo histórico (cron grava snapshots no D1)
+  tema: 'escuro',                                     // opcional: modo com que o painel abre ('claro' | 'escuro' | 'auto')
+  saudacao: 'Carla',                                  // opcional: quem a saudação de abertura cumprimenta (até 40 caracteres)
+  saudacaoLigada: false,                              // opcional: false desliga a saudação (ausente = ligada)
+  fundoAnimado: false,                                // opcional: false deixa o fundo parado (ausente = com movimento)
   createdAt: ISO
 }
 ```
@@ -268,6 +328,9 @@ Campos opcionais da config (o código só os grava quando o usuário os preenche
   (seria reenviável): deriva e grava só um verifier PBKDF2-SHA256 salgado por dashboard
   (`{ salt, verifier, iterations, algo }`, ver `functions/lib/auth-config.mjs`), recomputa a cada
   requisição e compara em tempo constante. O bloco `auth` inteiro é removido de toda resposta.
+- `tema`, `saudacao`, `saudacaoLigada`, `fundoAnimado`: a presença do painel (ver a seção "Presença do
+  painel", abaixo). Ausentes, o painel antigo se comporta como antes, exceto que o fundo vivo e a
+  saudação nascem ligados. O servidor valida a forma em `functions/lib/aparencia-shape.mjs`.
 - `storage: 'd1'`: liga o modo histórico. Nesse modo o Worker de snapshot (cron) grava o `DataSet`
   no D1 e o dashboard lê o snapshot mais recente. Ausente (ou diferente de `'d1'`) = modo ao vivo.
 
@@ -289,7 +352,54 @@ Fluxo do wizard (`config.html` + `config-wizard.js`), 4 passos:
 4. Nomear + cor de destaque + (opcional) meta, senha e modo histórico; salva no KV, redireciona pro dashboard
 
 `dashboard.html` + `dashboard.js`: lê `?id=`, busca config no KV, busca dados via conector,
-roda `computeAll` + layout do template, renderiza widgets.
+roda `computeAll` + layout do template (ou o layout da aba ativa, se o template tiver `tabs`),
+renderiza widgets. No topo do corpo vai a faixa de marca (`lib/cabecalho.js`): nome do painel,
+rótulo do domínio, período dos dados e o `config.logo`, se existir.
+
+---
+
+## Presença do painel (fundo vivo, saudação, carregamento, modo claro e escuro)
+
+O que dá identidade ao painel de cada dono. O motivo visual é um só, a linha da marca: ela deriva no
+fundo como curva de gráfico, se desenha embaixo do nome na saudação, é a barra de progresso no topo e a
+folha que revela o painel.
+
+| Peça | Regra pura (com teste) | Tela | CSS |
+|---|---|---|---|
+| Fundo vivo | `lib/fundo-cor.js` (cores e intensidade calibradas pelo contraste) | `lib/fundo.js`, `lib/marca.js` | `presenca.css` |
+| Saudação | `lib/saudacao.js` (quem cumprimenta, quando, tempos, HTML) | `lib/abertura.js` | `presenca.css` |
+| Carregamento | `lib/esqueleto.js`, `lib/estado-de-erro.js`, `lib/atualizado.js` | `lib/carregamento.js`, `dashboard.js` | `presenca.css` |
+| Modo inicial | `lib/tema-inicial.js`, `lib/modo-sugerido.js` | `lib/theme.js`, `lib/transicao.js` | `main.css`, `presenca.css` |
+| No servidor | `functions/lib/aparencia-shape.mjs`, `functions/lib/abertura-do-painel.mjs` | `functions/_middleware.js` | |
+
+- **Fundo vivo**: camada fixa atrás do conteúdo (`.fundo`, z-index -1) com duas manchas e duas folhas de
+  curvas na cor da marca (`accent`, e `accent2` na segunda mancha). Só `transform` anima, em camadas da
+  placa de vídeo; pausa com a aba escondida; fica parado com `fundoAnimado: false` ou com "reduzir
+  movimento". `aplicarMarca` (lib/marca.js) é o `aplicarAccent` de sempre mais as variáveis do fundo: é
+  o que o painel, o botão de modo e a prévia do assistente chamam. A intensidade das manchas é calibrada
+  pra que o texto que fica direto sobre o fundo da página mantenha 4,5:1 no pior momento.
+- **Saudação**: a página do painel já traz a tela de saudação no HTML. O middleware escreve nela o nome
+  (config.saudacao, ou o nome do painel) e o logotipo, e marca `data-saudacao` no `<html>`. O script
+  inline liga `data-saudar` uma vez por sessão do navegador por painel (nunca com "reduzir movimento") e
+  o CSS toca a coreografia desde o primeiro quadro: texto, linha, e a cortina em duas folhas que desce.
+  `lib/abertura.js` avisa o `dashboard.js` do instante em que a cortina começa a descer, e o painel é
+  desenhado ali, com a faixa, as abas, os filtros e o corpo entrando em sequência (`.anima-abertura` e
+  `--abertura-base`). Clique ou tecla pula. Se o JavaScript falhar, a cortina sai sozinha pelo CSS.
+  Painel protegido por senha não tem o nome no HTML: a saudação começa depois da senha.
+- **Carregamento**: esqueleto com as mesmas grades do painel (`esqueletoHtml(planoDoEsqueleto(...))`),
+  barra de progresso no topo, botão Atualizar e "Atualizado há X" na faixa, e estado de erro com
+  "Tentar de novo" (`mostrarFalha`). Numa falha ao atualizar, os números que estavam na tela ficam.
+- **Modo claro e escuro**: `config.tema` é o modo com que o painel abre. Quem decide, nesta ordem: a
+  escolha do visitante naquele painel (`localStorage` `cd-theme:<id>`), o modo do dono (o middleware
+  marca `data-theme` e `data-modo` no `<html>`), a escolha geral (`cd-theme`) e o sistema. A regra é
+  `resolverTemaInicial`; o script inline das páginas decide a mesma coisa antes do primeiro quadro e há
+  teste de paridade. Se o script inline mudar, rode `node imp-gerar-html.mjs` (na pasta de verificação)
+  e atualize o hash em `functions/_middleware.js`. Um TRECHO da página pode ter modo próprio com
+  `data-theme` (a prévia e as amostras do assistente): os tokens do escuro valem em `:root` e em
+  `[data-theme="dark"]`.
+- **Assistente**: `wizard/passo-modo.js` (duas amostras do painel da pessoa nos dois modos, com a
+  sugestão de `sugerirModo` marcada, e os campos de saudação e de fundo em "Mais opções"). A prévia
+  mostra o modo e o fundo escolhidos e toca a abertura no botão "Ver a abertura".
 
 ---
 
