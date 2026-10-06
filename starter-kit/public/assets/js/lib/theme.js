@@ -97,9 +97,9 @@ function montarBotao() {
     revelarModo(btn, proximo === 'dark', () => { aplicar(proximo); desenhar(); });
   });
 
-  // Coloca antes das ações (Reconfigurar, Voltar) se existirem; senão, no fim da barra.
+  // Entra no grupo de utilidades (junto de Copiar link e Reconfigurar); sem grupo, no fim da barra.
   const actions = bar.querySelector('.actions');
-  bar.insertBefore(btn, actions || null);
+  if (actions) actions.prepend(btn); else bar.append(btn);
   desenhar();
 }
 

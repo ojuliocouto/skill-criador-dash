@@ -1,49 +1,42 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { monograma, subtituloDoPainel, acoesHtml } from '../public/assets/js/lib/barra-topo.js';
+import { areaDoPainel, trilhaHtml, acoesHtml } from '../public/assets/js/lib/barra-topo.js';
 
-// A barra do topo é a primeira coisa que o dono vê. Marca com monograma (quando não há
-// logotipo), subtítulo dizendo o que é o painel e ações com ícone.
+// A barra do topo é uma trilha ("Meus painéis / Nome  Área") com um grupo único de utilidades
+// à direita. Nada de avatar com iniciais nem fileira de botões contornados iguais.
 
-test('monograma: iniciais das duas primeiras palavras, em maiúscula', () => {
-  assert.equal(monograma('Studio Equilíbrio - Anúncios'), 'SE');
-  assert.equal(monograma('padaria'), 'P');
-  assert.equal(monograma('  ótica central  '), 'ÓC');
+test('área: nome curto pra etiqueta; área desconhecida não inventa etiqueta', () => {
+  assert.equal(areaDoPainel('marketing'), 'Marketing');
+  assert.equal(areaDoPainel('financeiro'), 'Financeiro');
+  assert.equal(areaDoPainel('area-nova'), '');
+  assert.equal(areaDoPainel(undefined), '');
 });
 
-test('monograma: ignora símbolo e número solto; vazio vira D de Dashboard', () => {
-  assert.equal(monograma('- 2026 Vendas'), 'V');
-  assert.equal(monograma(''), 'D');
-  assert.equal(monograma(null), 'D');
+test('trilha: o caminho de volta vem antes do nome, com ícone, texto e separador', () => {
+  const html = trilhaHtml();
+  assert.match(html, /<a class="trilha-volta" href="\/"/);
+  assert.match(html, /Meus painéis/);
+  assert.match(html, /class="trilha-sep" aria-hidden="true"/);
+  assert.equal((html.match(/<svg /g) || []).length, 1);
 });
 
-test('subtítulo: diz a área do painel; área desconhecida não inventa nome', () => {
-  assert.equal(subtituloDoPainel('marketing'), 'Painel de marketing');
-  assert.equal(subtituloDoPainel('vendas'), 'Painel de vendas');
-  assert.equal(subtituloDoPainel('financeiro'), 'Painel financeiro');
-  assert.equal(subtituloDoPainel('area-nova'), 'Painel');
-  assert.equal(subtituloDoPainel(undefined), 'Painel');
-});
-
-test('ações: copiar link, reconfigurar e meus painéis, cada uma com ícone e texto', () => {
+test('utilidades: copiar link e reconfigurar, cada uma com ícone e texto', () => {
   const html = acoesHtml({ id: 'estudio-pilates' });
   assert.match(html, /data-copiar-link/);
   assert.match(html, /href="\/config\.html\?id=estudio-pilates"/);
   assert.match(html, /Reconfigurar/);
-  assert.match(html, /href="\/"/);
-  assert.match(html, /Meus painéis/);
-  assert.equal((html.match(/<svg /g) || []).length, 3, 'um ícone por ação');
-  assert.equal((html.match(/class="btn-texto"/g) || []).length, 3, 'texto separado pra sumir no celular');
-  assert.ok(!/aria-hidden="true"[^>]*>[^<]*<\/a>/.test(html));
+  assert.equal((html.match(/<svg /g) || []).length, 2, 'um ícone por utilidade');
+  assert.equal((html.match(/class="btn-texto"/g) || []).length, 2, 'texto separado pra sumir no celular');
+  assert.ok(!/Meus painéis/.test(html), 'a volta mora na trilha, não vira botão');
 });
 
-test('ações: grupo de abas não tem reconfigurar', () => {
+test('utilidades: grupo de abas não tem reconfigurar', () => {
   const html = acoesHtml({ id: 'g1', grupo: true });
   assert.ok(!/Reconfigurar/.test(html));
-  assert.match(html, /Meus painéis/);
+  assert.match(html, /data-copiar-link/);
 });
 
-test('ações: id com caractere perigoso sai codificado, nunca cru', () => {
+test('utilidades: id com caractere perigoso sai codificado, nunca cru', () => {
   const html = acoesHtml({ id: '"><script>alert(1)</script>' });
   assert.ok(!html.includes('<script>'));
   assert.ok(html.includes('id=%22%3E%3Cscript%3E'), 'o id entra codificado na URL');
