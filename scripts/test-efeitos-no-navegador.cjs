@@ -223,7 +223,8 @@ async function main() {
               return { fixo: col.classList.contains('rd--fixo'), visiveis, animada, h: rc.height };
             });
             const alvo = document.querySelector('.kpi__value'); const rg = document.createRange(); rg.selectNodeContents(alvo.firstChild);
-            return { largura: rr.width, texto: rg.getBoundingClientRect().width, cols };
+            const rt = rg.getBoundingClientRect();
+            return { largura: rr.width, texto: rt.width, esquerda: rr.left - rt.left, topo: rr.top - rt.top, cols };
           });
           assert.equal(q.cols.length, plano.length, 'a roleta deve ter uma casa por caractere do número novo');
           q.cols.forEach((col, i) => {
@@ -235,6 +236,8 @@ async function main() {
             assert.deepEqual(intrusos, [], `casa ${i} mostra dígito de passagem ${intrusos.join(',')} em ${t} ms (só ${[...permitidos].join(' e ')} podem aparecer)`);
           });
           assert.ok(Math.abs(q.largura - q.texto) <= 2, `a roleta mede ${q.largura.toFixed(1)} px e o número ${q.texto.toFixed(1)} px em ${t} ms`);
+          assert.ok(Math.abs(q.esquerda) <= 2, `a roleta está ${q.esquerda.toFixed(1)} px fora do número em ${t} ms`);
+          assert.ok(Math.abs(q.topo) <= 4, `a roleta está ${q.topo.toFixed(1)} px acima ou abaixo da linha do número em ${t} ms`);
           larguras.push(q.largura);
         }
         const variacao = Math.max(...larguras) - Math.min(...larguras);

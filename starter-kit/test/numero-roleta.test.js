@@ -2,8 +2,11 @@
 // qual, em que direção, e o quanto cada coluna espera pra começar.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
-import { planoDaRoleta, direcaoDaRoleta, caminhoDoDigito, atrasoDoDigito, DURACAO_DA_ROLETA, CELULAS_DA_TIRA }
+import { planoDaRoleta, direcaoDaRoleta, caminhoDoDigito, atrasoDoDigito, DURACAO_DA_ROLETA, CELULAS_DA_TIRA, tiraDoDigito }
   from '../public/assets/js/lib/numero-roleta.js';
 
 test('direcaoDaRoleta: valor subiu rola pra cima (1), desceu rola pra baixo (-1), igual ou inválido sobe', () => {
@@ -65,4 +68,30 @@ test('atrasoDoDigito: o da direita sai primeiro, com teto, e tudo cabe em menos 
   assert.equal(atrasoDoDigito(40), atrasoDoDigito(6), 'teto');
   assert.ok(DURACAO_DA_ROLETA + atrasoDoDigito(99) < 900);
   assert.ok(DURACAO_DA_ROLETA >= 400);
+});
+
+// ---------------------------------------------------------------- roleta limpa (3.7.0)
+
+test('tiraDoDigito: a casa tem só duas células, o dígito que sai e o que entra, nunca um dígito de passagem', () => {
+  assert.deepEqual(tiraDoDigito(3, 7, 1), { celulas: [3, 7], de: 0, para: -50 });
+  assert.deepEqual(tiraDoDigito(3, 7, -1), { celulas: [7, 3], de: -50, para: 0 });
+  assert.deepEqual(tiraDoDigito(9, 0, 1), { celulas: [9, 0], de: 0, para: -50 });
+  for (let de = 0; de < 10; de++) for (let para = 0; para < 10; para++) {
+    if (de === para) continue;
+    for (const dir of [1, -1]) {
+      const t = tiraDoDigito(de, para, dir);
+      assert.equal(t.celulas.length, 2);
+      assert.deepEqual([...t.celulas].sort(), [de, para].sort());
+      // sobe: o novo entra por baixo (a tira anda -50%); desce: o novo entra por cima (anda +50%)
+      assert.equal(t.para - t.de, dir === 1 ? -50 : 50);
+    }
+  }
+});
+
+test('CSS da roleta: cada casa tem a própria máscara de uma linha, com dígitos de largura igual', () => {
+  const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../public/assets/css/efeitos.css'), 'utf8');
+  const bloco = css.slice(css.indexOf('/* EFEITO 3'), css.indexOf('/* EFEITO 4'));
+  assert.match(bloco, /\.rd--col[^}]*overflow: hidden/);
+  assert.match(bloco, /\.rd--col[^}]*height: 1\.15em/);
+  assert.match(bloco, /tabular-nums/);
 });

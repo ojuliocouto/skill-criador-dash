@@ -26,10 +26,12 @@
 /* Com a régua ativa, os pontos fixos do gráfico saem do caminho: só o do dia em foco aparece. */
 .chart--em-foco .chart__point { opacity: 0.35; }
 
-/* EFEITO 3: números de roleta. O texto final fica no DOM (transparente) e a roleta vai por cima. */
-.kpi__roleta { position: absolute; left: 0; top: 0; display: flex; white-space: nowrap; color: var(--text); pointer-events: none; user-select: none; }
+/* EFEITO 3: números de roleta. O texto final fica no DOM (transparente) e a roleta vai por cima.
+   Cada casa é uma janela de UMA linha (overflow hidden) com só o dígito que sai e o que entra;
+   dígitos de largura igual (tabular-nums) pra o número não mexer de largura durante o giro. */
+.kpi__roleta { position: absolute; left: 0; top: 0; display: flex; white-space: nowrap; color: var(--text); pointer-events: none; user-select: none; font-variant-numeric: tabular-nums; }
 .rd { display: block; height: 1.15em; line-height: 1.15; }
-.rd--col { overflow: hidden; }
+.rd--col { overflow: hidden; height: 1.15em; }
 .rd__tira { display: block; }
 .rd__cel { display: block; height: 1.15em; line-height: 1.15; }
 

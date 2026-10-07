@@ -10,7 +10,7 @@ import { menosMovimento, textoDaContagem, CURVA } from './movimento.js';
 
 /** Duração do rolar de cada dígito (ms). Espelha --dur-roleta do efeitos.css. */
 export const DURACAO_DA_ROLETA = 640;
-/** A tira de cada dígito tem duas voltas de 0 a 9, pra dar a volta (9 pro 0) sem salto. */
+/** Comprimento da tira antiga (duas voltas de 0 a 9). A roleta atual usa só duas células (tiraDoDigito). */
 export const CELULAS_DA_TIRA = 20;
 const PASSO_DO_ATRASO = 26;
 const TETO_DO_ATRASO = 6;
@@ -32,6 +32,17 @@ export function caminhoDoDigito(de, para, direcao) {
   }
   const passos = de >= para ? de - para : de + 10 - para;
   return { inicio: de + 10, fim: de + 10 - passos };
+}
+
+/**
+ * A tira de UMA casa: só o dígito que sai e o que entra, um em cima do outro, e a tira anda meia
+ * altura. Nada de dígito de passagem (o 5 e o 6 entre o 4 e o 0 só embaralhavam). Subindo, o novo
+ * entra por baixo; descendo, por cima. `de` e `para` são o deslocamento (% da tira) do começo ao fim.
+ */
+export function tiraDoDigito(velho, novo, direcao) {
+  return direcao >= 0
+    ? { celulas: [velho, novo], de: 0, para: -50 }
+    : { celulas: [novo, velho], de: -50, para: 0 };
 }
 
 /**
@@ -62,18 +73,15 @@ export function atrasoDoDigito(indiceDaDireita) {
 
 // ---------------------------------------------------------------- DOM
 
-function tiraHtml() {
-  let h = '';
-  for (let i = 0; i < CELULAS_DA_TIRA; i++) h += `<span class="rd__cel">${i % 10}</span>`;
-  return h;
-}
-
-function montarRoleta(plano) {
+function montarRoleta(plano, direcao) {
   const roleta = document.createElement('span');
   roleta.className = 'kpi__roleta';
   roleta.setAttribute('aria-hidden', 'true');
   roleta.innerHTML = plano.map((c) => {
-    if (c.tipo === 'rola') return `<span class="rd rd--col" data-tipo="rola"><span class="rd__tira">${tiraHtml()}</span></span>`;
+    if (c.tipo === 'rola') {
+      const { celulas } = tiraDoDigito(c.de, c.para, direcao);
+      return `<span class="rd rd--col" data-tipo="rola"><span class="rd__tira">${celulas.map((n) => `<span class="rd__cel">${n}</span>`).join('')}</span></span>`;
+    }
     if (c.tipo === 'novo') return `<span class="rd rd--col" data-tipo="novo"><span class="rd__cel">${c.ch}</span></span>`;
     return `<span class="rd rd--fixo">${c.ch === ' ' ? '&nbsp;' : c.ch}</span>`;
   }).join('');
@@ -96,7 +104,7 @@ export function rolarIndicadores(raiz, antes) {
     const plano = planoDaRoleta(textoDaContagem(velho, formato, 1), alvo.textContent);
     if (!plano.some((c) => c.tipo !== 'fixo')) return;
     const direcao = direcaoDaRoleta(velho, novo);
-    const roleta = montarRoleta(plano);
+    const roleta = montarRoleta(plano, direcao);
     alvo.classList.add('is-contando');
     alvo.appendChild(roleta);
     let ultimo = 0;
@@ -109,10 +117,10 @@ export function rolarIndicadores(raiz, antes) {
       ultimo = Math.max(ultimo, atraso);
       if (item.tipo === 'rola') {
         const tira = col.firstElementChild;
-        const { inicio, fim } = caminhoDoDigito(item.de, item.para, direcao);
-        const y = (n) => `translateY(${-(n * 100) / CELULAS_DA_TIRA}%)`;
-        tira.style.transform = y(fim);
-        tira.animate([{ transform: y(inicio) }, { transform: y(fim) }],
+        const { de, para } = tiraDoDigito(item.de, item.para, direcao);
+        const y = (pct) => `translateY(${pct}%)`;
+        tira.style.transform = y(para);
+        tira.animate([{ transform: y(de) }, { transform: y(para) }],
           { duration: DURACAO_DA_ROLETA, delay: atraso, easing: CURVA.saida, fill: 'backwards' });
       } else {
         col.animate([{ opacity: 0, transform: `translateY(${direcao * 70}%)` }, { opacity: 1, transform: 'none' }],
