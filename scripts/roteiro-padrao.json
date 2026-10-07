@@ -1,6 +1,6 @@
 {
   "nome": "padrao",
-  "descricao": "Abre o painel, passa o mouse nos números, troca de aba duas vezes, volta à primeira, filtra e rola. Serve a qualquer painel de fábrica sem editar: o que não existir (abas, filtro) é pulado.",
+  "descricao": "Abre o painel, troca dois atalhos de período (7 e 30 dias), troca de aba passando o mouse no gráfico, volta à primeira, filtra e rola. Serve a qualquer painel de fábrica sem editar: o que não existir (atalhos, abas, gráfico, filtro) é pulado.",
   "duracao_minima_s": 11,
   "passos": [
     {
@@ -12,23 +12,45 @@
     },
     {
       "acao": "esperar",
-      "ms": 2000
+      "ms": 1200
     },
     {
       "acao": "print",
       "nome": "abriu"
     },
     {
-      "acao": "mover_mouse",
-      "seletor": ".kpi"
+      "acao": "clicar",
+      "seletor": ".atalho[data-atalho=\"7d\"]",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 350
+    },
+    {
+      "acao": "print",
+      "nome": "7 dias no meio da troca"
+    },
+    {
+      "acao": "esperar",
+      "ms": 450
+    },
+    {
+      "acao": "clicar",
+      "seletor": ".atalho[data-atalho=\"30d\"]",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 350
+    },
+    {
+      "acao": "print",
+      "nome": "30 dias no meio da troca"
     },
     {
       "acao": "esperar",
       "ms": 400
-    },
-    {
-      "acao": "print",
-      "nome": "numeros"
     },
     {
       "acao": "clicar",
@@ -40,8 +62,17 @@
       "ms": 500
     },
     {
+      "acao": "mover_mouse",
+      "seletor": ".chart--timeseries .chart__svg",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 300
+    },
+    {
       "acao": "print",
-      "nome": "segunda aba"
+      "nome": "segunda aba, mouse no grafico"
     },
     {
       "acao": "clicar",
@@ -85,7 +116,7 @@
     },
     {
       "acao": "esperar",
-      "ms": 400
+      "ms": 300
     },
     {
       "acao": "print",
