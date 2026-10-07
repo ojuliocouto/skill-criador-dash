@@ -10,6 +10,9 @@ import { esc } from './html.js';
 import { isoParaBR } from './data-br.js';
 import { transformDoMarcador, animar, DURACAO, CURVA } from './movimento.js';
 
+/** Quanto a pílula leva pra deslizar de um atalho ao outro (ms). */
+export const DURACAO_DA_PILULA = DURACAO.troca + 60;
+
 export const ATALHOS = Object.freeze([
   { id: 'hoje', rotulo: 'Hoje' },
   { id: '7d', rotulo: '7 dias' },
@@ -103,7 +106,7 @@ export function ligarAtalhos(barra, limites, aoMudar) {
     }
     if (!deslizar) return;
     const saida = transformDoMarcador(antes, depois);
-    if (saida !== 'none') animar(pilula, [{ transform: saida }, { transform: 'none' }], { duration: DURACAO.troca + 60, easing: CURVA.vaiVolta });
+    if (saida !== 'none') animar(pilula, [{ transform: saida }, { transform: 'none' }], { duration: DURACAO_DA_PILULA, easing: CURVA.vaiVolta });
   };
 
   const marcar = (id) => {

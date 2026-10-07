@@ -14,6 +14,7 @@ const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ler = (rel) => readFileSync(join(raiz, rel), 'utf8');
 const css = ler('public/assets/css/presenca.css');
 const mainCss = ler('public/assets/css/main.css');
+const efeitosCss = ler('public/assets/css/efeitos.css');
 const TRAVESSAO = String.fromCharCode(8212);
 const PAGINAS = ['public/index.html', 'public/config.html', 'public/dashboard.html', 'public/group.html'];
 const MODULOS_NOVOS = [
@@ -25,7 +26,7 @@ const MODULOS_NOVOS = [
   'functions/lib/aparencia-shape.mjs', 'functions/lib/abertura-do-painel.mjs',
 ];
 const TOCADOS = [
-  ...MODULOS_NOVOS, ...PAGINAS, 'public/assets/css/presenca.css', 'public/assets/css/main.css', 'public/assets/css/assistente.css',
+  ...MODULOS_NOVOS, ...PAGINAS, 'public/assets/css/presenca.css', 'public/assets/css/efeitos.css', 'public/assets/css/main.css', 'public/assets/css/assistente.css',
   'public/assets/js/dashboard.js', 'public/assets/js/index-page.js', 'public/assets/js/config-wizard.js',
   'public/assets/js/wizard/passo-aparencia.js', 'public/assets/js/wizard/previa.js', 'public/assets/js/wizard/passos.js',
   'public/assets/js/lib/config-do-painel.js', 'public/assets/js/lib/cabecalho.js', 'public/assets/js/lib/movimento.js',
@@ -179,4 +180,25 @@ test('páginas: estrutura do carregamento e da saudação só na página do pain
   assert.match(painel, /class="esqueleto"/);
   for (const p of PAGINAS.filter((x) => !x.includes('dashboard'))) assert.ok(!/id="saudacao"/.test(ler(p)), p);
   assert.ok(!/on(click|change|input)=/.test(painel), 'sem handler inline');
+});
+
+// ---------- o mesmo vale pro efeitos.css (3.7.0) ----------
+
+test('efeitos.css: nenhum desfoque e nenhum filter, mesma regra do presenca.css', () => {
+  assert.ok(!/(^|[\s;{])(backdrop-)?filter\s*:/.test(efeitosCss) && !/blur\(/.test(efeitosCss));
+});
+
+test('efeitos.css: gosto do dono, sem caixa alta, sem letra espaçada, sem sombra de texto', () => {
+  assert.ok(!/text-transform:\s*uppercase/i.test(efeitosCss));
+  for (const m of efeitosCss.matchAll(/letter-spacing:\s*([^;]+);/g)) assert.ok(/^-|^0|^normal/.test(m[1].trim()), `letter-spacing ${m[1]}`);
+  assert.ok(!/text-shadow/.test(efeitosCss));
+});
+
+test('efeitos.css: só transform e opacity nas transições e nos @keyframes (clip-path e traço permitidos)', () => {
+  for (const m of efeitosCss.matchAll(/transition(?:-property)?\s*:\s*([^;}]+)/g)) {
+    for (const parte of m[1].split(',')) assert.ok(/^(transform|opacity|clip-path|stroke-dashoffset|none|var\()/.test(parte.trim().split(/\s+/)[0]), `transição em ${parte.trim()}`);
+  }
+  for (const q of efeitosCss.matchAll(/@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g)) {
+    for (const p of new Set([...q[2].matchAll(/([a-z-]+)\s*:/g)].map((x) => x[1]))) assert.ok(['transform', 'opacity', 'stroke-dashoffset', 'clip-path'].includes(p), `@keyframes ${q[1]} anima ${p}`);
+  }
 });
