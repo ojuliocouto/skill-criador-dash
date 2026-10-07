@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.6.0
+version: 3.7.0
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -432,8 +432,9 @@ node ~/.claude/skills/criador-dash/scripts/gravar-video.js "<URL-DO-DASHBOARD>" 
 ```
   Usa a gravação nativa do Playwright (o mesmo navegador de teste do `prova-dash.js`): sem ffmpeg seu e
   sem ferramenta só de Mac, e a pasta de saída pode ter espaço e acento. O roteiro é
-  `scripts/roteiro-padrao.json` (abrir, esperar, mover o mouse, clicar nas abas, escolher no filtro, rolar):
-  serve ao painel de fábrica sem editar nada, e o que não existir no seu painel (abas, filtro) é pulado.
+  `scripts/roteiro-padrao.json` (abrir, esperar, trocar dois atalhos de período, clicar nas abas passando o mouse
+  no gráfico, escolher no filtro, rolar): serve ao painel de fábrica sem editar nada, e o que não existir no
+  seu painel (atalhos, abas, gráfico, filtro) é pulado.
   Roteiro próprio: `--roteiro meu-roteiro.json` (ações em `scripts/video/roteiro.cjs`). Grava
   `prova/video-desktop.webm` e `prova/video-mobile.webm` (WebM, cerca de 1 MB cada) e, porque quem revisa
   lê imagem e não vídeo, uma PRANCHA de 6 quadros tirados durante o mesmo roteiro:
@@ -571,6 +572,21 @@ O assistente de criação (`/config`) é guiado em quatro perguntas, em palavra 
 Movimento: tokens de duração e curva no `main.css`, lógica em `lib/movimento.js`. Só `transform` e
 `opacity`, entrada escalonada na primeira carga e na troca de aba (não a cada filtro), e tudo no estado
 final de imediato com `prefers-reduced-motion`. O valor final do número está no DOM desde o início.
+
+Os 7 efeitos de movimento (3.7.0; CSS em `public/assets/css/efeitos.css`, um módulo por efeito em
+`public/assets/js/lib/`). Todos desligam com `prefers-reduced-motion` e o valor final do número está sempre
+no DOM:
+1. **Cartão que vira a tela** (`cartao-vira-tela.js`, `cobertura-boot.js`): na lista, a linha do painel cresce na cor dele até cobrir a tela, o nome aparece, a página troca e a capa da mesma cor sobe quando o painel desenha.
+2. **Gráfico que responde** (`grafico-responde.js`): régua, ponto e etiqueta (dia, data, valor) deslizam de um dia ao outro sob o mouse ou o toque.
+3. **Período em um clique** (`periodo-atalhos.js`): Hoje, 7 dias, 30 dias, Este mês, Tudo e Personalizado, com a pílula deslizando ao escolhido.
+4. **Números de roleta** (`numero-roleta.js`): só o dígito que mudou rola, numa janela de uma linha por casa; separadores ficam parados.
+5. **Gráfico que se transforma** (`grafico-transforma.js`): a linha vai do desenho antigo ao novo e as barras de meta, ranking e funil crescem ou encolhem.
+6. **Meta batida** (`meta-batida.js`): uma vez por cruzamento de 100%, em cerca de 1,9 s, o cartão acende na cor da marca, uma faixa de luz o atravessa, um clarão corre pela barra, o número pulsa e o selo "Meta batida" entra. Não repete a cada redesenho.
+7. **Tabela que reordena** (`tabela-ordena.js`): clique no cabeçalho ordena (crescente, decrescente, original) e as linhas deslizam; a ordem escolhida sobrevive a filtro, troca de período e Atualizar até novo clique ou troca de aba.
+Faixa de duração deles: nenhum passa de 2,4 s e a troca de período inteira termina em até 1,0 s
+(`test/efeitos-duracao.test.js`). Os tetos de 120 a 700 ms seguem valendo para o resto do painel.
+A medida no navegador (pixels do cartão na meta batida, dígitos por casa na roleta, ordem da tabela)
+está em `node scripts/test-efeitos-no-navegador.cjs`.
 
 Presença (o que faz o painel não parecer modelo pronto; CSS em `public/assets/css/presenca.css`):
 - FUNDO VIVO na cor da marca (`config.accent` e `accent2`): manchas e curvas de gráfico derivando devagar

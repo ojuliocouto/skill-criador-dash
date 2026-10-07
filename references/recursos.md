@@ -26,6 +26,16 @@ fonte; "Limpar filtros" volta ao período/valores cheios. Lógica pura em `lib/f
 barra sobrevive aos repaints (fica fora do `#dashbody`, que é a única parte repintada). No modo
 histórico (D1) o filtro age sobre o snapshot lido, igual ao ao vivo.
 
+
+### Período em um clique, roleta e ordem da tabela (3.7.0)
+Acima dos campos De e Até há atalhos (Hoje, 7 dias, 30 dias, Este mês, Tudo, Personalizado; "Hoje" é o
+último dia COM dado). Ao trocar período ou filtro, os números rolam só no dígito que mudou, o gráfico e as
+barras vão do desenho antigo ao novo, e a meta que cruza 100% toca o marco uma vez. A ordem que a pessoa
+escolheu num cabeçalho de tabela continua valendo depois de filtro, troca de período e Atualizar, até ela
+clicar de novo (crescente, decrescente, original) ou trocar de aba. Tudo isso desliga com
+`prefers-reduced-motion`. Código: `lib/periodo-atalhos.js`, `lib/numero-roleta.js`,
+`lib/grafico-transforma.js`, `lib/meta-batida.js`, `lib/tabela-ordena.js`.
+
 ## Dashboard-grupo (vários dashboards num único link, com ABAS)
 
 Quando a mesma operação tem mais de uma área (Marketing + Vendas + Suporte do mesmo negócio), em vez de
