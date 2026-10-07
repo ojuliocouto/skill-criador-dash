@@ -141,3 +141,64 @@ test('estado final é o estilo base: nenhum seletor de movimento esconde conteú
     assert.deepEqual(regras, [], `${nome}: opacity 0 fora de keyframes em ${regras.join(' | ')}`);
   }
 });
+
+// ---------- travas de CSS e JS também sobre efeitos.css (3.7.0) ----------
+// Os limites acima NÃO mudaram. Aqui a mesma cobertura chega ao efeitos.css e aos módulos dos 7
+// efeitos. Os tetos de 120 a 700 ms não valem pra eles (test/efeitos-duracao.test.js tem a faixa deles).
+
+const efeitosCss = ler('assets/css/efeitos.css');
+const EFEITOS_JS = ['cartao-vira-tela', 'grafico-responde', 'grafico-transforma', 'meta-batida', 'numero-roleta', 'periodo-atalhos', 'tabela-ordena'];
+const semBlocosDeKeyframes = (css) => css.replace(/@keyframes\s+[\w-]+\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
+
+test('efeitos.css: só transform, opacity, stroke-dashoffset e clip-path animam', () => {
+  const permitidas = new Set(['transform', 'opacity', 'stroke-dashoffset', 'clip-path']);
+  const fora = propriedadesAnimadas(efeitosCss).filter((p) => !permitidas.has(p));
+  assert.deepEqual(fora, [], `efeitos.css anima propriedade fora da lista: ${fora.join(', ')}`);
+  assert.ok(propriedadesAnimadas(efeitosCss).includes('transform'), 'o leitor achou as transições do arquivo');
+});
+
+test('efeitos.css: sem filter, backdrop-filter nem blur', () => {
+  assert.ok(!/(^|[\s;{])(backdrop-)?filter\s*:/.test(efeitosCss), 'filter');
+  assert.ok(!/blur\(/.test(efeitosCss), 'blur');
+});
+
+test('efeitos.css: sem caixa alta, sem letra espaçada e sem sombra de texto', () => {
+  assert.ok(!/text-transform:\s*uppercase/i.test(efeitosCss), 'caixa alta');
+  for (const m of efeitosCss.matchAll(/letter-spacing:\s*([^;]+);/g)) assert.ok(/^-|^0(?![.\d])|^normal/.test(m[1].trim()), `letra espaçada: ${m[1]}`);
+  assert.ok(!/text-shadow/.test(efeitosCss), 'sombra de texto');
+});
+
+test('efeitos.css: nenhum conteúdo com opacity 0 fora de @keyframes (só camadas de ponteiro e de transição, sem texto da página)', () => {
+  const regras = [...semBlocosDeKeyframes(efeitosCss).matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter((m) => /opacity:\s*0(?![.\d])/.test(m[2]))
+    .map((m) => m[1].trim())
+    // Exceções declaradas: a régua, o ponto e a etiqueta do gráfico só existem sob o ponteiro (os valores
+    // continuam nos indicadores e na tabela) e o nome da capa de transição é só da animação.
+    .filter((sel) => !/chart__regua|chart__foco|chart__dica|capa__nome/.test(sel));
+  assert.deepEqual(regras, [], `opacity 0 fora de keyframes em ${regras.join(' | ')}`);
+});
+
+test('efeitos.css: nenhum !important (a regra global de movimento reduzido do main.css sempre vence)', () => {
+  assert.ok(!/!important/.test(efeitosCss));
+});
+
+test('movimento reduzido: toda página que carrega efeitos.css carrega o main.css, e cada módulo de efeito se desliga', () => {
+  for (const pagina of ['dashboard.html', 'index.html']) {
+    const html = ler(pagina);
+    assert.ok(html.includes('/assets/css/efeitos.css') && html.includes('/assets/css/main.css'), pagina);
+  }
+  for (const nome of EFEITOS_JS) {
+    const js = ler(`assets/js/lib/${nome}.js`);
+    // CSS puro (régua do gráfico) é zerado pela regra global; JS precisa consultar o movimento reduzido.
+    const consulta = /menosMovimento|animar\(|prefers-reduced-motion/.test(js);
+    const soCss = nome === 'grafico-responde' && !/\.animate\(/.test(js);
+    assert.ok(consulta || soCss, `${nome}.js anima sem consultar o movimento reduzido`);
+  }
+  assert.match(ler('assets/js/lib/cobertura-boot.js'), /prefers-reduced-motion:\s*reduce/);
+});
+
+test('movimento reduzido: o estado final é o estilo base do efeitos.css (nada fica escondido ou deslocado)', () => {
+  const regras = [...semBlocosDeKeyframes(efeitosCss).matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+  const deslocadas = regras.filter((m) => /(^|[;\s])transform:\s*(?!none|translate\(0|scale\(1\))/.test(m[2]) && !/regua|foco|dica|atalhos__pilula|capa|kpi__onda|goal-clarao|rd__/.test(m[1]));
+  assert.deepEqual(deslocadas.map((m) => m[1].trim()), [], 'transform fixo no estilo base');
+});

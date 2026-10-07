@@ -370,6 +370,7 @@ folha que revela o painel.
 | Saudação | `lib/saudacao.js` (quem cumprimenta, quando, tempos, HTML) | `lib/abertura.js` | `presenca.css` |
 | Carregamento | `lib/esqueleto.js`, `lib/estado-de-erro.js`, `lib/atualizado.js` | `lib/carregamento.js`, `dashboard.js` | `presenca.css` |
 | Modo inicial | `lib/tema-inicial.js`, `lib/modo-sugerido.js` | `lib/theme.js`, `lib/transicao.js` | `main.css`, `presenca.css` |
+| 7 efeitos de movimento (3.7.0) | `lib/cartao-vira-tela.js`, `grafico-responde.js`, `periodo-atalhos.js`, `numero-roleta.js`, `grafico-transforma.js`, `meta-batida.js`, `tabela-ordena.js` | `dashboard.js`, `index-page.js` | `efeitos.css` |
 | No servidor | `functions/lib/aparencia-shape.mjs`, `functions/lib/abertura-do-painel.mjs` | `functions/_middleware.js` | |
 
 - **Fundo vivo**: camada fixa atrás do conteúdo (`.fundo`, z-index -1) com duas manchas e duas folhas de

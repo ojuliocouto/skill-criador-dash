@@ -49,7 +49,7 @@ export function larguraDoDesenho(col, larguraDaTela) {
  * @returns {string} HTML
  */
 export function render(props = {}, points) {
-  const { title = '' } = props;
+  const { title = '', format = 'number' } = props;
   const titleHtml = title ? `<div class="chart__title">${esc(title)}</div>` : '';
   const list = Array.isArray(points) ? points : [];
 
@@ -132,7 +132,7 @@ export function render(props = {}, points) {
   const baseline = round(plotY + plotH);
   const areaPts = `${coords[0].x},${baseline} ${pts} ${coords[coords.length - 1].x},${baseline}`;
   const dots = coords
-    .map((c) => `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="3" />`)
+    .map((c, i) => `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="3" data-d="${esc(String(list[i].date == null ? '' : list[i].date).trim())}" data-v="${Number(list[i].value) || 0}" />`)
     .join('');
   const series = `<polygon class="chart__area" points="${areaPts}" />` +
     `<polyline class="chart__line" fill="none" points="${pts}" />${dots}`;
@@ -150,7 +150,7 @@ export function render(props = {}, points) {
   return (
     `<div class="chart chart--timeseries">` +
       titleHtml +
-      `<svg class="chart__svg" viewBox="0 0 ${Wc} ${H}" role="img" aria-label="${esc(label)}">` +
+      `<svg class="chart__svg" viewBox="0 0 ${Wc} ${H}" data-formato="${esc(format)}" role="img" aria-label="${esc(label)}">` +
         gridHtml +
         series +
         xLabelsHtml +

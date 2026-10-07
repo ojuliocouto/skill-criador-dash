@@ -32,6 +32,17 @@ teste('o roteiro padrão tem no mínimo 6 prints (a prancha de quadros)', () => 
   assert.ok(padrao.passos.filter((p) => p.acao === 'print').length >= 6);
 });
 
+teste('o roteiro padrão troca dois atalhos de período e passa o mouse no gráfico, todos opcionais (o painel pode não ter)', () => {
+  const clicaAtalho = padrao.passos.filter((p) => p.acao === 'clicar' && /data-atalho/.test(p.seletor || ''));
+  assert.ok(clicaAtalho.length >= 2, `só ${clicaAtalho.length} clique(s) em atalho de período`);
+  assert.ok(new Set(clicaAtalho.map((p) => p.seletor)).size >= 2, 'os dois cliques são em atalhos diferentes');
+  assert.ok(clicaAtalho.every((p) => p.opcional === true), 'atalho de período precisa ser opcional');
+  const gancho = padrao.passos.filter((p) => p.acao === 'mover_mouse' && /chart/.test(p.seletor || ''));
+  assert.ok(gancho.length >= 1 && gancho.every((p) => p.opcional === true), 'passar o mouse no gráfico, opcional');
+  const i = padrao.passos.findIndex((p) => p.acao === 'clicar' && /data-atalho/.test(p.seletor || ''));
+  assert.ok(padrao.passos.slice(i, i + 4).some((p) => p.acao === 'print'), 'o quadro da troca de período sai logo depois do clique');
+});
+
 teste('roteiro sem passos, sem abrir no começo ou com ação desconhecida é recusado', () => {
   assert.ok(roteiro.validarRoteiro({ passos: [] }).erros.length);
   assert.ok(roteiro.validarRoteiro({}).erros.length);
@@ -50,6 +61,14 @@ teste('cada ação cobra os seus campos', () => {
   assert.match(erros({ acao: 'escolher', seletor: 'select' }), /indice|valor/);
   assert.match(erros({ acao: 'print' }), /nome/);
   assert.match(erros({ acao: 'esperar_seletor' }), /seletor/);
+});
+
+teste('ação teclar: exige a tecla e entra na duração prevista (serve a mudar o atalho de período com o gráfico à vista no celular)', () => {
+  const erros = (p) => roteiro.validarRoteiro({ passos: [{ acao: 'abrir' }, p] }).erros.join();
+  assert.match(erros({ acao: 'teclar' }), /tecla/);
+  assert.doesNotMatch(erros({ acao: 'teclar', tecla: 'ArrowRight' }), /tecla|desconhecida/);
+  assert.ok(roteiro.ACOES.includes('teclar'));
+  assert.ok(roteiro.duracaoPrevistaMs([{ acao: 'teclar', tecla: 'ArrowRight' }]) > 0);
 });
 
 teste('roteiro com menos de 6 prints é recusado', () => {

@@ -43,6 +43,13 @@ import {
 import { periodoDosDados, cabecalhoHtml, estadoDosDadosHtml } from './lib/cabecalho.js';
 import { saidaDoElemento } from './widgets/meta.js';
 import { ocupar } from './wizard/dom.js';
+import { ligarGraficoResponde } from './lib/grafico-responde.js';
+import { fotografarDados, transformarDados } from './lib/grafico-transforma.js';
+import { rolarIndicadores } from './lib/numero-roleta.js';
+import { atalhosHtml, ligarAtalhos } from './lib/periodo-atalhos.js';
+import { cruzouMeta, marcarMetaBatida } from './lib/meta-batida.js';
+import { prepararCapa, levantarCapa } from './lib/cartao-vira-tela.js';
+import { ligarTabelaOrdena } from './lib/tabela-ordena.js';
 
 /**
  * Agrupa itens de layout: kpis consecutivos viram um unico bloco 'kpis';
@@ -518,10 +525,10 @@ export function buildFilterBar(template, dataset, colMap, opts = {}) {
           `<input id="${id}" type="text" inputmode="numeric" autocomplete="off" maxlength="10" ` +
           `placeholder="dd/mm/aaaa" class="input fb-input fb-date" value="" ` +
           `title="Dados de ${esc(de)} a ${esc(ate)}. Ex: ${esc(exemplo)}" /></div>`;
-      fields.push(campo('fb-from', 'De', de), campo('fb-to', 'Até', ate));
-      if (opts.mostrarIntervalo !== false) {
-        fields.push(`<span class="fb-range hint">Dados de ${esc(de)} a ${esc(ate)}</span>`);
-      }
+      // Atalhos de período (um clique) e, como opção "Personalizado", os campos digitados.
+      const intervalo = opts.mostrarIntervalo !== false ? `<span class="fb-range hint">Dados de ${esc(de)} a ${esc(ate)}</span>` : '';
+      fields.push(atalhosHtml('tudo'));
+      fields.push(`<div class="fb-datas" hidden>${campo('fb-from', 'De', de)}${campo('fb-to', 'Até', ate)}${intervalo}</div>`);
     }
   }
 
@@ -557,7 +564,8 @@ function readFilterState() {
     dims[el.dataset.slot] = el.value || '';
   });
   // Datas digitadas em dd/mm/aaaa viram ISO; data incompleta ou invalida nao filtra.
-  return { from: brParaISO(val('fb-from')), to: brParaISO(val('fb-to')), dims };
+  const barra = document.getElementById('filterbar');
+  return { from: brParaISO(val('fb-from')), to: brParaISO(val('fb-to')), dims, atalho: barra && barra.dataset.periodo ? barra.dataset.periodo : null };
 }
 
 // Monta o ctx de render (métricas, tendência e meta JÁ calculadas em cima das linhas
@@ -607,6 +615,8 @@ function renderBody(baseCtx, state, modo = 'quieto', extra = {}) {
   if (!bodyEl) return;
   const ctx = montarCtx(baseCtx, state);
   const antes = extra.antes || (modo === 'filtro' ? valoresDosIndicadores(bodyEl) : null);
+  // Foto do gráfico e das barras que estão na tela, pra o desenho novo sair deles (efeito 2).
+  const foto = modo === 'filtro' && !extra.antes ? fotografarDados(bodyEl) : null;
 
   // A classe entra ANTES do conteúdo: os elementos novos já nascem com a animação de entrada.
   // Fora da entrada ela sai, então o conteúdo novo nasce parado.
@@ -615,11 +625,22 @@ function renderBody(baseCtx, state, modo = 'quieto', extra = {}) {
   if (metaEl) metaEl.textContent = buildMetaText(ctx.dataset);
   if (modo === 'entrada') contarIndicadores(bodyEl, { atraso: extra.atraso || 0 });
   if (modo === 'filtro') {
-    contarIndicadores(bodyEl, { de: antes || [] });
+    // Números de roleta (efeito 3) no lugar da contagem; gráfico e barras vão do desenho antigo
+    // ao novo (efeito 2). Cartão que tem gráfico ou barras não recomeça: ele se transforma.
+    rolarIndicadores(bodyEl, antes || []);
+    if (foto) transformarDados(bodyEl, foto);
     bodyEl.querySelectorAll('.dash-cell').forEach((celula, i) => {
+      if (celula.querySelector('.chart--timeseries, .ranking, .funnel')) return;
       animar(celula, [{ opacity: 0.35, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
         { duration: DURACAO.troca, delay: Math.min(i, 4) * 30, fill: 'backwards' });
     });
+  }
+  // Meta batida (efeito 5): o marco toca quando a barra CRUZA 100%, uma vez; continuar batida
+  // depois não repete. A primeira carga só registra de onde se parte.
+  if (ctx.goal && baseCtx.ui) {
+    const cruzou = cruzouMeta(baseCtx.ui.pctMeta, ctx.goal.pct);
+    baseCtx.ui.pctMeta = ctx.goal.pct;
+    if (cruzou && (modo === 'filtro' || modo === 'entrada') && !extra.semMarco) marcarMetaBatida(bodyEl);
   }
 }
 
@@ -849,6 +870,11 @@ function wireMeta(baseCtx) {
 function wireFilters(baseCtx) {
   const bar = document.getElementById('filterbar');
   if (!bar) return;
+  // Atalhos de período (efeito 4): um clique põe a faixa nos campos e dispara a transição.
+  const dateCol = baseCtx.colMap && baseCtx.colMap[resolveDateSlot(baseCtx.template)];
+  const limites = dateCol ? dateBounds(baseCtx.dataset.rows, dateCol) : { min: null, max: null };
+  baseCtx.atalhos = ligarAtalhos(bar, limites, () => renderBody(baseCtx, readFilterState(), 'filtro'));
+  if (baseCtx.atalhos) ouvintesDaJanela.push(baseCtx.atalhos.soltar);
   bar.addEventListener('change', () => renderBody(baseCtx, readFilterState(), 'filtro'));
   // Mascara dd/mm/aaaa enquanto digita; filtra assim que a data fica completa ou vazia.
   bar.querySelectorAll('.fb-date').forEach((el) => {
@@ -862,6 +888,7 @@ function wireFilters(baseCtx) {
   if (reset) {
     reset.addEventListener('click', () => {
       bar.querySelectorAll('input, select').forEach((el) => { el.value = ''; });
+      if (baseCtx.atalhos) baseCtx.atalhos.selecionar('tudo', { silencioso: true });
       renderBody(baseCtx, emptyFilterState(), 'filtro');
     });
   }
@@ -909,7 +936,7 @@ export function renderDashboard(app, baseCtx, opts = {}) {
   const abas = abasVisiveis(abasDoTemplate(template), (t) => buildBodyHtml({ ...ctxSemFiltro, layout: t.layout }));
   const abaAtiva = resolverAba(abas, opts.previa ? opts.abaInicial : abaDoHash(location.hash));
   // O que a pessoa digitou na calculadora de meta sobrevive a um Atualizar (opts.metaInicial).
-  baseCtx.ui = { abas, abaAtiva, meta: opts.metaInicial || {} };
+  baseCtx.ui = { abas, abaAtiva, meta: opts.metaInicial || {}, pctMeta: opts.pctMetaInicial == null ? null : opts.pctMetaInicial };
   const abasHtml = barraDeAbasHtml(abas, abaAtiva, 'dashbody');
   const painelAttrs = abas.length
     ? ` role="tabpanel" tabindex="0" aria-labelledby="${esc(idDoBotaoDaAba(abaAtiva))}"`
@@ -955,6 +982,8 @@ export function renderDashboard(app, baseCtx, opts = {}) {
   wireAbas(app, baseCtx);
   wireMeta(baseCtx);
   wireLargura(baseCtx);
+  ouvintesDaJanela.push(ligarGraficoResponde(document.getElementById('dashbody')));
+  ouvintesDaJanela.push(ligarTabelaOrdena(document.getElementById('dashbody'), { aba: () => (baseCtx.ui ? baseCtx.ui.abaAtiva : '') }));
   wireAtualizar(app, baseCtx, opts);
   return { abaAtiva: () => (baseCtx.ui ? baseCtx.ui.abaAtiva : null) };
 }
@@ -964,6 +993,8 @@ let vezDaAbertura = 0;
 // Valor que não existe mais na fonte nova (um canal que saiu) simplesmente não volta.
 function restaurarFiltros(estado) {
   if (!estado || typeof estado !== 'object') return false;
+  const barra = document.getElementById('filterbar');
+  if (barra && estado.atalho) barra.dataset.periodo = estado.atalho;
   const por = (id, valor) => {
     const el = document.getElementById(id);
     if (el && valor) el.value = isoParaBR(valor);
@@ -1014,7 +1045,8 @@ function wireAtualizar(app, baseCtx, opts) {
       const estadoInicial = readFilterState();
       const metaInicial = baseCtx.ui ? baseCtx.ui.meta : {};
       baseCtx.dataset = novo;
-      renderDashboard(app, baseCtx, { ...opts, modo: 'filtro', estadoInicial, metaInicial });
+      const pctMetaInicial = baseCtx.ui ? baseCtx.ui.pctMeta : null;
+      renderDashboard(app, baseCtx, { ...opts, modo: 'filtro', estadoInicial, metaInicial, pctMetaInicial });
       const novoBotao = app.querySelector('#dashatualizar');
       if (novoBotao) novoBotao.focus({ preventScroll: true });
     } catch (err) {
@@ -1118,10 +1150,13 @@ async function loadDashboardInto(container, config, id, opts = {}) {
   // as peças dele entram em sequência com ela. Sem saudação, entra agora.
   const desenhar = (comCortina) => {
     if (!container.isConnected) return;
+    // Com a capa da lista acesa, as peças do painel entram quando ela começa a subir.
+    const comCapa = document.documentElement.hasAttribute('data-cobertura');
     renderDashboard(container, baseCtx, {
-      ...opts, modo: 'abertura', atrasoDaAbertura: comCortina ? TEMPOS.entradaBase : 0, aoAtualizar: buscar,
+      ...opts, modo: 'abertura', atrasoDaAbertura: comCortina ? TEMPOS.entradaBase : (comCapa ? 200 : 0), aoAtualizar: buscar,
     });
     terminarProgresso();
+    levantarCapa();
   };
   if (abertura) abertura.quandoRevelar(desenhar); else desenhar(false);
   return true;
@@ -1214,6 +1249,7 @@ async function init() {
   // o relógio dela antes de qualquer espera de rede.
   if (!abertura) abertura = prepararAbertura(id);
 
+  prepararCapa();
   // 1. Config
   let config;
   try {
