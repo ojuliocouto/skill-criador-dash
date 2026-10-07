@@ -53,14 +53,19 @@
   .filterbar .fb-datas { flex: 1 1 100%; }
 }
 
-/* EFEITO 5: meta batida. Onda na cor da marca atravessa o cartão e o selo entra. */
-.kpi__onda { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+/* EFEITO 5: meta batida. O cartão acende na cor da marca, uma faixa de luz o atravessa, um clarão
+   corre pela barra, o número pulsa e o selo entra com peso. As camadas nascem por JS e saem no fim;
+   o "de" de cada animação (opacidade 0) vem do primeiro quadro dela, nunca do CSS. */
+.kpi__onda { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
 .kpi__onda ~ * { position: relative; z-index: 1; }
-.kpi__onda-disco, .kpi__onda-anel { position: absolute; border-radius: 50%; opacity: 0; transform-origin: center; }
-.kpi__onda-disco { background: var(--accent-solido, var(--accent)); }
-.kpi__onda-anel { border: 3px solid var(--accent-solido, var(--accent)); }
-.kpi__onda-anel--eco { border-width: 1.5px; }
-.kpi__selo { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 8px 1px 6px; border-radius: 999px;
+.kpi__onda-luz { position: absolute; inset: 0; background: var(--accent-solido, var(--accent)); }
+.kpi__onda-passa { position: absolute; top: 0; bottom: 0; left: 0; width: 55%; }
+.kpi__onda-faixa { position: absolute; inset: 0; background: var(--accent-solido, var(--accent)); opacity: 0.22; }
+.kpi__onda-frente { position: absolute; top: 0; bottom: 0; right: 0; width: 14%; background: var(--accent-solido, var(--accent)); opacity: 0.5; }
+.kpi__goal-track { position: relative; }
+.kpi__goal-clarao { position: absolute; top: 0; bottom: 0; left: 0; width: 28%; background: #fff; pointer-events: none; }
+.kpi__value { transform-origin: 0 60%; }
+.kpi__selo { transform-origin: 0 50%; display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 8px 1px 6px; border-radius: 999px;
   background: var(--good); color: var(--on-good); font-size: 11px; font-weight: 600; letter-spacing: 0; vertical-align: baseline; }
 .kpi__selo svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
