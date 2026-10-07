@@ -69,7 +69,7 @@ export function render(props = {}, value) {
     goalHtml =
       `<div class="kpi__goal">` +
         `<div class="kpi__goal-track"><div class="kpi__goal-fill${done}" style="width:${w.toFixed(1)}%"></div></div>` +
-        `<div class="kpi__goal-text">${esc(goal.text)}</div>` +
+        `<div class="kpi__goal-text">${esc(goal.text)}${done ? `<span class="kpi__selo"><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.4 6.3l2.4 2.4 4.8-5.2" /></svg>Meta batida</span>` : ''}</div>` +
       `</div>`;
   }
   // Sem coluna mapeada o valor e 0 por fallback: desenhar a serie disso mostraria um

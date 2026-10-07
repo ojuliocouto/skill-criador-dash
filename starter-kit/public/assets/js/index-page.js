@@ -7,6 +7,7 @@ import { esqueletoDaListaHtml } from './lib/esqueleto.js';
 import { erroHtml, explicarFalha } from './lib/estado-de-erro.js';
 import { comecarProgresso, terminarProgresso } from './lib/carregamento.js';
 import { animar, menosMovimento, DURACAO } from './lib/movimento.js';
+import { cartaoViraTela } from './lib/cartao-vira-tela.js';
 
 const lista = document.getElementById('lista');
 
@@ -45,7 +46,7 @@ function itemHTML(dash) {
   const logo = safeLogoSrc(dash.logo);
   const logoImg = logo ? `<img class="brand-logo" alt="${nome}" src="${esc(logo)}" />` : '';
   return `
-    <div class="list-item" data-id="${id}" style="padding:14px 0;border-bottom:1px solid var(--border);">
+    <div class="list-item" data-id="${id}" data-aberto data-accent="${esc(dash.accent || '')}" data-nome="${nome}" style="padding:14px 0;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:10px;">
         ${logoImg}
         <div>
@@ -76,16 +77,21 @@ function renderLista(dashboards) {
   });
 }
 
-// Abrir um painel a partir da lista: a lista sai subindo um pouco e só então a página troca; o
-// painel entra com a abertura dele (saudação ou carregamento). Clique com tecla de atalho (nova
-// aba) e movimento reduzido navegam direto, como sempre.
+// Abrir um painel a partir da lista (efeito 6, cartão que vira a tela): o cartão do painel cresce
+// até cobrir a tela na cor da marca dele e a abertura do painel continua dessa mesma cor. Clique
+// com tecla de atalho (nova aba) e movimento reduzido navegam direto, como sempre. Se o cartão
+// não puder crescer, vale a saída de antes: a lista sobe um pouco e some.
 const principal = document.getElementById('main');
 lista.addEventListener('click', (ev) => {
-  const link = ev.target && ev.target.closest ? ev.target.closest('a[href^="/dashboard"]') : null;
-  if (!link || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
-  if (menosMovimento() || !principal) return;
+  if (!ev.target || !ev.target.closest || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  if (ev.target.closest('[data-excluir], .excluir-senha, input, select, textarea')) return;
+  const cartao = ev.target.closest('.list-item');
+  const link = cartao ? cartao.querySelector('a[href^="/dashboard"]') : null;
+  if (!link || menosMovimento() || !principal) return;
   ev.preventDefault();
   comecarProgresso();
+  const usou = cartaoViraTela(cartao, { cor: cartao.dataset.accent, nome: cartao.dataset.nome, destino: link.href, idDoPainel: cartao.dataset.id });
+  if (usou) return;
   animar(principal, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-12px)' }],
     { duration: DURACAO.toque, easing: 'ease-in', fill: 'forwards' });
   setTimeout(() => { window.location.href = link.href; }, DURACAO.toque);

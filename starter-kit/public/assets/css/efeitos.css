@@ -1,0 +1,82 @@
+/* Efeitos de movimento do protótipo (um bloco por efeito, cada um com o seu arquivo em js/lib/).
+   Regras do kit que valem aqui: só transform e opacity animam; nada de gradiente, desfoque nem
+   brilho; o estilo base é o estado FINAL (a animação parte de um "de" e chega nele); com
+   prefers-reduced-motion a regra global do main.css zera transition e animation. */
+:root {
+  --dur-regua: 140ms;   /* régua e etiqueta do gráfico indo de um dia ao outro */
+  --dur-dados: 640ms;   /* gráfico, barras e números indo do valor antigo ao novo */
+}
+
+/* EFEITO 1: gráfico que responde. Régua, ponto do dia e etiqueta com data e valor. */
+.chart--timeseries { position: relative; }
+.chart--timeseries .chart__svg { touch-action: pan-y; cursor: crosshair; }
+.chart__regua { stroke: var(--text-faint); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0; pointer-events: none;
+  transform-origin: 0 0; transition: transform var(--dur-regua) var(--ease-saida), opacity var(--dur-regua) var(--ease-saida); }
+.chart__foco { fill: var(--accent-graph, var(--accent)); stroke: var(--bg-elev); stroke-width: 2.5; opacity: 0; pointer-events: none;
+  transform-origin: 0 0; transition: transform var(--dur-regua) var(--ease-saida), opacity var(--dur-regua) var(--ease-saida); }
+.chart__regua.is-ativa, .chart__foco.is-ativa { opacity: 1; }
+.chart__dica { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; opacity: 0; white-space: nowrap;
+  display: flex; flex-direction: column; gap: 1px; padding: 7px 11px 8px; border-radius: 9px;
+  background: var(--bg-elev-2); border: 1px solid var(--border); font-variant-numeric: tabular-nums;
+  transition: transform var(--dur-regua) var(--ease-saida), opacity var(--dur-regua) var(--ease-saida); }
+.chart__dica.is-ativa { opacity: 1; }
+.chart__dica-data { font-size: 11.5px; color: var(--text-dim); }
+.chart__dica-valor { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.015em; }
+.chart--sem-deslize .chart__dica, .chart--sem-deslize .chart__regua, .chart--sem-deslize .chart__foco { transition: none; }
+/* Com a régua ativa, os pontos fixos do gráfico saem do caminho: só o do dia em foco aparece. */
+.chart--em-foco .chart__point { opacity: 0.35; }
+
+/* EFEITO 3: números de roleta. O texto final fica no DOM (transparente) e a roleta vai por cima. */
+.kpi__roleta { position: absolute; left: 0; top: 0; display: flex; white-space: nowrap; color: var(--text); pointer-events: none; user-select: none; }
+.rd { display: block; height: 1.15em; line-height: 1.15; }
+.rd--col { overflow: hidden; }
+.rd__tira { display: block; }
+.rd__cel { display: block; height: 1.15em; line-height: 1.15; }
+
+/* EFEITO 4: período em um clique. Controle segmentado com a pílula que desliza até o escolhido. */
+.atalhos { position: relative; display: inline-flex; box-sizing: border-box; height: 40px; max-width: 100%; gap: 2px; padding: 3px; border-radius: 11px;
+  background: var(--bg-elev-2); border: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.atalhos::-webkit-scrollbar { display: none; }
+.atalho { position: relative; z-index: 1; flex: 0 0 auto; display: flex; align-items: center; border: 0; background: transparent; color: var(--text-dim);
+  font: inherit; font-size: 13.5px; font-weight: 500; padding: 0 13px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.atalho:hover { color: var(--text); }
+.atalho[aria-checked="true"] { background: var(--accent-solido, var(--accent)); color: #fff; }
+.atalhos--pilula .atalho[aria-checked="true"], .atalhos--pilula .atalho[aria-checked="true"]:hover { background: transparent; color: #fff; }
+.atalhos__pilula { position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 8px; transform-origin: 0 0;
+  background: var(--accent-solido, var(--accent)); pointer-events: none; }
+.fb-atalhos-campo { min-width: 0; max-width: 100%; }
+.fb-datas { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+.fb-datas[hidden] { display: none; }
+@media (max-width: 620px) {
+  .filterbar .fb-atalhos-campo { flex: 1 1 100%; }
+  .atalhos { display: flex; }
+  .filterbar .fb-datas { flex: 1 1 100%; }
+}
+
+/* EFEITO 5: meta batida. Onda na cor da marca atravessa o cartão e o selo entra. */
+.kpi__onda { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.kpi__onda ~ * { position: relative; z-index: 1; }
+.kpi__onda-disco, .kpi__onda-anel { position: absolute; border-radius: 50%; opacity: 0; transform-origin: center; }
+.kpi__onda-disco { background: var(--accent-solido, var(--accent)); }
+.kpi__onda-anel { border: 3px solid var(--accent-solido, var(--accent)); }
+.kpi__onda-anel--eco { border-width: 1.5px; }
+.kpi__selo { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 8px 1px 6px; border-radius: 999px;
+  background: var(--good); color: var(--on-good); font-size: 11px; font-weight: 600; letter-spacing: 0; vertical-align: baseline; }
+.kpi__selo svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* EFEITO 6: cartão que vira a tela. Na lista, a capa cresce do cartão até cobrir a tela; no painel,
+   uma capa da mesma cor está acesa no primeiro quadro e sobe quando o painel já desenhou. */
+.capa { position: fixed; left: 0; top: 0; z-index: 1000; transform-origin: 0 0; pointer-events: none; }
+.capa__nome, .cobertura__nome { font-family: var(--font); font-weight: 600; font-size: clamp(26px, 5vw, 44px); line-height: 1.1;
+  letter-spacing: -0.03em; text-align: center; padding: 0 24px; pointer-events: none; }
+.capa__nome { position: fixed; left: 0; right: 0; top: 50%; z-index: 1001; margin-top: -0.55em; opacity: 0; }
+.cobertura { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center;
+  background: var(--cobertura-cor, #5b62d6); pointer-events: none; }
+html[data-cobertura] .cobertura { display: flex; }
+.list-item[data-aberto] { cursor: pointer; }
+
+/* EFEITO 7: tabela que reordena. Cabeçalho clicável com a seta da ordem; as linhas deslizam por JS (transform). */
+.table .table__el thead th[data-ordenavel] { cursor: pointer; user-select: none; }
+.table .table__el thead th[data-ordenavel]:hover, .table .table__el thead th[aria-sort="ascending"], .table .table__el thead th[aria-sort="descending"] { color: var(--text); }
+.table .table__el thead th[aria-sort="ascending"]::after { content: " \2191"; }
+.table .table__el thead th[aria-sort="descending"]::after { content: " \2193"; }

@@ -102,7 +102,9 @@ export const registry = {
       const title = props.title || 'Evolução no tempo';
       // repassa o span da celula: a proporcao do grafico depende da largura que ele vai ocupar
       // e a largura da tela: em tela estreita a célula ocupa tudo e o col deixa de valer
-      return card(null, renderTimeseries({ title, col: item && item.col, screenWidth: ctx.larguraDaTela }, points), 'chart');
+      const valDef = findMetricDef(template, props.valueSlot);
+      const format = props.format || (valDef && valDef.format) || 'number';
+      return card(null, renderTimeseries({ title, col: item && item.col, screenWidth: ctx.larguraDaTela, format }, points), 'chart');
     },
   },
 
