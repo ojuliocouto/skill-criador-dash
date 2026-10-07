@@ -63,3 +63,9 @@ test('atalhosHtml: radiogrupo com um item marcado, todos com nome legível e o c
   for (const r of ['Hoje', '7 dias', '30 dias', 'Este mês', 'Tudo', 'Personalizado']) assert.ok(html.includes(`>${r}<`), r);
   assert.ok(!/\u2014/.test(html));
 });
+
+test('setas do teclado trocam o atalho sem puxar a página de volta ao topo (foco com preventScroll)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const js = readFileSync(new URL('../public/assets/js/lib/periodo-atalhos.js', import.meta.url), 'utf8');
+  assert.match(js, /prox\.focus\(\{ preventScroll: true \}\)/);
+});

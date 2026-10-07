@@ -159,7 +159,7 @@ export function ligarAtalhos(barra, limites, aoMudar) {
     if (i < 0) return;
     e.preventDefault();
     const prox = lista[(i + (e.key === 'ArrowRight' ? 1 : lista.length - 1)) % lista.length];
-    prox.focus();
+    prox.focus({ preventScroll: true });
     selecionar(prox.dataset.atalho);
   });
 
