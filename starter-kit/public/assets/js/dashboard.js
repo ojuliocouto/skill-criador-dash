@@ -983,7 +983,7 @@ export function renderDashboard(app, baseCtx, opts = {}) {
   wireMeta(baseCtx);
   wireLargura(baseCtx);
   ouvintesDaJanela.push(ligarGraficoResponde(document.getElementById('dashbody')));
-  ouvintesDaJanela.push(ligarTabelaOrdena(document.getElementById('dashbody')));
+  ouvintesDaJanela.push(ligarTabelaOrdena(document.getElementById('dashbody'), { aba: () => (baseCtx.ui ? baseCtx.ui.abaAtiva : '') }));
   wireAtualizar(app, baseCtx, opts);
   return { abaAtiva: () => (baseCtx.ui ? baseCtx.ui.abaAtiva : null) };
 }

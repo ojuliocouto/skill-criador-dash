@@ -139,6 +139,57 @@ async function main() {
       await ctx.close();
     });
 
+    // ------------------------------------------------------------------ TABELA
+    const LINHAS = [
+      { Canal: 'Google', Leads: 120, Receita: 4000 }, { Canal: 'Instagram', Leads: 480, Receita: 900 },
+      { Canal: 'Email', Leads: 75, Receita: 12000 }, { Canal: 'Direto', Leads: 300, Receita: 2500 }, { Canal: 'Afiliados', Leads: 15, Receita: 100 },
+    ];
+    const FILTRADAS = [LINHAS[3], LINHAS[0], LINHAS[1], LINHAS[4]]; // outro período: outra seleção, outra ordem
+    const colunaLeads = (pagina) => pagina.evaluate(() => [...document.querySelectorAll('.table__el tbody tr')].map((tr) => tr.cells[1].textContent));
+    const pintar = (pagina, linhas) => pagina.evaluate((linhas) => { document.getElementById('grade').innerHTML = window.__efeitos.renderTabela({ title: 'Canais' }, { columns: ['Canal', 'Leads', 'Receita'], rows: linhas }); }, linhas);
+    const montarTabela = async (pagina) => {
+      await pagina.evaluate(() => { window.__aba = 'canais'; window.__efeitos.ligarTabelaOrdena(document.getElementById('grade'), { aba: () => window.__aba }); });
+      await pintar(pagina, LINHAS);
+    };
+    const esperarFim = (pagina) => pagina.evaluate(() => new Promise((ok) => setTimeout(ok, 700)));
+
+    await teste('tabela: a ordem escolhida sobrevive a filtro, troca de período e Atualizar, e sai com novo clique', async () => {
+      const { ctx, pagina } = await abrir(browser, bancada.url);
+      await montarTabela(pagina);
+      await pagina.locator('.table__el thead th').nth(1).click(); // Leads crescente
+      await esperarFim(pagina);
+      assert.deepEqual(await colunaLeads(pagina), ['15', '75', '120', '300', '480']);
+      await pintar(pagina, FILTRADAS); // filtro: outras linhas
+      assert.deepEqual(await colunaLeads(pagina), ['15', '120', '300', '480'], 'depois do filtro a ordem voltou à original');
+      assert.equal(await pagina.locator('.table__el thead th').nth(1).getAttribute('aria-sort'), 'ascending');
+      await pintar(pagina, LINHAS); // Atualizar: tudo de novo
+      assert.deepEqual(await colunaLeads(pagina), ['15', '75', '120', '300', '480']);
+      await pagina.locator('.table__el thead th').nth(1).click(); // decrescente
+      await esperarFim(pagina);
+      await pintar(pagina, FILTRADAS);
+      assert.deepEqual(await colunaLeads(pagina), ['480', '300', '120', '15']);
+      await pagina.locator('.table__el thead th').nth(1).click(); // terceira volta: original
+      await esperarFim(pagina);
+      await pintar(pagina, LINHAS);
+      assert.deepEqual(await colunaLeads(pagina), ['120', '480', '75', '300', '15']);
+      assert.deepEqual(pagina.__erros, []);
+      await ctx.close();
+    });
+
+    await teste('tabela: trocar de aba de tabela esquece a ordem', async () => {
+      const { ctx, pagina } = await abrir(browser, bancada.url);
+      await montarTabela(pagina);
+      await pagina.locator('.table__el thead th').nth(2).click();
+      await esperarFim(pagina);
+      await pagina.evaluate(() => { window.__aba = 'funil'; });
+      await pintar(pagina, LINHAS);
+      assert.deepEqual(await colunaLeads(pagina), ['120', '480', '75', '300', '15']);
+      await pagina.evaluate(() => { window.__aba = 'canais'; });
+      await pintar(pagina, LINHAS);
+      assert.deepEqual(await colunaLeads(pagina), ['120', '480', '75', '300', '15'], 'ao voltar à aba antiga a ordem não pode reaparecer');
+      await ctx.close();
+    });
+
     // ------------------------------------------------------------------ ROLETA
     const { planoDaRoleta } = await import('../starter-kit/public/assets/js/lib/numero-roleta.js');
     const CASOS = [

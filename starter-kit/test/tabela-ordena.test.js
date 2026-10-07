@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { valorDeOrdenacao, ordemDasLinhas, proximaDirecao } from '../public/assets/js/lib/tabela-ordena.js';
+import { valorDeOrdenacao, ordemDasLinhas, proximaDirecao, assinaturaDaTabela, registrarOrdem, reconciliarOrdem } from '../public/assets/js/lib/tabela-ordena.js';
 
 test('valorDeOrdenacao: número brasileiro, moeda e porcentagem viram número; data vira ISO; resto é texto', () => {
   assert.deepEqual(valorDeOrdenacao('R$ 1.234,56'), { tipo: 'num', v: 1234.56 });
@@ -47,4 +47,41 @@ test('proximaDirecao: ordena crescente, depois decrescente, depois volta ao orig
   assert.equal(proximaDirecao(null), 'asc');
   assert.equal(proximaDirecao('asc'), 'desc');
   assert.equal(proximaDirecao('desc'), null);
+});
+
+// ---------------------------------------------------------------- a ordem sobrevive ao filtro (3.7.0)
+
+test('assinaturaDaTabela: mesma tabela com outro período tem a mesma assinatura; outra tabela, não', () => {
+  assert.equal(assinaturaDaTabela(['Data', 'Canal', 'Leads']), assinaturaDaTabela(['Data', 'Canal', 'Leads']));
+  assert.notEqual(assinaturaDaTabela(['Data', 'Canal', 'Leads']), assinaturaDaTabela(['Canal', 'Leads']));
+});
+
+test('registrarOrdem: guarda coluna e direção na aba; direção nula (voltou ao original) esquece', () => {
+  let e = registrarOrdem(null, 'canais', 'T', 2, 'desc');
+  assert.deepEqual(e, { aba: 'canais', ordens: { T: { coluna: 2, direcao: 'desc' } } });
+  assert.deepEqual(registrarOrdem(e, 'canais', 'T', 2, null), { aba: 'canais', ordens: {} });
+});
+
+test('reconciliarOrdem: depois de filtro, troca de período ou Atualizar (mesma aba e tabela) a ordem escolhida volta', () => {
+  const e = registrarOrdem(null, 'canais', 'T', 3, 'asc');
+  for (let repintes = 0; repintes < 3; repintes++) {
+    const r = reconciliarOrdem(e, 'canais', 'T');
+    assert.deepEqual(r.aplicar, { coluna: 3, direcao: 'asc' });
+    assert.deepEqual(r.estado, e);
+  }
+});
+
+test('reconciliarOrdem: trocar de aba esquece a ordem (e ao voltar à aba antiga ela não volta)', () => {
+  const e = registrarOrdem(null, 'canais', 'T', 3, 'asc');
+  const outra = reconciliarOrdem(e, 'funil', 'T');
+  assert.equal(outra.aplicar, null);
+  const volta = reconciliarOrdem(outra.estado, 'canais', 'T');
+  assert.equal(volta.aplicar, null);
+});
+
+test('reconciliarOrdem: tabela de outro formato na mesma aba não herda a ordem; sem estado nada se aplica', () => {
+  const e = registrarOrdem(null, 'canais', 'T', 3, 'asc');
+  assert.equal(reconciliarOrdem(e, 'canais', 'OUTRA').aplicar, null);
+  assert.equal(reconciliarOrdem(null, 'canais', 'T').aplicar, null);
+  assert.equal(reconciliarOrdem(undefined, 'canais', 'T').estado.aba, 'canais');
 });

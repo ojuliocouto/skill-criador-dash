@@ -46,9 +46,36 @@ export function ordemDasLinhas(textos, direcao) {
   return itens.map((x) => x.i);
 }
 
+// ---------------------------------------------------------------- a ordem sobrevive ao repintar
+// Filtro, troca de período e Atualizar repintam o corpo inteiro (tabela nova). A ordem que a
+// pessoa escolheu fica guardada por aba e por tabela, e é devolvida a cada tabela que nasce,
+// até ela clicar de novo no cabeçalho ou trocar de aba. Funções puras, com teste.
+
+/** Identifica "a mesma tabela" entre repintes: os rótulos dos cabeçalhos, na ordem. */
+export function assinaturaDaTabela(cabecalhos) {
+  return (Array.isArray(cabecalhos) ? cabecalhos : []).map((c) => String(c).trim()).join('|');
+}
+
+/** Guarda (ou esquece, se `direcao` for nula) a ordem de uma tabela. Devolve o estado novo. */
+export function registrarOrdem(estado, aba, assinatura, coluna, direcao) {
+  const base = estado && estado.aba === aba ? estado.ordens : {};
+  const ordens = { ...base };
+  if (direcao) ordens[assinatura] = { coluna, direcao }; else delete ordens[assinatura];
+  return { aba, ordens };
+}
+
+/**
+ * Uma tabela acabou de nascer na `aba`: que ordem aplicar nela? Aba diferente da guardada
+ * esquece tudo. Devolve { aplicar: {coluna, direcao} | null, estado }.
+ */
+export function reconciliarOrdem(estado, aba, assinatura) {
+  if (!estado || estado.aba !== aba) return { aplicar: null, estado: { aba, ordens: {} } };
+  return { aplicar: estado.ordens[assinatura] || null, estado };
+}
+
 // ---------------------------------------------------------------- DOM
 
-function ordenar(tabela, indiceDaColuna, direcao) {
+function ordenar(tabela, indiceDaColuna, direcao, animar = true) {
   const corpo = tabela.tBodies[0];
   if (!corpo) return;
   const linhas = [...corpo.rows];
@@ -62,7 +89,7 @@ function ordenar(tabela, indiceDaColuna, direcao) {
     novas = [...linhas].sort((a, b) => Number(a.dataset.ordemOriginal) - Number(b.dataset.ordemOriginal));
   }
   novas.forEach((tr) => corpo.appendChild(tr));
-  if (menosMovimento() || typeof Element.prototype.animate !== 'function') return;
+  if (!animar || menosMovimento() || typeof Element.prototype.animate !== 'function') return;
   // Linha que viaja longe (a lista embaralhou) sai de perto e aparece: senão a tabela fica em
   // branco enquanto as linhas atravessam a tela vindas de fora dela.
   const TETO = 120;
@@ -77,8 +104,25 @@ function ordenar(tabela, indiceDaColuna, direcao) {
 }
 
 /** Liga o clique nos cabeçalhos das tabelas de dados do painel (uma vez, no #dashbody). */
-export function ligarTabelaOrdena(raiz) {
+export function ligarTabelaOrdena(raiz, opcoes = {}) {
   if (!raiz || typeof raiz.addEventListener !== 'function') return () => {};
+  const abaAtual = () => { try { return String((opcoes && typeof opcoes.aba === 'function' ? opcoes.aba() : '') || ''); } catch (_) { return ''; } };
+  let estado = null;
+  const cabecalhosDe = (tabela) => [...tabela.querySelectorAll('thead th')].map((th) => th.textContent);
+  // Tabela recém-nascida (filtro, período, Atualizar, troca de aba): devolve a ordem guardada, sem deslizar.
+  const reaplicar = () => {
+    raiz.querySelectorAll('.table .table__el').forEach((tabela) => {
+      if (tabela.dataset.ordemChecada) return;
+      tabela.dataset.ordemChecada = '1';
+      const r = reconciliarOrdem(estado, abaAtual(), assinaturaDaTabela(cabecalhosDe(tabela)));
+      estado = r.estado;
+      if (!r.aplicar) return;
+      const th = tabela.querySelectorAll('thead th')[r.aplicar.coluna];
+      if (!th) return;
+      th.setAttribute('aria-sort', r.aplicar.direcao === 'asc' ? 'ascending' : 'descending');
+      ordenar(tabela, r.aplicar.coluna, r.aplicar.direcao, false);
+    });
+  };
   const preparar = () => {
     raiz.querySelectorAll('.table .table__el thead th').forEach((th) => {
       if (th.dataset.ordenavel) return;
@@ -87,6 +131,7 @@ export function ligarTabelaOrdena(raiz) {
       th.setAttribute('role', 'columnheader');
       th.setAttribute('aria-sort', 'none');
     });
+    reaplicar(); // depois dos cabeçalhos: o aria-sort devolvido não pode ser apagado
   };
   const alternar = (th) => {
     const tabela = th.closest('table');
@@ -95,6 +140,7 @@ export function ligarTabelaOrdena(raiz) {
     const nova = proximaDirecao(atual === 'ascending' ? 'asc' : atual === 'descending' ? 'desc' : null);
     tabela.querySelectorAll('thead th').forEach((o) => o.setAttribute('aria-sort', 'none'));
     th.setAttribute('aria-sort', nova === 'asc' ? 'ascending' : nova === 'desc' ? 'descending' : 'none');
+    estado = registrarOrdem(estado, abaAtual(), assinaturaDaTabela(cabecalhosDe(tabela)), indice, nova);
     ordenar(tabela, indice, nova);
   };
   const aoClicar = (e) => { const th = e.target.closest ? e.target.closest('.table .table__el thead th') : null; if (th) { preparar(); alternar(th); } };

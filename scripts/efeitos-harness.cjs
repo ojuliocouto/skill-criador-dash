@@ -22,7 +22,9 @@ const PAGINA = (tema, acento) => `<!doctype html>
 import { render } from '/assets/js/widgets/kpi.js';
 import { marcarMetaBatida } from '/assets/js/lib/meta-batida.js';
 import { rolarIndicadores } from '/assets/js/lib/numero-roleta.js';
-window.__efeitos = { render, marcarMetaBatida, rolarIndicadores };
+import { ligarTabelaOrdena } from '/assets/js/lib/tabela-ordena.js';
+import { render as renderTabela } from '/assets/js/widgets/table.js';
+window.__efeitos = { render, marcarMetaBatida, rolarIndicadores, ligarTabelaOrdena, renderTabela };
 window.__pronto = true;
 </script></body></html>`;
 
