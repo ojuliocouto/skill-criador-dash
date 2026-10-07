@@ -45,6 +45,7 @@ async function abrir(browser, base, { reduzido = false, tema = 'dark', acento } 
   pagina.on('pageerror', (e) => erros.push(String(e)));
   await pagina.goto(`${base}/bancada.html?tema=${tema}${acento ? '&acento=' + encodeURIComponent(acento) : ''}`);
   await pagina.waitForFunction(() => window.__pronto === true);
+  await pagina.evaluate(() => document.fonts.ready.then(() => document.fonts.load('600 22px Geist').catch(() => {})));
   pagina.__erros = erros;
   return { ctx, pagina };
 }
