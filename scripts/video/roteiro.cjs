@@ -11,6 +11,7 @@
  *   mover_mouse      seletor | x,y  leva o mouse até o elemento ou ao ponto
  *   rolar            y            rola a página até a posição y (pixels)
  *   escolher         seletor + indice | valor   escolhe uma opção de <select> (o filtro)
+ *   teclar           tecla        aperta uma tecla no elemento em foco (ex.: ArrowRight muda o atalho de período sem voltar ao topo da página)
  *   print            nome         tira um quadro (PNG) no meio da gravação: vira a prancha de quadros
  *
  * "duracao_minima_s" (opcional, 10 a 15): o vídeo só fecha depois desse tempo, contado desde o começo da gravação.
@@ -21,13 +22,13 @@
  */
 const path = require('node:path');
 
-const ACOES = ['abrir', 'esperar', 'esperar_seletor', 'clicar', 'mover_mouse', 'rolar', 'escolher', 'print'];
+const ACOES = ['abrir', 'esperar', 'esperar_seletor', 'clicar', 'mover_mouse', 'rolar', 'escolher', 'teclar', 'print'];
 const MIN_PRINTS = 6;
 const FAIXA_S = { min: 10, max: 15 };
 const ESPERA_MAX_MS = 10000;
 
 // Custo médio de cada ação (ms) além das esperas explícitas: o mouse se move, a página responde.
-const CUSTO_MS = { abrir: 2000, esperar: 0, esperar_seletor: 500, clicar: 500, mover_mouse: 500, rolar: 700, escolher: 500, print: 300 };
+const CUSTO_MS = { abrir: 2000, esperar: 0, esperar_seletor: 500, clicar: 500, mover_mouse: 500, rolar: 700, escolher: 500, teclar: 300, print: 300 };
 
 const PERFIS = Object.freeze({
   desktop: Object.freeze({ viewport: Object.freeze({ width: 1440, height: 900 }), isMobile: false, hasTouch: false, deviceScaleFactor: 1 }),
@@ -57,6 +58,9 @@ function erroDoPasso(p, i) {
     case 'escolher':
       if (!ehTexto(p.seletor)) return `${rotulo} (escolher): falta "seletor"`;
       if (!ehNumero(p.indice) && !ehTexto(p.valor)) return `${rotulo} (escolher): use "indice" ou "valor"`;
+      break;
+    case 'teclar':
+      if (!ehTexto(p.tecla)) return `${rotulo} (teclar): falta "tecla"`;
       break;
     case 'print':
       if (!ehTexto(p.nome)) return `${rotulo} (print): falta "nome" do quadro`;

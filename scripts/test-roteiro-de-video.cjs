@@ -63,6 +63,14 @@ teste('cada ação cobra os seus campos', () => {
   assert.match(erros({ acao: 'esperar_seletor' }), /seletor/);
 });
 
+teste('ação teclar: exige a tecla e entra na duração prevista (serve a mudar o atalho de período com o gráfico à vista no celular)', () => {
+  const erros = (p) => roteiro.validarRoteiro({ passos: [{ acao: 'abrir' }, p] }).erros.join();
+  assert.match(erros({ acao: 'teclar' }), /tecla/);
+  assert.doesNotMatch(erros({ acao: 'teclar', tecla: 'ArrowRight' }), /tecla|desconhecida/);
+  assert.ok(roteiro.ACOES.includes('teclar'));
+  assert.ok(roteiro.duracaoPrevistaMs([{ acao: 'teclar', tecla: 'ArrowRight' }]) > 0);
+});
+
 teste('roteiro com menos de 6 prints é recusado', () => {
   const r = { passos: [{ acao: 'abrir' }, { acao: 'esperar', ms: 10000 }, { acao: 'print', nome: 'a' }] };
   assert.match(roteiro.validarRoteiro(r).erros.join(), /6 prints/);

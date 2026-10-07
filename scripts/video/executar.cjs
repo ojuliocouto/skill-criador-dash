@@ -70,6 +70,7 @@ async function executar(page, passos, o) {
         case 'rolar':
           await page.evaluate((y) => window.scrollTo({ top: y, behavior: 'smooth' }), p.y);
           break;
+        case 'teclar': await page.keyboard.press(p.tecla); break;
         case 'print': {
           const arquivo = roteiro.caminhoDeSaida(o.pastaDeQuadros, roteiro.nomeDoPrint(o.perfil, quadros.length + 1, p.nome));
           await page.screenshot({ path: arquivo });
