@@ -13,6 +13,7 @@ import { saveDashboard, getDashboard, fetchDataForSource, setDashboardAuth } fro
 import { sha256Hex } from './lib/auth.js';
 import { limparRotulos } from './lib/rotulos.js';
 import { fundoValido } from './lib/logo.js';
+import { PERIODOS_DA_META, PERIODO_PADRAO } from './lib/meta-periodo.js';
 import { DEFAULT_ACCENT } from './lib/color.js';
 import { temaDoModo } from './lib/tema-inicial.js';
 import { limparSaudacao, saudacaoValida } from './lib/saudacao.js';
@@ -89,6 +90,8 @@ export function prefillStateFromConfig(state, cfg) {
     hiddenMetrics: Array.isArray(c.hiddenMetrics) ? c.hiddenMetrics.filter((k) => typeof k === 'string') : [],
     labels: limparRotulos(c.labels),
     goal: meta,
+    // Painel antigo (meta sem periodo) volta vazio: continua como era até a pessoa escolher. Sem meta, o padrão.
+    goalPeriodo: c.goal && c.goal.periodo && PERIODOS_DA_META.some((p) => p.valor === c.goal.periodo) ? c.goal.periodo : (meta ? '' : PERIODO_PADRAO),
     storage: c.storage === 'd1' ? 'd1' : '',
     protegido: c.protected === true,
     // O que já estava digitado no passo 2 volta junto (o link da planilha, por exemplo).
@@ -129,6 +132,7 @@ const state = {
   heroMetric: '',
   hiddenMetrics: [],
   goal: '',
+  goalPeriodo: PERIODO_PADRAO, // a que período a meta se refere (mensal, semanal, periodo, total)
   storage: '',
   senha: '',
   protegido: false,
@@ -150,6 +154,7 @@ function escolherArea(id) {
     state.heroMetric = '';
     state.hiddenMetrics = [];
     state.goal = '';
+    state.goalPeriodo = PERIODO_PADRAO;
   }
   state.domain = id;
   goTo(2);

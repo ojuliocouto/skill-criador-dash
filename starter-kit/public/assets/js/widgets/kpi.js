@@ -65,7 +65,8 @@ export function render(props = {}, value) {
   let goalHtml = '';
   if (!unmapped && goal && Number.isFinite(goal.pct)) {
     const w = Math.max(0, Math.min(100, goal.pct * 100));
-    const done = goal.pct >= 1 ? ' is-done' : '';
+    // Comparação proporcional (justa === false) mostra o percentual, mas nunca o selo "Meta batida".
+    const done = goal.pct >= 1 && goal.justa !== false ? ' is-done' : '';
     goalHtml =
       `<div class="kpi__goal">` +
         `<div class="kpi__goal-track"><div class="kpi__goal-fill${done}" style="width:${w.toFixed(1)}%"></div></div>` +

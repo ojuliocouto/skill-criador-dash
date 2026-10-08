@@ -13,6 +13,7 @@ import { getDashboard, fetchDataForSource, fetchD1, setDashboardAuth } from './l
 import { getTemplate } from './templates/index.js';
 import { computeAll, computeAllMapped, timeSeries } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
+import { alvoDaMeta } from './lib/meta-periodo.js';
 import { sha256Hex } from './lib/auth.js';
 import { render as renderKpi } from './widgets/kpi.js';
 import { getWidget } from './widgets/index.js';
@@ -154,13 +155,17 @@ export function resolveDateSlot(template) {
 
 /**
  * Monta o progresso da meta (meta vs realizado) para a metrica configurada.
- * config.goal = { metricKey, value }. Retorna { metricKey, pct, text } ou null.
+ * config.goal = { metricKey, value, periodo? }. Retorna { metricKey, pct, text, justa } ou null.
+ * `janela` ({min,max} ISO das linhas na tela) permite comparar a meta com o período certo (3.7.1, D6):
+ * com goal.periodo 'mensal', 400 por mês contra 3 meses de dados é contra 1200. Config sem periodo
+ * compara com o período filtrado, como sempre foi. `justa` false = comparação proporcional: o percentual
+ * aparece, mas o marco e o selo "Meta batida" não valem.
  * `mapped` (opcional, key->boolean vindo de computeAllMapped) evita montar a
  * barra de progresso contra um valor que so e 0 por falta de coluna mapeada:
  * chave ausente do mapa e tratada como mapeada (compatibilidade com chamadas
  * antigas que nao passam `mapped`).
  */
-export function buildGoal(config, computed, mapped = {}, template = null) {
+export function buildGoal(config, computed, mapped = {}, template = null, janela = null) {
   const g = config && config.goal;
   if (!g || !g.metricKey) return null;
   if (mapped[g.metricKey] === false) return null;
@@ -174,8 +179,14 @@ export function buildGoal(config, computed, mapped = {}, template = null) {
   const def = template && findMetricDef(template, g.metricKey);
   const menorMelhor = def && def.betterWhen === 'lower';
   if (menorMelhor && val <= 0) return null;
-  const pct = menorMelhor ? target / val : val / target;
-  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} da meta` };
+  // Meta de custo (menor é melhor) não escala com o tamanho do período: o CPA do mês é o CPA do mês.
+  if (menorMelhor) {
+    const pctCusto = target / val;
+    return { metricKey: g.metricKey, pct: pctCusto, text: `${fmtPercent(pctCusto)} da meta`, justa: true };
+  }
+  const { alvo, rotulo, justa } = alvoDaMeta(g, janela);
+  const pct = val / alvo;
+  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} ${rotulo}`, justa };
 }
 
 /**
@@ -568,6 +579,14 @@ function readFilterState() {
   return { from: brParaISO(val('fb-from')), to: brParaISO(val('fb-to')), dims, atalho: barra && barra.dataset.periodo ? barra.dataset.periodo : null };
 }
 
+// Primeira e última data (ISO) das linhas que estão na tela: a janela contra a qual a meta é comparada.
+function janelaDasLinhas(rows, colMap, dateSlot) {
+  const col = colMap && colMap[dateSlot];
+  if (!col) return null;
+  const { min, max } = dateBounds(rows, col);
+  return min && max ? { min, max } : null;
+}
+
 // Monta o ctx de render (métricas, tendência e meta JÁ calculadas em cima das linhas
 // filtradas pelo estado de filtro). Separado do renderBody porque o renderDashboard também
 // precisa dele pra descobrir, antes de desenhar a barra, quais abas têm o que mostrar.
@@ -578,7 +597,7 @@ function montarCtx(baseCtx, state) {
   const dateSlot = resolveDateSlot(template);
   const { current, previous } = splitByPeriod(rows, colMap, dateSlot);
   const trends = buildTrends(template.metrics, current, previous, colMap);
-  const goal = buildGoal(config, computed, mapped, template);
+  const goal = buildGoal(config, computed, mapped, template, janelaDasLinhas(rows, colMap, dateSlot));
   const ds = { columns: dataset.columns, rows, meta: dataset.meta };
   // ui = o que sobrevive ao repaint: as abas em uso, a aba ativa e o que foi digitado na
   // calculadora de meta. O corpo é trocado inteiro a cada mudança de filtro, então nada disso
@@ -638,8 +657,10 @@ function renderBody(baseCtx, state, modo = 'quieto', extra = {}) {
   // Meta batida (efeito 5): o marco toca quando a barra CRUZA 100%, uma vez; continuar batida
   // depois não repete. A primeira carga só registra de onde se parte.
   if (ctx.goal && baseCtx.ui) {
-    const cruzou = cruzouMeta(baseCtx.ui.pctMeta, ctx.goal.pct);
-    baseCtx.ui.pctMeta = ctx.goal.pct;
+    // Só comparação justa conta para o marco: 400 por mês, 7 dias, 100% da proporção não é meta batida.
+    const pctDoMarco = ctx.goal.justa === false ? 0 : ctx.goal.pct;
+    const cruzou = cruzouMeta(baseCtx.ui.pctMeta, pctDoMarco);
+    baseCtx.ui.pctMeta = pctDoMarco;
     if (cruzou && (modo === 'filtro' || modo === 'entrada') && !extra.semMarco) marcarMetaBatida(bodyEl);
   }
 }
