@@ -109,7 +109,7 @@ export function renderColunas(corpo, ctx) {
       if (!pendentesDeConfirmacao(state.mapaFraco, state.colMap, state.mapaConfirmado).includes(chave)) return;
       aviso.appendChild(el('p', { class: 'hint', role: 'status', text: `Ligamos "${state.colMap[chave]}" a ${nomePadrao} só pelo nome parecido. Confira os exemplos ao lado.` }));
       aviso.appendChild(el('button', {
-        class: 'btn btn--sec', type: 'button', 'data-confirmar-coluna': chave, text: 'Está certo',
+        class: 'btn ghost', type: 'button', 'data-confirmar-coluna': chave, text: 'Está certo',
         onclick: () => { state.mapaConfirmado = { ...(state.mapaConfirmado || {}), [chave]: true }; limpar(retorno); desenharAviso(); },
       }));
     }
