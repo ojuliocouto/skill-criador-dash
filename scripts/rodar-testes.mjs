@@ -37,6 +37,7 @@ const PRECISAM = {
   'test-passe-de-gosto-no-navegador.cjs': 'navegador (mutantes do passe de gosto)',
   'test-prova-dash.cjs': 'navegador (o gate de tela abre as páginas de teste)',
   'test-resolver-playwright.cjs': 'Playwright instalado (acha o pacote pelo npm root -g)',
+  'test-senha-nos-scripts.cjs': 'navegador (prova-dash, passe de gosto e gravador entram num painel com senha)',
 };
 
 const achar = () => readdirSync(AQUI).filter((n) => /^test-.+\.(py|cjs)$/.test(n)).sort();

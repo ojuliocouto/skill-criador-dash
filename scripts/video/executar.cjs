@@ -5,6 +5,7 @@
  */
 const fs = require('node:fs');
 const roteiro = require('./roteiro.cjs');
+const { entrarComSenha } = require('./entrar-com-senha.cjs');
 
 const TEMPO_OBRIGATORIO_MS = 20000;
 const TEMPO_OPCIONAL_MS = 2500;
@@ -79,10 +80,8 @@ async function executar(page, passos, o) {
         case 'abrir': {
           const resp = await page.goto(o.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
           if (resp && resp.status() >= 400) throw new Error(`a página voltou ${resp.status()}`);
-          if (o.senha) {
-            const campo = page.locator('input[type="password"]').first();
-            if (await campo.count()) { await campo.fill(String(o.senha)); await page.keyboard.press('Enter'); }
-          }
+          // A tela de senha só nasce depois da resposta 401 da API: espera ela aparecer (entrar-com-senha.cjs).
+          if (o.senha) await entrarComSenha(page, String(o.senha));
           await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
           break;
         }

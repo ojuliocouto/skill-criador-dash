@@ -16,6 +16,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { acharPlaywright } = require('./video/achar-playwright.cjs');
 const { SINAIS, NAO_MEDIDOS, medirNaPagina } = require('./video/sinais-de-gosto.cjs');
+const { entrarComSenha } = require('./video/entrar-com-senha.cjs');
 
 const PERFIS = [{ nome: 'desktop', viewport: { width: 1440, height: 900 } }, { nome: 'mobile', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }];
 const TEMAS = [{ nome: 'claro', attr: 'light' }, { nome: 'escuro', attr: 'dark' }];
@@ -38,7 +39,8 @@ async function main() {
       const ctx = await browser.newContext({ viewport: perfil.viewport, hasTouch: !!perfil.hasTouch, isMobile: !!perfil.isMobile, deviceScaleFactor: 1 });
       const pagina = await ctx.newPage();
       await pagina.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      if (senha) { const campo = pagina.locator('input[type="password"]').first(); if (await campo.count()) { await campo.fill(String(senha)); await pagina.keyboard.press('Enter'); } }
+      // A tela de senha só nasce depois da resposta 401 da API. Sem esperar por ela o script media a tela de senha e dava verde.
+      if (senha) await entrarComSenha(pagina, String(senha));
       await pagina.waitForSelector('.kpi__value, .table__el, .resumo__el', { timeout: 30000 });
       await pagina.waitForTimeout(4500); // a abertura (saudação) e a contagem dos números terminam
       const nAbas = await pagina.locator('.abas [role="tab"]').count();
