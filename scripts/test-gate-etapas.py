@@ -43,6 +43,12 @@ class Etapas(unittest.TestCase):
         self.assertEqual(self.rodar('registrar', '0', '--arquivo', 'etapa.json'), 1)
 
 
+WHOAMI = (' ⛅️ wrangler 4.1.0\n\nGetting User settings...\n👋 You are logged in with an OAuth Token, associated with the email ana@exemplo.com.\n'
+          '┌──────────────────┬──────────────────────────────────┐\n│ Account Name     │ Account ID                       │\n'
+          '├──────────────────┼──────────────────────────────────┤\n│ Conta da Ana     │ 0123456789abcdef0123456789abcdef │\n└──────────────────┴──────────────────────────────────┘\n')
+TOML = 'name = "clinica-lume"\npages_build_output_dir = "public"\n[[kv_namespaces]]\nbinding = "DASHBOARDS_KV"\nid = "0123456789abcdef0123456789abcdef"\n'
+
+
 class EtapasDash(unittest.TestCase):
     """T12 (teste com aluno, 02/10/2026): "Não" passava como prova nas etapas 4 e 6."""
 
@@ -51,7 +57,8 @@ class EtapasDash(unittest.TestCase):
         '2': {'operacao': 'Estúdio', 'inventario': '13 linhas'},
         '2.5': dict.fromkeys(['numero_heroi', 'pergunta', 'exclusoes', 'accent', 'densidade', 'tema'], 'Decidido'),
         '3': {'modo_dados': 'ao vivo'},
-        '4': {'conta_confirmada': 'wrangler whoami: conta da pessoa', 'infra': 'KV criado'},
+        '4': {'conta_confirmada': 'wrangler whoami: conta da pessoa', 'infra': 'KV criado',
+              'arquivos': ['whoami.txt', 'wrangler.toml']},
         '5': {'primeiro_render': 'conferido', 'mapeamento': 'Data, Investimento'},
     }
 
@@ -60,6 +67,8 @@ class EtapasDash(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.pasta = pathlib.Path(self.temp.name)
         (self.pasta / 'nota.txt').write_text('evidência real', encoding='utf-8')
+        (self.pasta / 'whoami.txt').write_text(WHOAMI, encoding='utf-8')
+        (self.pasta / 'wrangler.toml').write_text(TOML, encoding='utf-8')
         (self.pasta / 'dash-desktop.png').write_bytes(b'\x89PNG prova')
         (self.pasta / 'video-desktop.webm').write_bytes(b'\x1a\x45\xdf\xa3 video de prova')
         (self.pasta / 'video-mobile.webm').write_bytes(b'\x1a\x45\xdf\xa3 video de prova')
@@ -135,6 +144,76 @@ class EtapasDash(unittest.TestCase):
         self.assertIn('gravar-video.js', r.stdout)
 
 
+class Etapa4ConfereDeVerdade(unittest.TestCase):
+    """D1, complemento: o gate da etapa 4 só olhava se o texto começava com "Não"; qualquer outro texto passava.
+    Agora ele confere o que a etapa quer garantir: conta Cloudflare confirmada (saída do wrangler whoami)
+    e infra provisionada (wrangler.toml do projeto com o id real do KV, sem placeholder)."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.pasta = pathlib.Path(self.temp.name)
+        (self.pasta / 'nota.txt').write_text('evidência real', encoding='utf-8')
+        (self.pasta / 'whoami.txt').write_text(WHOAMI, encoding='utf-8')
+        (self.pasta / 'wrangler.toml').write_text(TOML, encoding='utf-8')
+        for e in ['1', '2', '2.5', '3']:
+            self.assertEqual(self.reg(e, EtapasDash.DOCS[e])[0], 0)
+
+    def reg(self, etapa, doc):
+        arq = self.pasta / f'etapa-{etapa}.json'
+        arq.write_text(json.dumps({'arquivos': ['nota.txt'], **doc}), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta),
+                            'registrar', etapa, '--arquivo', arq.name], capture_output=True, text=True, encoding='utf-8', errors='replace')
+        return r.returncode, r.stdout
+
+    def quatro(self, **troca):
+        return self.reg('4', {**EtapasDash.DOCS['4'], **troca})
+
+    def test_evidencia_real_passa(self):
+        self.assertEqual(self.quatro()[0], 0)
+
+    def test_mutante_texto_qualquer_sem_whoami_barra(self):
+        # "SIMULADA..." passava; sem o arquivo do whoami não passa mais.
+        codigo, saida = self.quatro(conta_confirmada='SIMULADA: conta da pessoa', arquivos=['nota.txt', 'wrangler.toml'])
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn('whoami', saida)
+
+    def test_mutante_whoami_com_texto_inventado_barra(self):
+        (self.pasta / 'whoami.txt').write_text('SIMULADA: conta da pessoa confirmada', encoding='utf-8')
+        codigo, saida = self.quatro()
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn('whoami', saida)
+
+    def test_mutante_whoami_deslogado_barra(self):
+        (self.pasta / 'whoami.txt').write_text('Getting User settings...\nYou are not authenticated. Please run `wrangler login`.\n', encoding='utf-8')
+        self.assertEqual(self.quatro()[0], 1)
+
+    def test_mutante_wrangler_toml_com_placeholder_barra(self):
+        (self.pasta / 'wrangler.toml').write_text(TOML.replace('0123456789abcdef0123456789abcdef', '<SEU_KV_NAMESPACE_ID>'), encoding='utf-8')
+        codigo, saida = self.quatro()
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn('wrangler.toml', saida)
+
+    def test_mutante_wrangler_toml_sem_kv_barra(self):
+        (self.pasta / 'wrangler.toml').write_text('name = "clinica-lume"\npages_build_output_dir = "public"\n', encoding='utf-8')
+        self.assertEqual(self.quatro()[0], 1)
+
+    def test_mutante_wrangler_toml_ausente_barra(self):
+        (self.pasta / 'wrangler.toml').unlink()
+        self.assertEqual(self.quatro(arquivos=['whoami.txt'])[0], 1)
+
+    def test_mutante_placeholder_so_em_comentario_nao_barra(self):
+        (self.pasta / 'wrangler.toml').write_text(TOML + '# id = "<SEU_D1_ID>"\n', encoding='utf-8')
+        self.assertEqual(self.quatro()[0], 0)
+
+    def test_evidencia_alterada_depois_barra_na_checagem(self):
+        self.assertEqual(self.quatro()[0], 0)
+        (self.pasta / 'whoami.txt').write_text(WHOAMI.replace('Conta da Ana', 'Outra conta'), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'checar', '4'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+        self.assertEqual(r.returncode, 1)
+
+
 class ModoLocalSemConta(unittest.TestCase):
     """D1 (teste de ponta a ponta, 02/10/2026): sem conta Cloudflare o gate travava as etapas 5, 6 e 7.
     Construir e provar em local fecha sozinho; publicar continua exigindo a conta, sem publicação falsa."""
@@ -148,6 +227,8 @@ class ModoLocalSemConta(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.pasta = pathlib.Path(self.temp.name)
         (self.pasta / 'nota.txt').write_text('evidência real', encoding='utf-8')
+        (self.pasta / 'whoami.txt').write_text(WHOAMI, encoding='utf-8')
+        (self.pasta / 'wrangler.toml').write_text(TOML, encoding='utf-8')
         (self.pasta / 'dash-desktop.png').write_bytes(b'\x89PNG prova')
         (self.pasta / 'video-desktop.webm').write_bytes(b'\x1a\x45\xdf\xa3 video')
         (self.pasta / 'video-mobile.webm').write_bytes(b'\x1a\x45\xdf\xa3 video')

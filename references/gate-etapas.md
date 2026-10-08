@@ -139,6 +139,13 @@ feito de verdade. `arquivos` aponta arquivos reais e não vazios dentro de `~/me
 }
 ```
 
+O gate da etapa 4 (3.7.1) **confere os arquivos**, não só o texto: `arquivos` precisa ter a saída crua do
+`wrangler whoami` (um arquivo com `whoami` no nome, com o e-mail da conta e o Account ID de 32 caracteres; "not
+authenticated" ou texto inventado são recusados) e o `wrangler.toml` do projeto, com o binding `DASHBOARDS_KV` com id real
+(32 hex) e nenhum placeholder ativo. Salve com `wrangler whoami > evidencias/whoami.txt`. A pasta `evidencias/` fica
+fora do git (`.gitignore` do kit), então o Account ID ali é aceitável. O gate confere formato e coerência; não prova
+sozinho que o arquivo veio do comando.
+
 `evidencias/etapa-5.json`:
 
 ```json

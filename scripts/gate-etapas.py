@@ -53,12 +53,50 @@ def comeca_com_nao(valor):
     return bool(re.match(r"nao\b", texto))
 
 
+PLACEHOLDERS_DO_TOML = ("<SEU_KV_NAMESPACE_ID>", "<SEU_KV_CACHE_ID>", "<SEU_D1_ID>", "<NOME-DO-PROJETO>")
+
+
+def conferir_conta_e_infra(projeto, doc):
+    """D1 (complemento): a etapa 4 quer garantir DUAS coisas, e agora confere as duas em arquivo, não em texto livre.
+
+    1. Conta Cloudflare da pessoa confirmada: um arquivo `*whoami*` nos `arquivos` com a saída do `wrangler whoami`
+       (e-mail e Account ID de 32 hex, ou a tabela Account Name/Account ID). Texto inventado ou "not authenticated" não passa.
+    2. Infra provisionada: o `wrangler.toml` do projeto com o id REAL do KV `DASHBOARDS_KV` (32 hex) e nenhum placeholder
+       ativo. Linha comentada não conta.
+    O gate lê formato; não prova que o arquivo veio mesmo do comando. Quem prova isso é o `uso-ferramentas` e o olhar de
+    quem revisa. Mas o falsificador agora precisa fabricar um whoami e um toml coerentes, não escrever uma palavra."""
+    arquivos = [str(a) for a in doc.get("arquivos", [])] if isinstance(doc.get("arquivos"), list) else []
+    quem = [a for a in arquivos if "whoami" in Path(a).name.lower()]
+    if not quem:
+        raise ValueError("Etapa 4: liste em arquivos a saída do `wrangler whoami` (ex: evidencias/whoami.txt). "
+                         "Conta confirmada é o que o comando mostrou, não uma frase.")
+    saida = (projeto / quem[0]).read_text(encoding="utf-8", errors="replace") if (projeto / quem[0]).is_file() else ""
+    if re.search(r"not authenticated|not logged in|wrangler login", saida, re.IGNORECASE) and not re.search(r"logged in with", saida, re.IGNORECASE):
+        raise ValueError(f"Etapa 4: o whoami ({quem[0]}) mostra que a pessoa NÃO está logada. Rode `wrangler login` e refaça.")
+    tem_email = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", saida)
+    tem_conta = re.search(r"\b[0-9a-f]{32}\b", saida)
+    if not (tem_email and tem_conta):
+        raise ValueError(f"Etapa 4: {quem[0]} não parece a saída do `wrangler whoami` (faltam o e-mail da conta e o Account ID "
+                         "de 32 caracteres). Cole a saída do comando, sem editar.")
+    toml_rel = next((a for a in arquivos if Path(a).name == "wrangler.toml"), "wrangler.toml")
+    toml = projeto / toml_rel
+    if not toml.is_file():
+        raise ValueError("Etapa 4: wrangler.toml do projeto não encontrado. A infra se prova pelo arquivo com o id real do KV.")
+    ativo = "\n".join(l for l in toml.read_text(encoding="utf-8", errors="replace").splitlines() if not l.strip().startswith("#"))
+    sobra = [ph for ph in PLACEHOLDERS_DO_TOML if ph in ativo]
+    if sobra:
+        raise ValueError(f"Etapa 4: wrangler.toml ainda tem placeholder ativo ({', '.join(sobra)}). Provisione o KV e cole o id.")
+    if not re.search(r'binding\s*=\s*"DASHBOARDS_KV"\s*\n\s*id\s*=\s*"[0-9a-f]{32}"', ativo):
+        raise ValueError('Etapa 4: wrangler.toml sem o binding DASHBOARDS_KV com id real de 32 caracteres (hex). '
+                         "Crie com `wrangler kv namespace create DASHBOARDS_KV` e cole o id.")
+
+
 def modo_local(doc):
     """3.7.1 (D1): a etapa 4 declara `"modo": "local"` quando a pessoa ainda não tem conta Cloudflare."""
     return isinstance(doc, dict) and doc.get("modo") == "local"
 
 
-def validar_dash(etapa, doc, local=False):
+def validar_dash(etapa, doc, local=False, projeto=None):
     """T12 (teste com aluno, 02/10/2026): "Não" passava como prova porque o gate só via campo
     preenchido. Conta não confirmada não fecha a etapa 4; painel não publicado não fecha a 6.
 
@@ -73,10 +111,13 @@ def validar_dash(etapa, doc, local=False):
         if not str(doc.get("publicacao_pendente", "")).strip():
             raise ValueError("Etapa 4 em modo local: preencha publicacao_pendente com o que fica por fazer "
                              "quando a pessoa tiver a conta (provisionar a infra e publicar). Entrega local não é entrega publicada.")
-    elif etapa == "4" and comeca_com_nao(doc.get("conta_confirmada", "")):
-        raise ValueError("Etapa 4: conta não confirmada. Sem a conta Cloudflare da pessoa (wrangler whoami) "
-                         'não existe infra. Para construir e provar o dash em local mesmo assim, registre a etapa 4 '
-                         'com "modo": "local" e "publicacao_pendente"; para publicar, volte aqui quando ela confirmar.')
+    elif etapa == "4":
+        if comeca_com_nao(doc.get("conta_confirmada", "")):
+            raise ValueError("Etapa 4: conta não confirmada. Sem a conta Cloudflare da pessoa (wrangler whoami) "
+                             'não existe infra. Para construir e provar o dash em local mesmo assim, registre a etapa 4 '
+                             'com "modo": "local" e "publicacao_pendente"; para publicar, volte aqui quando ela confirmar.')
+        if projeto is not None:
+            conferir_conta_e_infra(projeto, doc)
     if etapa == "7" and local and not str(doc.get("publicacao_pendente", "")).strip():
         raise ValueError("Etapa 7 em modo local: preencha publicacao_pendente com o que falta para publicar. "
                          "O encerramento não pode esconder que o dash não foi publicado.")
@@ -111,7 +152,7 @@ def validar(projeto, arquivo, etapa, campos, perfil, local=False):
             if not isinstance(doc["briefing"], dict) or not doc["briefing"].get(campo):
                 raise ValueError(f"Briefing incompleto: {campo}. Fato ausente deve constar como pendente, nunca inventado.")
     if perfil == "dash":
-        validar_dash(etapa, doc, local)
+        validar_dash(etapa, doc, local, projeto)
     if "passe_de_gosto" in campos:
         passe = doc["passe_de_gosto"]
         if not isinstance(passe, dict) or type(passe.get("antes")) is not int or passe["antes"] < 0 or type(passe.get("depois")) is not int or passe["depois"] != 0 or not passe.get("inspecao"):
