@@ -30,7 +30,7 @@ import { sincronizarModoDoPainel } from './lib/theme.js';
 import { TEMPOS } from './lib/saudacao.js';
 import { esc } from './lib/html.js';
 import { brandInnerHtml } from './lib/brand.js';
-import { areaDoPainel, trilhaHtml, acoesHtml, ligarCopiarLink } from './lib/barra-topo.js';
+import { areaDoPainel, trilhaHtml, acoesHtml, ligarCopiarLink, ligarBarraSolida } from './lib/barra-topo.js';
 import { aplicarPersonalizacao } from './lib/personalizacao.js';
 import { aplicarRotulos } from './lib/rotulos.js';
 import { DURACAO, CURVA, textoDaContagemEntre, transformDoMarcador, menosMovimento, animar } from './lib/movimento.js';
@@ -187,7 +187,10 @@ export function buildGoal(config, computed, mapped = {}, template = null, janela
   }
   const { alvo, rotulo, justa } = alvoDaMeta(g, janela);
   const pct = val / alvo;
-  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} ${rotulo}`, justa };
+  // Comparação proporcional que passou de 100%: o percentual sozinho parece meta batida. O texto diz que é ritmo;
+  // o selo e o marco ficam para a meta de verdade batida (mês cheio, mês em curso já acima da meta inteira, período, total).
+  const acima = justa === false && pct >= 1 ? ', acima do ritmo' : '';
+  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} ${rotulo}${acima}`, justa };
 }
 
 /**
@@ -1198,6 +1201,7 @@ async function loadDashboardInto(container, config, id, opts = {}) {
 // filhos sao buscadas sob demanda e cacheadas. A aba ativa reflete/atualiza ?tab=.
 async function initGroup(app, group, groupId) {
   renderTopbar(group, groupId);
+  ligarBarraSolida(document.querySelector('.topbar'));
 
   const tabs = (group.tabs || []).filter((t) => t && t.id);
   if (!tabs.length) {
@@ -1313,6 +1317,7 @@ async function init() {
 
   // Dashboard comum: topbar + carrega e renderiza no #app.
   renderTopbar(config, id);
+  ligarBarraSolida(document.querySelector('.topbar'));
   await loadDashboardInto(app, config, id);
 }
 

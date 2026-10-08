@@ -64,6 +64,7 @@
   /* Quase opaco e sem desfoque: a barra fica sobre o fundo em movimento, e desfoque de fundo
      ali seria recalculado a cada quadro. */
   --topbar-bg: rgba(12, 14, 18, 0.9);
+  --topbar-solido: rgb(12, 14, 18);
   --radius: 10px;
   --radius-sm: 7px;
   /* Sombra tingida (nao preto puro) e minima: elevacao discreta de ferramenta. */
@@ -86,6 +87,7 @@
   /* Escurecido de #8b93a1 (reprovava AA, ~2.9:1) pra 6.13:1 sobre --bg-elev e 5.67:1 sobre --bg. */
   --text-faint: #5b6270;
   --topbar-bg: rgba(255, 255, 255, 0.92);
+  --topbar-solido: rgb(255, 255, 255);
   --shadow: 0 1px 3px rgba(23, 31, 48, 0.08);
   /* Tons escurecidos de good/bad so no claro: os originais (verde/vermelho claros)
      reprovam no contraste WCAG AA sobre fundo branco. */
@@ -135,6 +137,9 @@ a:hover { text-decoration: underline; }
      barra nasce desse tamanho e o conteúdo abaixo não desce quando eles chegam. */
   min-height: 78.75px;
 }
+/* Rolada a página, o conteúdo passaria por trás da barra como texto fantasma (fundo translúcido, e desfoque é proibido):
+   a barra fica OPACA assim que sai do topo. No topo, a aparência de sempre. */
+.topbar.is-rolado { background: var(--topbar-solido); }
 /* Barra do topo em trilha: "Meus painéis / [marca] Nome  Área" à esquerda e UM grupo de
    utilidades à direita. Sem avatar de iniciais, sem fileira de botões contornados iguais. */
 .topbar .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; font-weight: 650; letter-spacing: -0.01em; }

@@ -680,7 +680,7 @@ está em `node <dir-da-skill>/scripts/test-efeitos-no-navegador.cjs`.
 `semanal`, `periodo` (vale para o período escolhido, qualquer tamanho) ou `total`. Com meta mensal, o painel compara com a meta de
 cada mês do período na tela e escreve contra o quê: "96% da meta de 3 meses" (período que começa no dia 1: cada mês tocado vale a
 meta inteira), "84% da meta do mês" (mês em andamento) ou "da meta proporcional (91 em 7 dias)" (período que não começa no dia 1: a
-meta é rateada pelos dias de cada mês). O selo e o marco "Meta batida" só valem em comparação justa (meses ou semanas inteiros, mês em
+meta é rateada pelos dias de cada mês). Selo e marco só valem para meta de verdade batida: mês cheio do calendário, mês em curso já acima da meta inteira ("Este mês" a 110%), meta de período ou total. Em comparação proporcional que passou de 100% o texto diz "acima do ritmo" e o selo não aparece (é ritmo, não meta batida). O selo e o marco "Meta batida" só valem em comparação justa (meses ou semanas inteiros, mês em
 andamento, período, total); em comparação proporcional o percentual aparece sem o selo. Meta de custo (CPA, CPL) não escala com o
 período. **Compatibilidade:** config sem `periodo` (painel já publicado) continua comparando com o período filtrado, como sempre; o
 assistente reaberto num painel assim mostra "Como estava" e só muda quando a pessoa escolhe. O servidor recusa `periodo` inválido (400).

@@ -121,3 +121,55 @@ test('servidor: goal.periodo desconhecido é recusado com mensagem; ausente e v�
   assert.match(validarMeta({ goal: 'oi' }), /meta/i);
   assert.match(validarMeta({ goal: { metricKey: 'leads', value: -3 } }), /meta/i);
 });
+
+// ---- selo e marco só para meta de verdade batida; acima do ritmo diz isso (3.7.1, achado do coordenador) ----
+import { render as renderKpi } from '../public/assets/js/widgets/kpi.js';
+import { cruzouMeta } from '../public/assets/js/lib/meta-batida.js';
+
+const cartao = (valor, janela, goal = { metricKey: 'leads', value: 400, periodo: 'mensal' }) => {
+  const g = buildGoal({ goal }, { leads: valor }, {}, null, janela);
+  return { g, html: renderKpi({ label: 'Leads', format: 'integer', goal: g }, valor) };
+};
+
+test('"Este mês" com 84% da meta inteira: sem selo, sem marco', () => {
+  const { g, html } = cartao(337, j('2026-09-01', '2026-09-28'));
+  assert.match(g.text, /84,25% da meta do mês/);
+  assert.doesNotMatch(html, /Meta batida/);
+  assert.equal(cruzouMeta(0.5, g.justa === false ? 0 : g.pct), false);
+});
+
+test('"Este mês" com 110% da meta inteira: selo e marco', () => {
+  const { g, html } = cartao(440, j('2026-09-01', '2026-09-28'));
+  assert.equal(g.justa, true);
+  assert.match(html, /Meta batida/);
+  assert.equal(cruzouMeta(0.84, g.justa === false ? 0 : g.pct), true);
+});
+
+test('30 dias corridos acima do proporcional: sem selo, sem marco, e o texto diz "acima do ritmo"', () => {
+  const { g, html } = cartao(1494, j('2026-08-30', '2026-09-28'), { metricKey: 'leads', value: 500, periodo: 'mensal' });
+  assert.ok(g.pct > 1);
+  assert.equal(g.justa, false);
+  assert.match(g.text, /da meta proporcional/);
+  assert.match(g.text, /acima do ritmo/);
+  assert.doesNotMatch(html, /Meta batida/);
+  assert.equal(cruzouMeta(0.5, g.justa === false ? 0 : g.pct), false);
+});
+
+test('proporcional abaixo de 100% não fala em ritmo (só o número e o contra-quê)', () => {
+  const { g } = cartao(40, j('2026-08-10', '2026-08-16'));
+  assert.doesNotMatch(g.text, /ritmo/);
+});
+
+test('mês cheio do calendário acima da meta: selo', () => {
+  const { g, html } = cartao(477, j('2026-08-01', '2026-08-31'));
+  assert.match(g.text, /da meta do mês/);
+  assert.match(html, /Meta batida/);
+});
+
+test('meta de período e total acima de 100%: selo, sem texto de ritmo', () => {
+  for (const periodo of ['periodo', 'total']) {
+    const { g, html } = cartao(500, j('2026-07-20', '2026-08-10'), { metricKey: 'leads', value: 400, periodo });
+    assert.doesNotMatch(g.text, /ritmo/);
+    assert.match(html, /Meta batida/);
+  }
+});

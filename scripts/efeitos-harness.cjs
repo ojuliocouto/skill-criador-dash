@@ -92,6 +92,18 @@ window.__pronto = true;
 </script></body></html>`;
 };
 
+// Barra do topo (3.7.1): a barra fixa com o conteúdo rolando por trás, como no painel.
+const PAGINA_TOPO = (tema) => `<!doctype html>
+<html lang="pt-BR" data-theme="${tema}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bancada da barra do topo</title>
+<link rel="stylesheet" href="/assets/css/main.css"><link rel="stylesheet" href="/assets/css/presenca.css"></head>
+<body><header class="topbar"><div class="brand"><span class="dot"></span><span class="name">Painel de teste</span></div></header>
+<main class="wrap">${Array.from({ length: 30 }, (_, i) => `<p style="font-size:34px;font-weight:700;margin:0 0 18px;color:var(--text)">Número ${i} R$ ${1000 + i * 37},00 texto grande atrás da barra</p>`).join('')}</main>
+<script type="module">
+import { ligarBarraSolida } from '/assets/js/lib/barra-topo.js';
+ligarBarraSolida(document.querySelector('.topbar'));
+window.__pronto = true;
+</script></body></html>`;
+
 function subir(opcoes = {}) {
   const tema = opcoes.tema || 'dark';
   const acento = opcoes.acento || '#1F8A70';
@@ -99,6 +111,7 @@ function subir(opcoes = {}) {
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/bancada.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA(url.searchParams.get('tema') || tema, url.searchParams.get('acento') || acento)); return; }
     if (url.pathname === '/gosto.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA_GOSTO(url.searchParams.get('m') || 'limpo', url.searchParams.get('tema') || 'light')); return; }
+    if (url.pathname === '/topo.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA_TOPO(url.searchParams.get('tema') || 'light')); return; }
     if (url.pathname === '/celular.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA_CELULAR); return; }
     const arq = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
     if (!arq.startsWith(PUBLIC) || !fs.existsSync(arq) || fs.statSync(arq).isDirectory()) { res.writeHead(404); res.end('nao achei'); return; }
