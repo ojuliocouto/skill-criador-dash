@@ -773,3 +773,52 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
    absoluta mostra o número do quadro (dashboard.js). Nada muda de tamanho nem empurra vizinho. */
 .kpi__value.is-contando { position: relative; color: transparent; }
 .kpi__conta { position: absolute; left: 0; top: 0; color: var(--text); white-space: nowrap; user-select: none; pointer-events: none; }
+
+/* D12 (3.7.1): "Dados linha a linha" no celular vira um cartão por linha, como as tabelas por canal e por semana
+   (nunca uma tabela virada de lado). Sem cabeçalho clicável, quem ordena é o seletor "Ordenar por". */
+.table { container-type: inline-size; container-name: tabela; }
+.ordenar-por { display: none; flex-direction: column; gap: 5px; margin: 0 0 12px; color: var(--text-dim); font-size: 12.5px; font-weight: 500; }
+.ordenar-por__select { width: 100%; min-height: 44px; }
+.resumo .ordenar-por { display: none; }
+@container tabela (max-width: 480px) {
+  .table--p .table__el, .table--p .table__el tbody { display: block; }
+  .table--p .table__el thead { display: none; }
+  .table--p .table__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .table--p .table__el tbody tr:hover { background: transparent; }
+  .table--p .table__el tbody tr:last-child { border-bottom: 0; }
+  .table--p .table__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; white-space: normal; }
+  .table--p .table__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .table--p .table__el td:first-child { grid-column: 1 / -1; font-size: 14px; font-weight: 600; color: var(--text); }
+  .table--p .table__el td:first-child::before { display: none; }
+  .table--p .ordenar-por { display: flex; }
+  .table--p .table__arrasta { display: none; }
+}
+@container tabela (max-width: 740px) {
+  .table--m .table__el, .table--m .table__el tbody { display: block; }
+  .table--m .table__el thead { display: none; }
+  .table--m .table__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .table--m .table__el tbody tr:hover { background: transparent; }
+  .table--m .table__el tbody tr:last-child { border-bottom: 0; }
+  .table--m .table__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; white-space: normal; }
+  .table--m .table__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .table--m .table__el td:first-child { grid-column: 1 / -1; font-size: 14px; font-weight: 600; color: var(--text); }
+  .table--m .table__el td:first-child::before { display: none; }
+  .table--m .ordenar-por { display: flex; }
+  .table--m .table__arrasta { display: none; }
+}
+@container tabela (max-width: 1120px) {
+  .table--g .table__el, .table--g .table__el tbody { display: block; }
+  .table--g .table__el thead { display: none; }
+  .table--g .table__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .table--g .table__el tbody tr:hover { background: transparent; }
+  .table--g .table__el tbody tr:last-child { border-bottom: 0; }
+  .table--g .table__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; white-space: normal; }
+  .table--g .table__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .table--g .table__el td:first-child { grid-column: 1 / -1; font-size: 14px; font-weight: 600; color: var(--text); }
+  .table--g .table__el td:first-child::before { display: none; }
+  .table--g .ordenar-por { display: flex; }
+  .table--g .table__arrasta { display: none; }
+}
+@container resumo (max-width: 480px) { .resumo--p .ordenar-por { display: flex; } }
+@container resumo (max-width: 740px) { .resumo--m .ordenar-por { display: flex; } }
+@container resumo (max-width: 1120px) { .resumo--g .ordenar-por { display: flex; } }

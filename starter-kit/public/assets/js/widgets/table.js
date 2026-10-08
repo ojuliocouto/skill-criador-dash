@@ -4,6 +4,7 @@
 import { esc } from './_util.js';
 import { parseNumberBR, parseDateBR, fmtInteger, fmtCurrency } from '../lib/format.js';
 import { isoParaBR } from '../lib/data-br.js';
+import { seletorDeOrdemHtml } from '../lib/tabela-ordena.js';
 
 const DUAS_CASAS = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -43,6 +44,13 @@ function celulaDe(meta, v) {
   return celula(v);
 }
 
+// Quantas colunas: decide em que largura do cartão a tabela vira um cartão por linha (como a resumida).
+function classeDeTamanho(n) {
+  if (n <= 4) return 'table--p';
+  if (n <= 8) return 'table--m';
+  return 'table--g';
+}
+
 /**
  * @param {{title?:string, pageSize?:number, columnMeta?:Object<string,{label?:string, format?:'date'|'currency'}>}} props
  * @param {{columns:string[], rows:Object[]}} data
@@ -64,8 +72,9 @@ export function render(props = {}, data = {}) {
     && rows.slice(0, pageSize).every((r) => r[c] == null || r[c] === '' || celulaDe(metaDe(c), r[c]).num));
   // Cabeçalho: rótulo do slot quando a coluna está mapeada. O nome da coluna na fonte fica na
   // dica, pra quem precisar achar a coluna na planilha.
+  const rotuloDe = (c) => (metaDe(c) && metaDe(c).label) || c;
   const head = columns.map((c, i) => {
-    const rotulo = (metaDe(c) && metaDe(c).label) || c;
+    const rotulo = rotuloDe(c);
     const dica = rotulo !== c ? ` title="Coluna na fonte: ${esc(c)}"` : '';
     return `<th scope="col"${numerica[i] ? ' class="num"' : ''}${dica}>${esc(rotulo)}</th>`;
   }).join('');
@@ -89,8 +98,9 @@ export function render(props = {}, data = {}) {
     .join('');
 
   return (
-    `<div class="table">` +
+    `<div class="table ${classeDeTamanho(columns.length)}">` +
       titleHtml +
+      seletorDeOrdemHtml(columns.map(rotuloDe)) +
       `<div class="table__scroll">` +
         `<table class="table__el">` +
           `<thead><tr>${head}</tr></thead>` +

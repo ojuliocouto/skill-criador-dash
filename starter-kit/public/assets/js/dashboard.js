@@ -51,6 +51,7 @@ import { atalhosHtml, ligarAtalhos } from './lib/periodo-atalhos.js';
 import { cruzouMeta, marcarMetaBatida } from './lib/meta-batida.js';
 import { prepararCapa, levantarCapa } from './lib/cartao-vira-tela.js';
 import { ligarTabelaOrdena } from './lib/tabela-ordena.js';
+import { ligarBordas } from './lib/rolagem-borda.js';
 
 /**
  * Agrupa itens de layout: kpis consecutivos viram um unico bloco 'kpis';
@@ -738,6 +739,13 @@ function posicionarMarcador(app, { deslizar = false } = {}) {
   marcador.style.width = `${para.width}px`;
   marcador.style.height = `${para.height}px`;
   barra.classList.add('abas--marcador');
+  // As abas rolam por dentro em tela estreita: a aba ativa nunca fica escondida (sem mexer na rolagem da página).
+  if (barra.scrollWidth > barra.clientWidth) {
+    const esquerda = ativa.offsetLeft - 12;
+    const direita = ativa.offsetLeft + ativa.offsetWidth + 12 - barra.clientWidth;
+    if (esquerda < barra.scrollLeft) barra.scrollLeft = Math.max(0, esquerda);
+    else if (direita > barra.scrollLeft) barra.scrollLeft = direita;
+  }
   if (!deslizar) return;
   const saida = transformDoMarcador(de, para);
   if (saida !== 'none') animar(marcador, [{ transform: saida }, { transform: 'none' }], { duration: DURACAO.troca, easing: CURVA.vaiVolta });
@@ -836,6 +844,8 @@ function wireAbas(app, baseCtx) {
   marcador.setAttribute('aria-hidden', 'true');
   barra.insertBefore(marcador, barra.firstChild);
   posicionarMarcador(app);
+  // Em tela estreita as abas rolam por dentro (nunca quebram de linha): a borda esmaecida avisa que há mais.
+  ouvintesDaJanela.push(ligarBordas(barra));
   const reposicionar = () => posicionarMarcador(app);
   window.addEventListener('resize', reposicionar);
   ouvintesDaJanela.push(() => window.removeEventListener('resize', reposicionar));
