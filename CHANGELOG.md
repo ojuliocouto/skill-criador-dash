@@ -3,6 +3,7 @@
 ## 3.7.2
 
 - Prova de vídeo que não mente: o gravador espera o número de verdade (`esperar_numero`, obrigatório, até 45 s), conta os quadros com número e guarda no `video-info.json`; sem número em nenhum quadro, reprova. O gate da etapa 6 lê o arquivo (desktop e celular). Medido no dash local: 1,4 s até o primeiro número, 5 cargas seguidas (1482, 1397, 1409, 1412, 1406 ms).
+- CI nos três sistemas (`.github/workflows/portabilidade.yml`: Windows, macOS e Linux, Node 22, Python 3.12, Playwright com Chromium, ffmpeg; mais o job do Windows em `C:\curso automação\skill`) e comando único `scripts/rodar-testes.mjs` (`--so-portateis`, `--lista`, `--filtro`). Teste sem Playwright se declara PULADO com o motivo; no CI esse pulo é falha. Teste de acentuação passa a ler as strings pela árvore `ast` (o f-string do Python 3.12 quebra o `tokenize`); chaves de hash do gate saem com `/`.
 
 ## 3.7.1
 

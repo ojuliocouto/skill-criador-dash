@@ -1,0 +1,99 @@
+name: portabilidade
+
+# Prova a skill em Windows, macOS e Linux DE VERDADE (máquinas reais do GitHub), não por simulação.
+# A suíte inteira roda por um comando só (scripts/rodar-testes.mjs): npm test do starter-kit, todos os
+# scripts/test-*.py (pelo py.mjs) e todos os scripts/test-*.cjs, sem curinga de shell. No CI a variável CI
+# está ligada: teste que pula por falta de Playwright conta como falha, porque aqui ele existe de propósito.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: suíte completa (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar o Playwright (pacote global, como a skill ensina)
+        run: npm install -g playwright
+
+      - name: Baixar o Chromium (Linux, com as bibliotecas do sistema)
+        if: runner.os == 'Linux'
+        run: npx playwright install --with-deps chromium
+
+      - name: Baixar o Chromium (Windows e macOS)
+        if: runner.os != 'Linux'
+        run: npx playwright install chromium
+
+      - name: ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      - name: ffmpeg (Windows; o runner não traz winget, então choco)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
+
+      - name: Versões
+        run: |
+          node --version
+          python --version
+          ffmpeg -version
+          node scripts/py.mjs --descobrir
+
+      - name: Suíte inteira
+        run: node scripts/rodar-testes.mjs
+
+  caminho-com-acento-e-espaco:
+    name: testes portáteis em pasta com acento e espaço (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Clonar para C:\curso automação\skill
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "C:\curso automação" | Out-Null
+          git clone "$env:GITHUB_WORKSPACE" "C:\curso automação\skill"
+          Get-ChildItem "C:\curso automação\skill\scripts\rodar-testes.mjs"
+
+      - name: Testes portáteis a partir de lá
+        shell: pwsh
+        working-directory: C:\curso automação\skill
+        run: node scripts/rodar-testes.mjs --so-portateis

@@ -257,7 +257,7 @@ def validar(projeto, arquivo, etapa, campos, perfil, local=False):
         p = (projeto / nome).resolve()
         if not p.is_relative_to(projeto) or p == arquivo or p.name == REGISTRO:
             raise ValueError("A evidência precisa estar dentro do projeto e não pode ser o próprio registro.")
-        hashes[str(p.relative_to(projeto))] = digest(p)
+        hashes[p.relative_to(projeto).as_posix()] = digest(p)
     return hashes
 
 
@@ -315,7 +315,7 @@ def main():
             if not arquivo.is_relative_to(projeto):
                 raise ValueError("O JSON precisa estar dentro do projeto.")
             hashes = validar(projeto, arquivo, args.etapa, etapas[args.etapa], args.perfil, local)
-            hashes[str(arquivo.relative_to(projeto))] = digest(arquivo)
+            hashes[arquivo.relative_to(projeto).as_posix()] = digest(arquivo)
             # Corrigir uma etapa invalida as seguintes; um resultado antigo não prova a versão nova.
             registro = {e: registro[e] for e in ordem[:indice] if e in registro}
             registro[args.etapa] = {"hashes": hashes}

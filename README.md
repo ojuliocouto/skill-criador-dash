@@ -168,6 +168,16 @@ Repo layout: `SKILL.md` (the agent playbook), `references/` (infra commands, sec
 extension guides, loaded on demand), `scripts/preflight.py` (environment + wrangler.toml checks before
 deploy), and `starter-kit/` (the deployable code library).
 
+## Running the whole test suite (any system)
+
+```
+node <skill-dir>/scripts/rodar-testes.mjs                 # starter-kit npm test + every scripts/test-*.py and test-*.cjs
+node <skill-dir>/scripts/rodar-testes.mjs --so-portateis  # only what needs no browser (Node and Python are enough)
+node <skill-dir>/scripts/rodar-testes.mjs --lista         # list what would run
+```
+
+No shell globs (Windows does not expand them): the runner reads the folder itself, runs `.py` files through `py.mjs`, and reports any test that skipped itself with `PULADO: <reason>`. GitHub Actions (`.github/workflows/portabilidade.yml`) runs it on Windows, macOS and Linux, plus the browser-free subset from a folder with an accent and a space on Windows; in CI a skip for lack of Playwright counts as a failure.
+
 ## What changed in 3.7.1
 
 Fixes from an end-to-end run: build and prove a dash locally before having a Cloudflare account (`"modo": "local"` on step 4); a goal now has a period (`goal.periodo`: monthly by default); the assistant preview loads the effects stylesheet; Portuguese synonyms for column auto-mapping (weak matches ask for confirmation); every shown number can be hidden; sortable tables everywhere (the total row stays last); phone layout (cards plus "Ordenar por", 44 px targets, scrolling controls with a fading edge); a second official video script (`--roteiro efeitos`); and a measured taste pass (`scripts/passe-de-gosto.js`) that the step 6 gate reads. Details in `CHANGELOG.md`.
