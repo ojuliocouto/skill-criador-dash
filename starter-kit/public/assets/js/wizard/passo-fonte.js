@@ -90,12 +90,17 @@ export function renderFonte(corpo, ctx) {
   const seletor = el('div', { class: 'origens', role: 'group', 'aria-label': 'Origem dos números' });
   const area = el('div', { class: 'origem-area' });
   const retorno = el('div', { id: 'sourceFeedback', class: 'origem-retorno', 'aria-live': 'polite' });
-  const continuar = el('button', { class: 'btn', type: 'button', text: 'Continuar' });
+  const continuar = el('button', { class: 'btn', type: 'button', text: 'Continuar', 'aria-describedby': 'continuarDica' });
+  const dica = el('p', { class: 'hint continuar__dica', id: 'continuarDica' });
   let botaoDeConectar = null;
 
   // Uma ação principal por tela: enquanto não há números, a principal é conectar; depois, continuar.
   function pesos() {
     continuar.classList.toggle('ghost', !state.dataset);
+    // Desabilitado de verdade (não só apagado) enquanto faltam os números, e a dica diz o que falta.
+    continuar.disabled = !state.dataset;
+    dica.hidden = !!state.dataset;
+    dica.textContent = state.fonte && state.fonte.origem ? 'Falta conectar os seus números: preencha a origem escolhida e toque em Conectar.' : 'Falta escolher de onde vêm os seus números.';
     if (botaoDeConectar) botaoDeConectar.classList.toggle('ghost', !!state.dataset);
   }
   function conectado(ds, source, rotuloDepois) {
@@ -230,5 +235,5 @@ export function renderFonte(corpo, ctx) {
       : 'Antes de continuar, traga os seus números: escolha uma origem aqui em cima (planilha, arquivo ou Meta Ads) e conecte.'));
     chamarAtencao(f.origem ? area : seletor);
   });
-  corpo.appendChild(acoes({ aoVoltar: () => ctx.ir(1) }, continuar));
+  corpo.appendChild(acoes({ aoVoltar: () => ctx.ir(1), extra: dica }, continuar));
 }

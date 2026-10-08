@@ -60,6 +60,17 @@ export function tokenize(raw) {
 }
 
 export function autoMap(slots, columns) {
+  return autoMapDetalhado(slots, columns).mapa;
+}
+
+/**
+ * Igual a autoMap, mas também diz o que foi ligado só por SINÔNIMO FRACO (`slot.aliasesFracos`: nomes
+ * em português que costumam significar o dado, mas não com certeza, como "contatos" para Leads). O
+ * assistente mostra esses e pede confirmação; nada vai pro painel só por semelhança de nome sem a pessoa
+ * ver. Sinônimo fraco só entra depois dos nomes de sempre: nunca rouba coluna de um nome forte.
+ * @returns {{mapa: {[slot:string]: string|null}, fracos: {[slot:string]: string}}}
+ */
+export function autoMapDetalhado(slots, columns) {
   // Descarta colunas com header vazio: nunca devem casar (planilha Google costuma
   // exportar uma coluna vazia no fim, e o bug antigo fazia ela casar o 1o slot).
   const cols = (columns || [])
@@ -100,7 +111,21 @@ export function autoMap(slots, columns) {
     }
   }
 
-  return result;
+  // Passada 3: sinônimos fracos, só para o que continua sem coluna e só com colunas que ninguém usou.
+  const fracos = {};
+  for (const slot of slots || []) {
+    if (result[slot.key]) continue;
+    const fracosDoSlot = (slot.aliasesFracos || []).map((a) => normalizeHeader(a)).filter(Boolean);
+    for (const alias of fracosDoSlot) {
+      if (alias.length < MIN_SUBSTR) continue;
+      const aliasTokens = tokenize(alias);
+      const hit = cols.find((c) => !usados.has(c.original) && (c.norm === alias
+        || (c.norm.length >= MIN_SUBSTR && headerMatchesAlias(tokenize(c.original), aliasTokens))));
+      if (hit) { result[slot.key] = hit.original; usados.add(hit.original); fracos[slot.key] = hit.original; break; }
+    }
+  }
+
+  return { mapa: result, fracos };
 }
 
 /**

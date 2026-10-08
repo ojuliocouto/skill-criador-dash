@@ -13,17 +13,37 @@ function chavesDeMetrica(template) {
 }
 
 /**
+ * Toda chave de número que ALGUM widget do painel mostra: cartão da faixa, passo do funil, coluna de tabela
+ * por canal, semana ou dados. Plano e abas. É a lista do que a pessoa pode querer esconder.
+ * @returns {Set<string>}
+ */
+export function numerosExibidos(template) {
+  const out = new Set();
+  const visitar = (item) => {
+    const p = (item && item.props) || {};
+    if (!item) return;
+    if (item.widget === 'kpi' && p.metricKey) out.add(p.metricKey);
+    if (item.widget === 'funnel' && Array.isArray(p.steps)) p.steps.forEach((s) => s && s.metricKey && out.add(s.metricKey));
+    if (item.widget === 'resumo' && Array.isArray(p.metrics)) p.metrics.forEach((m) => { const k = chaveDe(m); if (k) out.add(k); });
+  };
+  ((template && template.layout) || []).forEach(visitar);
+  ((template && Array.isArray(template.tabs)) ? template.tabs : []).forEach((t) => ((t && t.layout) || []).forEach(visitar));
+  return out;
+}
+
+/**
  * Lista as métricas do template pro wizard oferecer como herói ou como "não entra".
- * @returns {{key:string, label:string, naFaixa:boolean}[]}
+ * @returns {{key:string, label:string, naFaixa:boolean, exibido:boolean}[]} `exibido`: algum widget mostra esse número
  */
 export function metricasDoPainel(template) {
   // "Na faixa" olha o layout plano e o de cada aba: com abas, o que a pessoa vê é a faixa da aba.
   const layouts = [(template && template.layout) || []]
     .concat(((template && Array.isArray(template.tabs)) ? template.tabs : []).map((t) => (t && t.layout) || []));
   const naFaixa = new Set(layouts.flat().filter((i) => i && i.widget === 'kpi').map((i) => i.props && i.props.metricKey));
+  const exibidos = numerosExibidos(template);
   return ((template && template.metrics) || [])
     .filter((m) => m && m.key)
-    .map((m) => ({ key: m.key, label: m.label || m.key, naFaixa: naFaixa.has(m.key) }));
+    .map((m) => ({ key: m.key, label: m.label || m.key, naFaixa: naFaixa.has(m.key), exibido: exibidos.has(m.key) }));
 }
 
 /**

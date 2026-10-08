@@ -31,8 +31,11 @@ export const template = {
     { key: 'investimento', label: 'Investimento', required: true, aliases: ['investimento', 'gasto', 'custo', 'valor gasto', 'spend', 'amount spent'] },
     { key: 'impressoes', label: 'Impressões', required: false, aliases: ['impressoes', 'impressions', 'impressao'] },
     { key: 'cliques', label: 'Cliques', required: false, aliases: ['cliques', 'clicks', 'clique'] },
-    { key: 'leads', label: 'Leads', required: false, aliases: ['leads', 'lead', 'cadastros'] },
-    { key: 'conversoes', label: 'Conversões', required: false, aliases: ['conversoes', 'conversao', 'vendas', 'purchases', 'compras'] },
+    { key: 'leads', label: 'Leads', required: false, aliases: ['leads', 'lead', 'cadastros'],
+      // Sinônimos por semelhança de nome: o assistente liga, mostra o que ligou e pede confirmação.
+      aliasesFracos: ['contatos', 'contato', 'inscritos', 'inscrito', 'inscricoes', 'inscricao', 'interessados', 'interessado', 'oportunidades'] },
+    { key: 'conversoes', label: 'Conversões', required: false, aliases: ['conversoes', 'conversao', 'vendas', 'purchases', 'compras'],
+      aliasesFracos: ['avaliacoes agendadas', 'avaliacao agendada', 'agendamentos', 'agendamento', 'agendados', 'consultas', 'consulta', 'orcamentos', 'orcamento', 'pedidos', 'pedido', 'matriculas', 'matricula', 'avaliacoes'] },
     { key: 'receita', label: 'Receita', required: false, aliases: ['receita', 'faturamento', 'revenue', 'valor de conversao'] },
   ],
   metrics: [

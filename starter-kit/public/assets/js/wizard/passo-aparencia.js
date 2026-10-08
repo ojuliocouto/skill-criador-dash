@@ -218,7 +218,7 @@ export function renderAparencia(corpo, ctx) {
   function desenharOcultos() {
     limpar(ocultos);
     state.hiddenMetrics = (state.hiddenMetrics || []).filter((k) => k !== destaque());
-    for (const m of numeros.filter((x) => x.naFaixa && x.key !== destaque())) {
+    for (const m of numeros.filter((x) => x.exibido && x.key !== destaque())) {
       const id = `oculta-${m.key}`;
       const chk = el('input', { id, type: 'checkbox', value: m.key, 'data-oculta': m.key });
       chk.checked = state.hiddenMetrics.includes(m.key);
@@ -249,11 +249,6 @@ export function renderAparencia(corpo, ctx) {
       el('label', { class: 'marcar', for: 'dashAccent2Usar' }, [usarSegunda, el('span', { text: 'Usar uma segunda cor' })]),
       campo({ id: 'dashAccent2', rotulo: 'Segunda cor', controle: segunda, soLeitor: true, dica: 'Tinge de leve o fundo dos gráficos. Sem ela, vale a cor principal.' }),
     ]),
-    el('fieldset', { class: 'campo ocultos__grupo' }, [
-      el('legend', { class: 'campo__rotulo', text: 'Números que não aparecem (opcional)' }),
-      ocultos,
-      el('p', { class: 'hint', text: 'Marque o que ninguém usa para decidir. Sai da faixa de números, das tabelas e do funil deste painel.' }),
-    ]),
     campo({
       id: 'dashPassword', rotulo: 'Senha para abrir o painel (opcional)', controle: senha,
       dica: state.protegido
@@ -265,7 +260,7 @@ export function renderAparencia(corpo, ctx) {
       dica: 'O histórico precisa de um banco de dados e de uma atualização automática ligados no servidor. Se você não instalou isso, deixe em Ao vivo.',
     }) : null,
   ]);
-  if (state.accent2 || (state.hiddenMetrics || []).length || state.storage === 'd1' || state.saudacao || state.saudacaoLigada === false || state.fundoAnimado === false) mais.open = true;
+  if (state.accent2 || state.storage === 'd1' || state.saudacao || state.saudacaoLigada === false || state.fundoAnimado === false) mais.open = true;
 
   // ---- montagem ----
   const criar = el('button', { class: 'btn', id: 'criarPainel', type: 'button', text: state.id ? 'Salvar alterações' : 'Criar painel' });
@@ -293,6 +288,11 @@ export function renderAparencia(corpo, ctx) {
     campo({ id: 'dashHero', rotulo: 'Número em destaque', controle: heroi, dica: 'É o número que aparece maior, no começo do painel.' }),
     metaCampo,
     periodoCampo,
+    el('fieldset', { class: 'campo ocultos__grupo' }, [
+      el('legend', { class: 'campo__rotulo', text: 'Números que não aparecem (opcional)' }),
+      ocultos,
+      el('p', { class: 'hint', text: 'Marque o que ninguém usa para decidir. Sai da faixa de números, das tabelas e do funil deste painel.' }),
+    ]),
     mais,
     retorno,
     acoes({ aoVoltar: () => ctx.ir(3) }, criar),
