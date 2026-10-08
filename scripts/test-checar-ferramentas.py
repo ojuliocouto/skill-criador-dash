@@ -10,7 +10,7 @@ o que tem que reprovar.
 Nao depende do ambiente: o unico caso que exigiria ferramenta instalada e pulado com aviso
 quando ela nao esta la.
 
-    node scripts/py.mjs test-checar-ferramentas.py
+    node <dir-da-skill>/scripts/py.mjs test-checar-ferramentas.py
 """
 import importlib.util
 import pathlib

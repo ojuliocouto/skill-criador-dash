@@ -15,9 +15,9 @@ A licao: "esta instalada" e "aparece na lista" NAO sao verificacao. Verificacao 
 ferramenta fazer alguma coisa e conferir se voltou.
 
 Uso:
-    node scripts/py.mjs checar-ferramentas.py                # tabela + saida != 0 se faltar critico
-    node scripts/py.mjs checar-ferramentas.py --json         # para consumo por agente
-    node scripts/py.mjs checar-ferramentas.py --sem-testes   # pula `npm test` (mais rapido)
+    node <dir-da-skill>/scripts/py.mjs checar-ferramentas.py                # tabela + saida != 0 se faltar critico
+    node <dir-da-skill>/scripts/py.mjs checar-ferramentas.py --json         # para consumo por agente
+    node <dir-da-skill>/scripts/py.mjs checar-ferramentas.py --sem-testes   # pula `npm test` (mais rapido)
 """
 import json
 import os

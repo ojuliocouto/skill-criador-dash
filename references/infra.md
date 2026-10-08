@@ -8,7 +8,7 @@ starter-kit feita no passo 1 do SKILL.md; é onde mora o `wrangler.toml`, o `db/
 
 Antes de começar, rode o preflight (checa Node, wrangler, login, placeholders e token de ambiente):
 ```
-node ~/.claude/skills/criador-dash/scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy
+node <dir-da-skill>/scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy
 ```
 
 ## Base (os dois modos)
@@ -31,7 +31,7 @@ deploy TÊM que ser iguais). Nunca commite id real em repo público. Confirme qu
 placeholder ANTES de seguir:
 ```
 grep -n "<SEU_KV\|<NOME-DO-PROJETO\|meu-dashboard" wrangler.toml   # tem que voltar VAZIO. Se achar algo, ainda falta trocar.
-# ou: node ~/.claude/skills/criador-dash/scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy  (faz esta checagem e as demais)
+# ou: node <dir-da-skill>/scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy  (faz esta checagem e as demais)
 ```
 Se você deployar com um placeholder de id ainda no toml, o deploy COMPILA e passa, mas a API responde 500
 "Binding DASHBOARDS_KV não configurado" em runtime. Por isso o grep acima é obrigatório antes do passo 3.

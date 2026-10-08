@@ -20,7 +20,7 @@ Como o teste se prova: ele primeiro roda o varredor em exemplos RUINS plantados 
 reprovados) e em exemplos BONS (têm que passar), e só então varre os arquivos de verdade.
 
 Uso:
-    node scripts/py.mjs test-portabilidade.py
+    node <dir-da-skill>/scripts/py.mjs test-portabilidade.py
 """
 import ast
 import re

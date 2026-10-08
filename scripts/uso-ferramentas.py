@@ -17,10 +17,10 @@ confere de novo, agora: arquivo que precisa existir e ter tamanho, ou trecho que
 encontrado no codigo. Registro cuja evidencia sumiu vale como nao registrado.
 
 Uso:
-    node scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --arquivo <path> [--detalhe "..."]
-    node scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --no-codigo "<trecho>" --em <dir>
-    node scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --detalhe "..." --sem-artefato
-    node scripts/py.mjs uso-ferramentas.py checar [--projeto <dir>]
+    node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --arquivo <path> [--detalhe "..."]
+    node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --no-codigo "<trecho>" --em <dir>
+    node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py registrar <ferramenta> --detalhe "..." --sem-artefato
+    node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py checar [--projeto <dir>]
 """
 import argparse
 import datetime

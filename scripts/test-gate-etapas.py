@@ -135,5 +135,105 @@ class EtapasDash(unittest.TestCase):
         self.assertIn('gravar-video.js', r.stdout)
 
 
+class ModoLocalSemConta(unittest.TestCase):
+    """D1 (teste de ponta a ponta, 02/10/2026): sem conta Cloudflare o gate travava as etapas 5, 6 e 7.
+    Construir e provar em local fecha sozinho; publicar continua exigindo a conta, sem publicação falsa."""
+
+    LOCAL = {'modo': 'local', 'conta_confirmada': 'Não: a pessoa ainda não tem conta Cloudflare',
+             'infra': 'local: wrangler pages dev com KV em disco; nada provisionado na Cloudflare',
+             'publicacao_pendente': 'Publicar depois que a pessoa criar a conta (etapas 4 e 6)'}
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.pasta = pathlib.Path(self.temp.name)
+        (self.pasta / 'nota.txt').write_text('evidência real', encoding='utf-8')
+        (self.pasta / 'dash-desktop.png').write_bytes(b'\x89PNG prova')
+        (self.pasta / 'video-desktop.webm').write_bytes(b'\x1a\x45\xdf\xa3 video')
+        (self.pasta / 'video-mobile.webm').write_bytes(b'\x1a\x45\xdf\xa3 video')
+
+    def gate(self, comando, etapa, doc=None):
+        argv = [sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), comando, etapa]
+        if doc is not None:
+            arq = self.pasta / f'etapa-{etapa}.json'
+            arq.write_text(json.dumps({'arquivos': ['nota.txt'], **doc}), encoding='utf-8')
+            argv += ['--arquivo', arq.name]
+        r = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8', errors='replace')
+        return r.returncode, r.stdout
+
+    def ate_a_4_local(self):
+        for e in ['1', '2', '2.5', '3']:
+            self.assertEqual(self.gate('registrar', e, EtapasDash.DOCS[e])[0], 0, e)
+        return self.gate('registrar', '4', self.LOCAL)
+
+    def test_etapa_4_local_registra_e_a_5_segue(self):
+        self.assertEqual(self.ate_a_4_local()[0], 0)
+        self.assertEqual(self.gate('registrar', '5', EtapasDash.DOCS['5'])[0], 0, 'a etapa 5 (montar e provar em local) tem que fechar sem conta')
+
+    def test_etapa_4_sem_modo_local_continua_barrando_nao(self):
+        # Não afrouxou: "Não" sozinho, sem declarar o modo local, segue bloqueando.
+        for e in ['1', '2', '2.5', '3']:
+            self.gate('registrar', e, EtapasDash.DOCS[e])
+        sem_modo = {k: v for k, v in self.LOCAL.items() if k != 'modo'}
+        codigo, saida = self.gate('registrar', '4', sem_modo)
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn('conta não confirmada', saida)
+
+    def test_modo_local_exige_dizer_o_que_fica_pendente(self):
+        for e in ['1', '2', '2.5', '3']:
+            self.gate('registrar', e, EtapasDash.DOCS[e])
+        sem_pendencia = {k: v for k, v in self.LOCAL.items() if k != 'publicacao_pendente'}
+        self.assertEqual(self.gate('registrar', '4', sem_pendencia)[0], 1)
+
+    def test_modo_diferente_de_local_e_recusado(self):
+        for e in ['1', '2', '2.5', '3']:
+            self.gate('registrar', e, EtapasDash.DOCS[e])
+        self.assertEqual(self.gate('registrar', '4', {**self.LOCAL, 'modo': 'simulado'})[0], 1)
+
+    def test_etapa_6_recusa_publicar_quando_a_4_foi_local(self):
+        self.ate_a_4_local()
+        self.gate('registrar', '5', EtapasDash.DOCS['5'])
+        doc6 = {'prova_publicada': 'https://meu-dash.pages.dev/dashboard.html?id=x', 'pendencias': 'Nenhuma',
+                'passe_de_gosto': {'antes': 3, 'depois': 0, 'inspecao': 'tells'},
+                'arquivos': ['dash-desktop.png', 'video-desktop.webm', 'video-mobile.webm']}
+        codigo, saida = self.gate('registrar', '6', doc6)
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn('conta', saida.lower())
+        self.assertIn('etapa 4', saida.lower())
+
+    def test_etapa_7_fecha_em_local_dizendo_que_nao_foi_publicado(self):
+        self.ate_a_4_local()
+        self.gate('registrar', '5', EtapasDash.DOCS['5'])
+        codigo, saida = self.gate('registrar', '7', {'contexto': 'projetos/x.md salvo', 'publicacao_pendente': 'Publicar quando houver conta'})
+        self.assertEqual(codigo, 0, saida)
+        self.assertIn('local', saida.lower())
+        self.assertIn('não publicad', saida.lower())
+
+    def test_etapa_7_em_local_exige_a_pendencia(self):
+        self.ate_a_4_local()
+        self.gate('registrar', '5', EtapasDash.DOCS['5'])
+        self.assertEqual(self.gate('registrar', '7', {'contexto': 'projetos/x.md salvo'})[0], 1)
+
+    def test_etapa_7_sem_a_6_continua_barrada_quando_a_4_nao_foi_local(self):
+        for e in ['1', '2', '2.5', '3', '4', '5']:
+            self.gate('registrar', e, EtapasDash.DOCS[e])
+        codigo, saida = self.gate('registrar', '7', {'contexto': 'x', 'publicacao_pendente': 'x'})
+        self.assertEqual(codigo, 1, saida)
+        self.assertIn('Etapa 6 não registrada', saida)
+
+    def test_checar_mostra_que_o_dash_esta_em_local(self):
+        self.ate_a_4_local()
+        codigo, saida = self.gate('checar', '4')
+        self.assertEqual(codigo, 0, saida)
+        self.assertIn('local', saida.lower())
+
+    def test_refazer_a_4_com_conta_real_tira_o_modo_local(self):
+        self.ate_a_4_local()
+        self.assertEqual(self.gate('registrar', '4', EtapasDash.DOCS['4'])[0], 0)
+        self.gate('registrar', '5', EtapasDash.DOCS['5'])
+        codigo, saida = self.gate('registrar', '7', {'contexto': 'x', 'publicacao_pendente': 'x'})
+        self.assertEqual(codigo, 1, 'com conta real a etapa 6 volta a ser obrigatória')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

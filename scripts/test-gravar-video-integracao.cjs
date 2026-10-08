@@ -6,7 +6,7 @@
  *  - saíram 6 quadros e a prancha, e o painel falso mostra o número, a aba trocou e o filtro mudou nos quadros;
  *  - um roteiro inválido é recusado antes de abrir o navegador.
  * Sem Playwright, avisa que foi PULADO (não finge que passou).
- * Uso: node scripts/test-gravar-video-integracao.cjs
+ * Uso: node <dir-da-skill>/scripts/test-gravar-video-integracao.cjs
  */
 const fs = require('node:fs');
 const http = require('node:http');

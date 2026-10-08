@@ -1,7 +1,7 @@
 """Bloqueia avanço sem artefatos de etapas anteriores ou após sua alteração.
 
-Uso: node scripts/py.mjs gate-etapas.py --projeto DIR registrar ETAPA --arquivo JSON
-     node scripts/py.mjs gate-etapas.py --projeto DIR checar ETAPA
+Uso: node <dir-da-skill>/scripts/py.mjs gate-etapas.py --projeto DIR registrar ETAPA --arquivo JSON
+     node <dir-da-skill>/scripts/py.mjs gate-etapas.py --projeto DIR checar ETAPA
 O JSON contém campos obrigatórios e uma lista `arquivos` de evidências do projeto.
 Valida presença, sequência e integridade. Julgamento de qualidade continua nas lentes.
 """
@@ -14,6 +14,7 @@ import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lancador  # noqa: E402  (comando com o caminho completo da skill)
 import plataforma  # noqa: E402  (portabilidade Windows/macOS/Linux)
 
 plataforma.texto_console()
@@ -52,12 +53,33 @@ def comeca_com_nao(valor):
     return bool(re.match(r"nao\b", texto))
 
 
-def validar_dash(etapa, doc):
+def modo_local(doc):
+    """3.7.1 (D1): a etapa 4 declara `"modo": "local"` quando a pessoa ainda não tem conta Cloudflare."""
+    return isinstance(doc, dict) and doc.get("modo") == "local"
+
+
+def validar_dash(etapa, doc, local=False):
     """T12 (teste com aluno, 02/10/2026): "Não" passava como prova porque o gate só via campo
-    preenchido. Conta não confirmada não fecha a etapa 4; painel não publicado não fecha a 6."""
-    if etapa == "4" and comeca_com_nao(doc.get("conta_confirmada", "")):
+    preenchido. Conta não confirmada não fecha a etapa 4; painel não publicado não fecha a 6.
+
+    3.7.1 (D1): sem conta o aluno honesto parava na etapa 4 e não podia nem registrar o dash em local.
+    Agora a etapa 4 aceita `"modo": "local"` (com `publicacao_pendente` dizendo o que fica por fazer):
+    as etapas 5 e 7 fecham com o dash em local; a 6 (publicação) continua exigindo a conta de verdade.
+    "Não" sem declarar o modo local segue bloqueando."""
+    if etapa == "4" and "modo" in doc:
+        if doc["modo"] != "local":
+            raise ValueError('Etapa 4: o único modo aceito é "local" (sem conta Cloudflare ainda). '
+                             'Com conta, tire o campo modo e confirme a conta de verdade.')
+        if not str(doc.get("publicacao_pendente", "")).strip():
+            raise ValueError("Etapa 4 em modo local: preencha publicacao_pendente com o que fica por fazer "
+                             "quando a pessoa tiver a conta (provisionar a infra e publicar). Entrega local não é entrega publicada.")
+    elif etapa == "4" and comeca_com_nao(doc.get("conta_confirmada", "")):
         raise ValueError("Etapa 4: conta não confirmada. Sem a conta Cloudflare da pessoa (wrangler whoami) "
-                         "não existe infra; volte a esta etapa quando ela confirmar.")
+                         'não existe infra. Para construir e provar o dash em local mesmo assim, registre a etapa 4 '
+                         'com "modo": "local" e "publicacao_pendente"; para publicar, volte aqui quando ela confirmar.')
+    if etapa == "7" and local and not str(doc.get("publicacao_pendente", "")).strip():
+        raise ValueError("Etapa 7 em modo local: preencha publicacao_pendente com o que falta para publicar. "
+                         "O encerramento não pode esconder que o dash não foi publicado.")
     if etapa == "6":
         prova = str(doc.get("prova_publicada", ""))
         if comeca_com_nao(prova) or not re.search(r"https://\S+", prova):
@@ -72,12 +94,12 @@ def validar_dash(etapa, doc):
         nomes = [Path(str(a)).name.lower() for a in arquivos]
         for perfil in ("desktop", "mobile"):
             if not any(perfil in n and n.endswith(EXTENSOES_DE_VIDEO) for n in nomes):
-                raise ValueError(f"Etapa 6: falta o vídeo de prova do {perfil}. Grave com: node scripts/gravar-video.js "
-                                 f"\"<URL-DO-DASHBOARD>\" --saida prova (gera prova/video-desktop.webm e prova/video-mobile.webm), "
-                                 f"e liste os dois em arquivos.")
+                raise ValueError(f"Etapa 6: falta o vídeo de prova do {perfil}. Grave com: "
+                                 f"{lancador.comando('gravar-video.js', chr(34) + '<URL-DO-DASHBOARD>' + chr(34), '--saida', 'prova')} "
+                                 f"(gera prova/video-desktop.webm e prova/video-mobile.webm), e liste os dois em arquivos.")
 
 
-def validar(projeto, arquivo, etapa, campos, perfil):
+def validar(projeto, arquivo, etapa, campos, perfil, local=False):
     doc = json.loads(arquivo.read_text(encoding="utf-8"))
     if not isinstance(doc, dict):
         raise ValueError("A evidência da etapa precisa ser um objeto JSON.")
@@ -89,7 +111,7 @@ def validar(projeto, arquivo, etapa, campos, perfil):
             if not isinstance(doc["briefing"], dict) or not doc["briefing"].get(campo):
                 raise ValueError(f"Briefing incompleto: {campo}. Fato ausente deve constar como pendente, nunca inventado.")
     if perfil == "dash":
-        validar_dash(etapa, doc)
+        validar_dash(etapa, doc, local)
     if "passe_de_gosto" in campos:
         passe = doc["passe_de_gosto"]
         if not isinstance(passe, dict) or type(passe.get("antes")) is not int or passe["antes"] < 0 or type(passe.get("depois")) is not int or passe["depois"] != 0 or not passe.get("inspecao"):
@@ -104,6 +126,18 @@ def validar(projeto, arquivo, etapa, campos, perfil):
             raise ValueError("A evidência precisa estar dentro do projeto e não pode ser o próprio registro.")
         hashes[str(p.relative_to(projeto))] = digest(p)
     return hashes
+
+
+def esta_em_local(registro):
+    """True quando a etapa 4 foi registrada em modo local (sem conta Cloudflare)."""
+    item = registro.get("4")
+    return isinstance(item, dict) and item.get("local") is True
+
+
+def exigidas(ordem, ate, local):
+    """Etapas que precisam estar registradas para chegar em `ate` (índice exclusivo). Em modo local a 6
+    (publicação) não existe: o dash não foi publicado, e dizer isso é o que a etapa 7 registra."""
+    return [e for e in ordem[:ate] if not (local and e == "6")]
 
 
 def conferir(projeto, registro, etapas):
@@ -135,20 +169,33 @@ def main():
             raise ValueError("Registro de etapas inválido.")
         ordem = list(etapas)
         indice = ordem.index(args.etapa)
-        conferir(projeto, registro, ordem[:indice + (args.comando == "checar")])
+        local = args.perfil == "dash" and esta_em_local(registro)
+        if args.perfil == "dash" and args.etapa == "6" and local:
+            raise ValueError("Etapa 6: publicar exige a conta Cloudflare da pessoa, e a etapa 4 está registrada em modo "
+                             "local (sem conta). Quando ela tiver a conta, refaça a etapa 4 de verdade "
+                             "(conta_confirmada e infra reais, sem o campo modo) e só então registre a 6.")
+        conferir(projeto, registro, exigidas(ordem, indice + (args.comando == "checar"), local))
         if args.comando == "registrar":
             if args.arquivo is None:
                 raise ValueError("Use --arquivo com o JSON da etapa concluída.")
             arquivo = (projeto / args.arquivo).resolve()
             if not arquivo.is_relative_to(projeto):
                 raise ValueError("O JSON precisa estar dentro do projeto.")
-            hashes = validar(projeto, arquivo, args.etapa, etapas[args.etapa], args.perfil)
+            hashes = validar(projeto, arquivo, args.etapa, etapas[args.etapa], args.perfil, local)
             hashes[str(arquivo.relative_to(projeto))] = digest(arquivo)
             # Corrigir uma etapa invalida as seguintes; um resultado antigo não prova a versão nova.
-            registro = {e: registro[e] for e in ordem[:indice]}
+            registro = {e: registro[e] for e in ordem[:indice] if e in registro}
             registro[args.etapa] = {"hashes": hashes}
+            if args.perfil == "dash" and args.etapa == "4" and modo_local(json.loads(arquivo.read_text(encoding="utf-8"))):
+                registro["4"]["local"] = True
+                local = True
+            elif args.etapa == "4":
+                local = False
             alvo.write_text(json.dumps(registro, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"PASSA: etapa {args.etapa}, sequência e integridade conferidas.")
+        if local and int(float(args.etapa) * 2) >= 8:  # etapa 4 em diante
+            print("MODO LOCAL: o dash foi construído e provado em local, sem conta Cloudflare. NÃO publicado. "
+                  "A publicação (etapas 4 de verdade e 6) fica pendente até a pessoa ter a conta; declare isso na entrega.")
         return 0
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"BLOQUEIA: {e}")

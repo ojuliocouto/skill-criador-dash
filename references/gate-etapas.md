@@ -5,9 +5,9 @@ Não verifica sozinho se a copy é boa, se uma aprovação é autêntica ou se a
 Essas responsabilidades continuam com o usuário e as lentes de auditoria.
 
 Crie uma pasta `evidencias/` dentro da pasta do projeto. No dashboard, a pasta do projeto é a
-cópia do starter-kit feita no passo 1 (`cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash`),
+cópia do starter-kit feita no passo 1 (`cp -R <dir-da-skill>/starter-kit ~/meu-dash`),
 e todo caminho abaixo é relativo a `~/meu-dash`. Nunca use a pasta da skill
-(`~/.claude/skills/criador-dash`) para guardar dados de cliente. Cada etapa recebe um JSON próprio
+(`<dir-da-skill>`) para guardar dados de cliente. Cada etapa recebe um JSON próprio
 e arquivos de evidência.
 Use cópias estáveis dos documentos aprovados: modificar a evidência invalida a etapa.
 
@@ -60,16 +60,22 @@ Todas as etapas também exigem `arquivos`: lista de arquivos não vazios dentro 
 No perfil `dash`, "Não" não é prova: `conta_confirmada` começando com "Não" bloqueia a etapa 4, e
 a etapa 6 só passa com a URL `https://` do dashboard publicado em `prova_publicada` e o PNG do
 `prova-dash.js` (ex: `prova/dash-desktop.png`) e os vídeos de prova do desktop e do celular
-(`prova/video-desktop.webm` e `prova/video-mobile.webm`, de `gravar-video.js`) em `arquivos`. Sem conta da pessoa, o roteiro para
-na etapa 4 e a entrega fica pendente, declarada como tal.
+(`prova/video-desktop.webm` e `prova/video-mobile.webm`, de `gravar-video.js`) em `arquivos`.
+
+**Modo local (sem conta Cloudflare, 3.7.1).** As etapas de construção e prova (1, 2, 2.5, 3, 5) não precisam de
+conta; só a publicação (4 e 6) precisa. Sem conta, a etapa 4 registra com `"modo": "local"` e
+`"publicacao_pendente"` (o que fica por fazer); `conta_confirmada` pode dizer "Não". Aí a 5 e a 7 fecham, a 6
+recusa (não existe publicação falsa) e cada passada imprime `MODO LOCAL ... NÃO publicado`. Sem o campo
+`"modo": "local"`, "Não" em `conta_confirmada` continua bloqueando. A 7 em local exige `publicacao_pendente` também.
+Refazer a etapa 4 sem o campo `modo` (conta de verdade) volta a exigir a 6.
 Para `passe_de_gosto`, use `{"antes": 0, "depois": 0, "inspecao": "Itens efetivamente inspecionados"}`.
 A contagem final precisa ser zero. Para campos sem pendência, escreva `"Nenhuma"`.
 Para trabalho futuro, como métricas após tráfego, registre o plano e a limitação atual.
 Não coloque tokens, senhas ou identificadores de conta em evidências destinadas ao Git.
 
 ```bash
-node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash registrar 0 --arquivo evidencias/etapa-0.json
-node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash checar 0
+node <dir-da-skill>/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash registrar 0 --arquivo evidencias/etapa-0.json
+node <dir-da-skill>/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash checar 0
 ```
 
 No dashboard, acrescente `--perfil dash` e comece pela etapa 1. O gate de ferramentas

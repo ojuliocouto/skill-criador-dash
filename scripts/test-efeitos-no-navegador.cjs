@@ -5,7 +5,7 @@
  *  - ROLETA: em 5 quadros durante o giro, cada casa mostra no máximo 2 dígitos e só o que sai e o
  *    que entra, separadores não rolam, a largura do número não varia mais de 2 px.
  * As animações são pausadas e o relógio delas é posto em cada instante: a medida não depende de tempo real.
- * Uso: node scripts/test-efeitos-no-navegador.cjs   (EFEITOS_QUADROS=<pasta> guarda os PNG dos quadros)
+ * Uso: node <dir-da-skill>/scripts/test-efeitos-no-navegador.cjs   (EFEITOS_QUADROS=<pasta> guarda os PNG dos quadros)
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

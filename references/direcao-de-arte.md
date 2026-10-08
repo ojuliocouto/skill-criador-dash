@@ -68,7 +68,7 @@ começa a montar antes de ter isso escrito.
 outros widgets copiam esse padrão. Errar ali não custa um widget, custa o painel.
 
 ```bash
-node scripts/prova-dash.js "<URL>" --out prova-parcial
+node <dir-da-skill>/scripts/prova-dash.js "<URL>" --out prova-parcial
 ```
 
 Abra o PNG e confira contra o que foi decidido na Fase 1:

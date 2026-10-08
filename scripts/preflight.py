@@ -6,10 +6,10 @@ Automatiza o checklist do SKILL.md (passo 1) e o passo BLOQUEANTE do provisionam
 passa mas a API responde 500 "Binding DASHBOARDS_KV nao configurado" em runtime).
 
 Uso:
-  node scripts/py.mjs preflight.py --starter-kit ~/meu-dash                     # passo 1: ambiente
-  node scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy   # passo 4: bloqueia placeholder
-  node scripts/py.mjs preflight.py --starter-kit starter-kit --history   # inclui checks do modo historico
-  node scripts/py.mjs preflight.py --starter-kit starter-kit --run-tests # roda a suite npm test no final
+  node <dir-da-skill>/scripts/py.mjs preflight.py --starter-kit ~/meu-dash                     # passo 1: ambiente
+  node <dir-da-skill>/scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy   # passo 4: bloqueia placeholder
+  node <dir-da-skill>/scripts/py.mjs preflight.py --starter-kit starter-kit --history   # inclui checks do modo historico
+  node <dir-da-skill>/scripts/py.mjs preflight.py --starter-kit starter-kit --run-tests # roda a suite npm test no final
 
 Sai com codigo 0 se tudo ok, 1 se houver bloqueio. Nao muda nada: so le e reporta.
 """
@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lancador  # noqa: E402  (comando com o caminho completo da skill; porta livre)
 import plataforma  # noqa: E402  (portabilidade Windows/macOS/Linux)
 
 plataforma.texto_console()
@@ -83,6 +84,19 @@ def check_api_token(avisos: list) -> None:
         print(f"{AVISO} CLOUDFLARE_API_TOKEN exportado no shell (pode apontar pra conta errada)")
     else:
         print(f"{OK} CLOUDFLARE_API_TOKEN: não exportado (deploy usa o OAuth do wrangler login)")
+
+
+def check_porta(avisos: list, porta: int = 8788) -> None:
+    """D4 (teste de ponta a ponta): a 8788 é a porta do `npm run dev`; ocupada, o dev falha com
+    'Address already in use'. Avisa ANTES e já diz a porta livre, só com socket (funciona no Windows)."""
+    if not lancador.porta_ocupada(porta):
+        print(f"{OK} porta {porta} (npm run dev): livre")
+        return
+    livre = lancador.porta_livre(porta + 1)
+    avisos.append(
+        f"A porta {porta} já está em uso (outro servidor aberto, talvez um npm run dev antigo). "
+        f"Suba o dashboard em outra: npm run dev -- --port {livre} e troque {porta} por {livre} nos endereços.")
+    print(f"{AVISO} porta {porta}: ocupada; a primeira livre é {livre} (npm run dev -- --port {livre})")
 
 
 def check_toml(path: Path, problemas: list, nome: str, exigir_projeto: bool,
@@ -171,6 +185,18 @@ def main() -> int:
     check_node(problemas)
     check_wrangler(problemas, avisos)
     check_api_token(avisos)
+    check_porta(avisos)
+    if not starter.exists():
+        # D2 (teste de ponta a ponta): a pasta do projeto nasce no passo 1; antes disso só o ambiente
+        # pode ser conferido. O preflight só lê: diz o comando que cria a pasta e não cria nada.
+        criar = lancador.comando("lancador.py", "iniciar", lancador.caminho(starter))
+        msg = f"A pasta do projeto {starter} ainda não existe. Crie com: {criar}"
+        print(f"{BLOQUEIO if args.antes_do_deploy else AVISO} pasta do projeto: ainda não existe ({starter})")
+        if args.antes_do_deploy:
+            problemas.append(msg + " (sem a pasta não há wrangler.toml para conferir).")
+        else:
+            avisos.append(msg + ". Depois rode este preflight de novo para conferir wrangler.toml e .dev.vars.")
+        return _fechar(args, problemas, avisos)
     check_toml(starter / "wrangler.toml", problemas, "wrangler.toml", exigir_projeto=True,
                avisos=avisos, bloquear=args.antes_do_deploy)
     if args.history:
@@ -180,7 +206,10 @@ def main() -> int:
     check_dev_vars(starter, avisos)
     if args.run_tests:
         run_tests(starter, problemas)
+    return _fechar(args, problemas, avisos)
 
+
+def _fechar(args, problemas: list, avisos: list) -> int:
     print()
     if avisos:
         print("Avisos (não bloqueiam, mas leia):")

@@ -1,7 +1,7 @@
 /**
  * Parte pura do gravador de vídeo de prova (scripts/video/roteiro.cjs e scripts/video/duracao-webm.cjs):
  * validação do roteiro, montagem dos passos, nomes de arquivo e leitura da duração de um WebM.
- * Uso: node scripts/test-roteiro-de-video.cjs
+ * Uso: node <dir-da-skill>/scripts/test-roteiro-de-video.cjs
  */
 const assert = require('node:assert/strict');
 const path = require('node:path');

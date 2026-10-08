@@ -13,7 +13,7 @@ Required, before you run any command below:
 - **Claude Code**, installed and signed in. This repository is a Claude Code skill: `SKILL.md` is the script an AI coding agent follows to walk you through the build. You can still read and run the starter-kit code without Claude Code, but the guided experience assumes it.
 - **Your data**, as a Google Sheet or a CSV file. If you use a Google Sheet, share it as "Anyone with the link" before pasting the link; without that sharing setting the connector cannot read it.
 
-- **Python 3.8 or newer**, for the guided-flow scripts (tool checker, preflight, step gates). You never call it by name: every script runs through `node scripts/py.mjs <script>.py`, which finds the right Python command for your system on its own (its name differs between Windows, macOS and Linux) and turns on UTF-8 mode.
+- **Python 3.8 or newer**, for the guided-flow scripts (tool checker, preflight, step gates). You never call it by name: every script runs through `node <skill-dir>/scripts/py.mjs <script>.py`, which finds the right Python command for your system on its own (its name differs between Windows, macOS and Linux) and turns on UTF-8 mode.
 - **Playwright with Chromium** (`npm i -g playwright && npx playwright install chromium`), for the proof screenshot and the proof video of the published dashboard. `playwright install chromium` also downloads the ffmpeg build Playwright uses to record video; if it is missing, `npx playwright install ffmpeg`.
 - **The `frontend-design` skill**, for the visual plan: `npx -y skills add anthropics/skills --skill frontend-design --agent claude-code -g -y --copy`. The `-g` matters: without it the skill is installed into the current folder instead of your user-level skills folder.
 
@@ -112,8 +112,8 @@ The person chooses per dashboard:
 - Light or dark mode chosen by the dashboard owner (`config.tema`: `claro`, `escuro` or `auto`). The server sets the initial `data-theme` in the HTML, so the wrong mode never flashes. Visitors can still toggle; their choice is stored per dashboard in their own browser.
 - Presence: a slow-moving background in the brand color, an opening greeting ("Olá, <name>", once per browser session, skippable, `config.saudacao`) that reveals the dashboard, loading skeletons in the shape of the dashboard with a progress bar, a Refresh button with "updated X ago" and an error state with "Try again". Everything collapses to the final state with `prefers-reduced-motion`. Opt out with `config.fundoAnimado: false` and `config.saudacaoLigada: false`.
 - `POST /api/admin-check`: lets the wizard confirm the admin key up front without mutating anything (rate limited per IP, constant-time compare, key only in a header).
-- Motion (7 named effects, all off under `prefers-reduced-motion`, final numbers always in the DOM): **Card that becomes the screen** (the panel row grows in its own color to cover the screen, then the panel takes over), **Chart that responds** (ruler, dot and label with date and value follow the pointer), **Period in one click** (Today, 7 days, 30 days, This month, All, Custom, with a sliding pill), **Roulette numbers** (only the changed digit rolls, in a one-line window per digit; separators never move), **Chart that transforms** (the line morphs and the goal, ranking and funnel bars grow or shrink on filter changes), **Goal hit** (once per crossing of 100%, about 1.9 s: the card lights up in the brand color, a band of light sweeps across it, a flash runs along the bar, the number pulses and the "Meta batida" seal lands) and **Table that reorders** (click a header to sort; the chosen order survives filters, period changes and Refresh until you click again or switch tab). Effects use only `transform`, `opacity`, `stroke-dashoffset` and `clip-path`, none lasts more than 2.4 s and a full period switch ends within 1.0 s; see `starter-kit/public/assets/css/efeitos.css` and `node scripts/test-efeitos-no-navegador.cjs`.
-- Proof video: every delivery ships a 10 to 15 s video of the published dashboard (open, switch tab, filter) at 1440x900 and 390x844, recorded with Playwright's native `recordVideo` (no ffmpeg of your own, no Mac-only tool, output folders may contain spaces and accents): `node scripts/gravar-video.js "<dashboard-url>" --saida prova`. A default script, `scripts/roteiro-padrao.json` (open, wait, switch two period shortcuts, click tabs and hover the chart, pick a filter option, scroll), works on any factory dashboard without editing; steps whose element does not exist are skipped. Because reviewers read images, not video, it also saves a contact sheet of 6 frames taken during the same run (`prancha-desktop.png`, `prancha-mobile.png`) and a `video-info.json` with format, size and duration (read from the WebM itself, no ffprobe). The output is WebM, about 1 MB per video. Step 6 of `gate-etapas.py` refuses to register a delivery without the desktop and mobile videos.
+- Motion (7 named effects, all off under `prefers-reduced-motion`, final numbers always in the DOM): **Card that becomes the screen** (the panel row grows in its own color to cover the screen, then the panel takes over), **Chart that responds** (ruler, dot and label with date and value follow the pointer), **Period in one click** (Today, 7 days, 30 days, This month, All, Custom, with a sliding pill), **Roulette numbers** (only the changed digit rolls, in a one-line window per digit; separators never move), **Chart that transforms** (the line morphs and the goal, ranking and funnel bars grow or shrink on filter changes), **Goal hit** (once per crossing of 100%, about 1.9 s: the card lights up in the brand color, a band of light sweeps across it, a flash runs along the bar, the number pulses and the "Meta batida" seal lands) and **Table that reorders** (click a header to sort; the chosen order survives filters, period changes and Refresh until you click again or switch tab). Effects use only `transform`, `opacity`, `stroke-dashoffset` and `clip-path`, none lasts more than 2.4 s and a full period switch ends within 1.0 s; see `starter-kit/public/assets/css/efeitos.css` and `node <skill-dir>/scripts/test-efeitos-no-navegador.cjs`.
+- Proof video: every delivery ships a 10 to 15 s video of the published dashboard (open, switch tab, filter) at 1440x900 and 390x844, recorded with Playwright's native `recordVideo` (no ffmpeg of your own, no Mac-only tool, output folders may contain spaces and accents): `node <skill-dir>/scripts/gravar-video.js "<dashboard-url>" --saida prova`. A default script, `scripts/roteiro-padrao.json` (open, wait, switch two period shortcuts, click tabs and hover the chart, pick a filter option, scroll), works on any factory dashboard without editing; steps whose element does not exist are skipped. Because reviewers read images, not video, it also saves a contact sheet of 6 frames taken during the same run (`prancha-desktop.png`, `prancha-mobile.png`) and a `video-info.json` with format, size and duration (read from the WebM itself, no ffprobe). The output is WebM, about 1 MB per video. Step 6 of `gate-etapas.py` refuses to register a delivery without the desktop and mobile videos.
 - Engineered-tool visual system (deliberately not an "AI template" look): self-hosted Geist Sans for text and Geist Mono tabular for every number (KPIs, funnel, ranking, chart axis, table headers); KPIs live in one hairline-divided panel rather than N cards with a colored bar; the chart Y-axis uses round nice-number ticks and a filled area under the line; flat surfaces, hairline borders, tinted minimal shadow, no decorative gradient or glow. The brand accent works in both themes and is swappable per dashboard. Regression guards in `test/design.test.js` (no radial-gradient, fonts wired, numbers in mono). The moving brand-colored background and the opening greeting are the one deliberate exception: they live in a separate stylesheet, `presenca.css`, with their own guard in `test/presenca.test.js`, so the rules above still hold for `main.css`.
 - 2D desktop grid layout: non-KPI widgets flow into a 12-column grid (each layout item declares an optional `col` span 3..8), so the time series sits next to the funnel and rankings pair up, instead of a single vertical stack. Collapses to one column on mobile.
 - Built-in client-side filters: a filter bar (period from/to plus one selector per categorical dimension) recomputes every KPI, trend, funnel, series, ranking and table in the browser on change, without reloading or re-hitting the source.
@@ -177,7 +177,9 @@ walkthrough. In short, once you are inside `starter-kit/`:
 npm test                      # 500+ unit tests: node --test 'test/*.test.js'
 npm run dev                   # local dev server with Functions + KV (wrangler pages dev public --compatibility-date=2026-01-01)
 ```
-Run `node ../scripts/py.mjs preflight.py --starter-kit .` (from inside `starter-kit/`) to check your environment at any time.
+Run `node <skill-dir>/scripts/py.mjs preflight.py --starter-kit .` (from inside `starter-kit/`) to check your environment at any time.
+
+In this README `<skill-dir>` means the folder that holds `SKILL.md` (wherever you installed or cloned the skill; if the path has a space or an accent, wrap it in double quotes). Every script command works from any folder. To get the commands already printed with the full path resolved for your machine, run `node <skill-dir>/scripts/py.mjs lancador.py`; to create the project folder (a clean copy of `starter-kit/`) run `node <skill-dir>/scripts/py.mjs lancador.py iniciar ~/meu-dash`.
 
 Behind the wizard: the dashboard (`dashboard.html`) reads `?id=`, loads the config from KV, fetches
 the data through the connector, runs `computeAll` plus the template layout, and renders the widgets.
@@ -325,7 +327,7 @@ MIT.
 
 ## Ferramentas e gates do roteiro guiado
 
-Antes do Passo 1, execute `node scripts/py.mjs checar-ferramentas.py` na raiz da skill.
+Antes do Passo 1, execute `node <dir-da-skill>/scripts/py.mjs checar-ferramentas.py` (`<dir-da-skill>` é a pasta onde está o `SKILL.md`; de qualquer pasta).
 Além de Node 22+, wrangler e starter-kit, o roteiro exige Python 3.9+ e Playwright.
 O 21st.dev é opcional e nunca bloqueia: o código dele é pago e vem em React, e o
 starter-kit é HTML puro. O roteiro guiado bloqueia só se faltar uma ferramenta crítica.
@@ -348,16 +350,16 @@ O gate de tela exige número em `.kpi__value` visível; um ano no título não �
 Dashboards personalizados precisam preservar esse marcador nos valores de métricas.
 
 ```bash
-node scripts/test-prova-dash.cjs
-node scripts/test-resolver-playwright.cjs
-node scripts/test-roteiro-de-video.cjs
-node scripts/test-gravar-video-integracao.cjs
-node scripts/test-efeitos-no-navegador.cjs
-node scripts/py.mjs test-skill-md.py
-node scripts/py.mjs test-biblioteca-independe-do-layout.py
-node scripts/py.mjs test-preflight.py
-node scripts/py.mjs test-uso-ferramentas.py
-node scripts/py.mjs test-gate-etapas.py
+node <skill-dir>/scripts/test-prova-dash.cjs
+node <skill-dir>/scripts/test-resolver-playwright.cjs
+node <skill-dir>/scripts/test-roteiro-de-video.cjs
+node <skill-dir>/scripts/test-gravar-video-integracao.cjs
+node <skill-dir>/scripts/test-efeitos-no-navegador.cjs
+node <skill-dir>/scripts/py.mjs test-skill-md.py
+node <skill-dir>/scripts/py.mjs test-biblioteca-independe-do-layout.py
+node <skill-dir>/scripts/py.mjs test-preflight.py
+node <skill-dir>/scripts/py.mjs test-uso-ferramentas.py
+node <skill-dir>/scripts/py.mjs test-gate-etapas.py
 ```
 
 Datas brasileiras com hora preservam o dia informado. Status de venda são reconhecidos

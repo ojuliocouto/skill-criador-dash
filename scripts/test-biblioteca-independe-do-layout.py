@@ -13,7 +13,7 @@ os templates (tira um KPI e troca o herói, como um aluno faria) e exige:
   1. a suíte da biblioteca continua 100% verde;
   2. a suíte do layout padrão percebe a mudança (senão ela não confere nada).
 
-    node scripts/py.mjs test-biblioteca-independe-do-layout.py
+    node <dir-da-skill>/scripts/py.mjs test-biblioteca-independe-do-layout.py
 """
 import pathlib
 import re

@@ -73,12 +73,12 @@ Marque "Add python.exe to PATH" se instalar o Python pelo instalador gráfico.
 quase nunca existe; no macOS e no Linux às vezes só existe ele. Por isso todo script desta skill roda assim:
 
 ```
-node ~/.claude/skills/criador-dash/scripts/py.mjs <nome-do-script>.py <argumentos>
+node <dir-da-skill>/scripts/py.mjs <nome-do-script>.py <argumentos>
 ```
 
 O `py.mjs` procura `python3`, depois `python`, depois `py -3`, confirma que é Python 3 de verdade e
 liga o modo UTF-8 (sem ele o Windows quebra em palavra com acento). Para saber qual Python a
-máquina tem: `node ~/.claude/skills/criador-dash/scripts/py.mjs --descobrir`. Se ele disser que não
+máquina tem: `node <dir-da-skill>/scripts/py.mjs --descobrir`. Se ele disser que não
 achou, instale pela tabela acima e tente de novo.
 
 **5. As diferenças que importam:**
@@ -97,19 +97,37 @@ achou, instale pela tabela acima e tente de novo.
 
 | Nome no roteiro | Caminho | O que é |
 |---|---|---|
-| pasta da skill | `~/.claude/skills/criador-dash` | o roteiro, os scripts e a biblioteca original. Só leitura: nunca trabalhe nem guarde dado de cliente aqui. |
+| `<dir-da-skill>` | a pasta onde está ESTE `SKILL.md` (você sabe qual é: a pasta de onde leu este arquivo; pode ser a pasta de skills de qualquer instalação do Claude Code, uma pasta com espaço ou acento, ou um clone do repositório) | o roteiro, os scripts e a biblioteca original. Só leitura: nunca trabalhe nem guarde dado de cliente aqui. |
 | pasta do projeto | `~/meu-dash` | a CÓPIA do starter-kit que vira o dashboard da pessoa. Todo trabalho acontece aqui. |
 
-A pasta do projeto nasce de um comando só, no passo 1:
+**Todo comando deste roteiro funciona de qualquer pasta**, porque os scripts são chamados pelo caminho
+completo: onde está escrito `<dir-da-skill>`, ponha o caminho real da pasta da skill. Se o caminho tiver
+espaço ou acento (`C:/Users/João Silva/...`), ponha o caminho inteiro entre aspas duplas. Nenhum comando
+depende de qual pasta está aberta no terminal. Não tem certeza do caminho? Rode, de qualquer pasta,
+
+```
+node <dir-da-skill>/scripts/py.mjs lancador.py --projeto ~/meu-dash
+```
+
+O `lancador.py` imprime todos os comandos do roteiro (checar ferramentas, preflight, gates, prova de tela, vídeo)
+com o caminho completo já resolvido nesta máquina e entre aspas quando precisa. O `gate-etapas.py` faz o mesmo
+quando manda rodar outro script. Copie dali em vez de remontar o caminho na mão.
+
+A pasta do projeto nasce de um comando só, no passo 1. A pasta ainda não existe, então este comando vem ANTES
+de qualquer outro que use `~/meu-dash`:
 
 ```bash
-cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash
+node <dir-da-skill>/scripts/py.mjs lancador.py iniciar ~/meu-dash
 cd ~/meu-dash
 ```
 
+O `iniciar` copia o `starter-kit` sem o cache do wrangler nem o `.dev.vars` (nada de conta ou segredo vai junto),
+recusa pasta que já tem conteúdo e imprime o próximo comando. Faz o mesmo que
+`cp -R <dir-da-skill>/starter-kit ~/meu-dash`, mas também funciona no Windows e com caminho de espaço ou acento.
+
 Daí em diante, todo comando roda de dentro de `~/meu-dash`, e todo caminho relativo do roteiro
 (`evidencias/`, `prova/`, `projetos/`, `.dev.vars`, `public/`) é relativo a ela. Os scripts da
-skill são chamados pelo caminho completo (`node ~/.claude/skills/criador-dash/scripts/py.mjs <script>.py ...`, ver a seção anterior).
+skill são chamados pelo caminho completo (`node <dir-da-skill>/scripts/py.mjs <script>.py ...`, ver a seção anterior).
 Se a pessoa preferir outro nome de pasta, troque `~/meu-dash` em todos os comandos.
 
 ## Protocolo de operação (leia antes de tudo)
@@ -142,7 +160,7 @@ responder, não existe Passo 1.** Não é um checklist que você lê e segue mes
 checklist é pulado, gate não.
 
 ```
-node ~/.claude/skills/criador-dash/scripts/py.mjs checar-ferramentas.py
+node <dir-da-skill>/scripts/py.mjs checar-ferramentas.py
 ```
 
 O verificador não pergunta se a ferramenta está instalada: ele MANDA cada uma fazer alguma
@@ -192,7 +210,7 @@ com `--antes-do-deploy`, o `wrangler.toml`, o `.dev.vars` e o projeto ANTES do d
 
 ### 1. Onboarding e checklist
 
-Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 1 --arquivo evidencias/etapa-1.json`.
+Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 1 --arquivo evidencias/etapa-1.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Nunca presuma que a pessoa leu o README. Explique em 3 frases:
 - "Eu vou construir com você o seu dashboard, na sua conta Cloudflare, do jeito da sua operação."
@@ -202,15 +220,40 @@ Nunca presuma que a pessoa leu o README. Explique em 3 frases:
 Explique em uma frase cada palavra técnica antes de mandar comando (a pessoa pode nunca ter usado):
 as frases prontas estão no Glossário, no topo deste roteiro.
 
-Rode o preflight, que checa o ambiente de uma vez e diz o que falta:
+**Primeiro a pasta, depois o preflight.** A pasta do projeto ainda não existe (ela nasce aqui, ver a seção
+"Pastas"), então o primeiro comando do passo é o que a cria. É nela que ficam `evidencias/` (dos gates),
+`.dev.vars` e o dashboard da pessoa:
 ```
-node ~/.claude/skills/criador-dash/scripts/py.mjs preflight.py --starter-kit ~/meu-dash
+node <dir-da-skill>/scripts/py.mjs lancador.py iniciar ~/meu-dash
+cd ~/meu-dash
 ```
+Se já criou no Passo 0 por causa de alguma ferramenta, não repita: o `iniciar` recusa pasta com conteúdo.
+
+Agora rode o preflight, que checa o ambiente de uma vez e diz o que falta:
+```
+node <dir-da-skill>/scripts/py.mjs preflight.py --starter-kit ~/meu-dash
+```
+(Se rodar o preflight antes de criar a pasta, ele não quebra: confere só o ambiente e imprime o comando que cria a pasta.)
+
+**Os avisos que o preflight pode dar, e o que cada um significa** (explique à pessoa antes de ela ver):
+- **`CLOUDFLARE_API_TOKEN exportado no shell`**: é uma chave de acesso guardada numa variável do terminal. Ela
+  SOBREPÕE o `wrangler login` e pode apontar para outra conta que não a da pessoa (o deploy sairia na conta errada).
+  Se a pessoa não a colocou ali de propósito, tire: `unset CLOUDFLARE_API_TOKEN` (Git Bash, macOS e Linux) ou
+  `Remove-Item Env:CLOUDFLARE_API_TOKEN` (PowerShell), e confira com `wrangler whoami`. Se foi de propósito (token
+  da conta certa), siga e registre isso na etapa 4.
+- **`porta 8788 ocupada`**: a 8788 é a porta onde o `npm run dev` abre o dashboard no computador. Se outro programa
+  já usa essa porta (um `npm run dev` antigo, outra ferramenta), o dev para com `Address already in use`. O aviso já
+  diz a primeira porta livre; para descobrir outra a qualquer hora: `node <dir-da-skill>/scripts/py.mjs lancador.py porta-livre`.
+  Não chute 8789 ou 8790: são as vizinhas que costumam estar ocupadas também.
+- **placeholder no `wrangler.toml`**: veja logo abaixo.
+
 Neste passo, o aviso de placeholder no `wrangler.toml` é esperado até o passo 4
 (`<SEU_KV_NAMESPACE_ID>`): a pessoa ainda não criou KV nenhum. Ele não bloqueia agora; vira bloqueio só quando o
 preflight roda com `--antes-do-deploy`, no passo 4.
 Checklist (um item por vez; se faltar algo, resolva antes de seguir):
 - [ ] Conta no Cloudflare? (plano grátis cobre Pages + Functions + KV; D1 tem free tier). Senão: dash.cloudflare.com.
+      Ainda sem conta? Não trava: dá para construir e provar o dashboard inteiro no computador (modo local,
+      veja o quadro dentro do passo 4). Só a publicação espera a conta.
 - [ ] Node 22 ou mais novo instalado? (`node -v`). O wrangler atual exige Node 22+; com uma versão mais
       velha (18, 20) ele nem roda os testes nem faz o deploy. Sem Node instalado, nada funciona.
 - [ ] wrangler disponível? `npm i -g wrangler` (a versão atual, 4.x, é a que exige Node 22+ acima). Se
@@ -221,10 +264,6 @@ Checklist (um item por vez; se faltar algo, resolva antes de seguir):
       pode apontar pra outra conta (o preflight avisa); se indevido, `unset CLOUDFLARE_API_TOKEN`.
 - [ ] Conta certa? `wrangler whoami` (mostra email e Account ID). Errada: `wrangler logout` e login de novo.
 
-Antes de qualquer outro comando deste passo, crie a pasta do projeto (seção "Pastas"):
-`cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash && cd ~/meu-dash`. É nela que
-ficam `evidencias/` (dos gates), `.dev.vars` e o dashboard da pessoa.
-
 #### Quickstart (primeira vez, só no seu computador)
 
 Antes de tocar na conta Cloudflare real, rode isto com a pessoa, um passo por vez, pra ela ver um
@@ -232,9 +271,9 @@ dashboard funcionando no próprio computador em poucos minutos. Isso separa "amb
 "infra provisionada": se algo falhar depois, você já sabe que não é o Node, o wrangler nem o
 wizard, é o provisionamento.
 
-1. Crie a pasta do projeto e entre nela:
+1. Crie a pasta do projeto e entre nela (se o passo 1 já criou, só entre nela):
    ```bash
-   cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash
+   node <dir-da-skill>/scripts/py.mjs lancador.py iniciar ~/meu-dash
    cd ~/meu-dash
    ```
 2. Confira o ambiente. Não existe `npm install` (o kit não tem dependência), então isto já prova
@@ -248,10 +287,13 @@ wizard, é o provisionamento.
    ```bash
    echo "ADMIN_TOKEN=token-local-de-teste" > .dev.vars
    ```
-4. Suba o servidor local:
+4. Suba o servidor local. A porta padrão é a 8788; o preflight já avisou se ela está ocupada. Para ter
+   certeza antes de subir, peça uma livre e use-a no lugar do 8788 em todos os endereços:
    ```bash
-   npm run dev
+   node <dir-da-skill>/scripts/py.mjs lancador.py porta-livre
+   npm run dev -- --port 8788
    ```
+   (troque 8788 pelo número que o primeiro comando imprimiu, se for outro).
 5. Abra `http://localhost:8788/config.html` no navegador e siga os 4 passos do wizard: escolha o
    domínio (Marketing), suba o arquivo de exemplo `examples/marketing-exemplo.csv` (ou a planilha
    da pessoa), confira as colunas, dê um nome e uma cor. Ao salvar, o wizard pede o token de
@@ -259,13 +301,14 @@ wizard, é o provisionamento.
 6. Pronto: o primeiro dashboard está rodando local. O deploy na conta da pessoa vem no passo 4.
 
 **Porta ocupada.** Se o `npm run dev` responder `Address already in use (127.0.0.1:8788)`, já tem
-outro servidor usando a porta 8788 (talvez um `npm run dev` antigo aberto em outra janela). Rode
-`npm run dev -- --port 8790` e troque 8788 por 8790 em todos os endereços
-(`http://localhost:8790/config.html`).
+outro servidor usando a porta 8788 (talvez um `npm run dev` antigo aberto em outra janela). Não adivinhe outra:
+rode `node <dir-da-skill>/scripts/py.mjs lancador.py porta-livre` (ele imprime a primeira livre, ex.: 8841) e
+suba com `npm run dev -- --port 8841`, trocando 8788 por 8841 em todos os endereços
+(`http://localhost:8841/config.html`). Não mate o processo da porta ocupada: pode ser de outra tarefa da pessoa.
 
 ### 2. Descoberta da operação
 
-Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2 --arquivo evidencias/etapa-2.json`.
+Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2 --arquivo evidencias/etapa-2.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Que área medir: Marketing, Vendas, Suporte, ou mais de uma (um dashboard por área; junte num grupo com abas).
 - Onde os dados vivem: planilha, CRM, Meta Ads, WhatsApp, sistema com API etc.
@@ -273,7 +316,7 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
 
 ### 2.5 DIREÇÃO DO PAINEL (antes de montar qualquer widget)
 
-Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2.5 --arquivo evidencias/etapa-2.5.json`.
+Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 2.5 --arquivo evidencias/etapa-2.5.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 
 O painel nasce feio quando ninguém decidiu o que ele responde. Esta é a fase de concepção do
@@ -318,7 +361,7 @@ Registre o uso (`uso-ferramentas.py registrar "skill frontend-design" ...`, ver 
 
 ### 3. Escolher o modo de dados
 
-Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 3 --arquivo evidencias/etapa-3.json`.
+Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 3 --arquivo evidencias/etapa-3.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados"):
 - AO VIVO: lê a fonte na hora, só KV pra config, setup mínimo. Bom pra maioria.
@@ -326,18 +369,47 @@ Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados")
 
 ### 4. Provisionar a infra DELA
 
-Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 4 --arquivo evidencias/etapa-4.json`.
+Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 4 --arquivo evidencias/etapa-4.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Pergunte qual conta Cloudflare usar e siga `references/infra.md` na ordem (o passo do wrangler.toml é
-BLOQUEANTE: rode `node ~/.claude/skills/criador-dash/scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy` antes do deploy):
+BLOQUEANTE: rode `node <dir-da-skill>/scripts/py.mjs preflight.py --starter-kit ~/meu-dash --antes-do-deploy` antes do deploy):
 - KV `DASHBOARDS_KV` (sempre) e `DASHBOARD_CACHE` (opcional).
 - Modo histórico: D1 + `db/schema.sql` + Worker cron (`workers/snapshot/`).
 - Projeto Pages + domínio customizado.
 - `ADMIN_TOKEN` (OBRIGATÓRIO): mutação é fail-closed, sem o token ninguém cria/apaga dashboard.
 
+#### Sem conta Cloudflare: o que fecha e o que espera
+
+A pessoa pode querer ver o dashboard funcionando no computador antes de ter (ou de criar) a conta. Isso é
+legítimo e não pode travar o roteiro. O gate separa as etapas em duas famílias:
+
+| Família | Etapas | Precisa de conta? |
+|---|---|---|
+| Construção e prova em local | 1, 2, 2.5, 3, 5 (e o quickstart) | Não. O dash roda com `npm run dev`, o KV fica em disco, a prova de tela (`prova-dash.js`) aponta para `http://localhost:<porta>`. |
+| Publicação | 4 e 6 | Sim. A 4 provisiona KV, Pages e `ADMIN_TOKEN` na conta DELA; a 6 só fecha com a URL `https://` publicada. |
+| Encerramento | 7 | Fecha em local, mas declara que NÃO foi publicado. |
+
+Sem conta, registre a etapa 4 assim (a pasta `evidencias/` e o resto seguem como em `references/gate-etapas.md`):
+
+```json
+{
+  "modo": "local",
+  "conta_confirmada": "Não: a pessoa ainda não tem conta Cloudflare",
+  "infra": "local: wrangler pages dev com KV em disco; nada provisionado na Cloudflare",
+  "publicacao_pendente": "Publicar quando a pessoa criar a conta: refazer a etapa 4 e fazer a 6",
+  "arquivos": ["evidencias/decisao-local.md"]
+}
+```
+
+Daí a etapa 5 (montar e provar em local) e a 7 (encerramento) registram normalmente, e o gate imprime
+`MODO LOCAL ... NÃO publicado` a cada passada. A etapa 6 recusa: não existe publicação falsa, e `"Não"` em
+`conta_confirmada` sem o `"modo": "local"` continua bloqueando a etapa 4. Quando a conta existir, refaça a etapa 4 de
+verdade (sem o campo `modo`; isso invalida as seguintes), siga para o 5.1 de novo se mudou algo e faça a 6.
+Na entrega ao dono, diga com todas as letras: "construído e provado em local, não publicado".
+
 ### 5. Montar o dashboard
 
-Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 5 --arquivo evidencias/etapa-5.json`.
+Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 5 --arquivo evidencias/etapa-5.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Escolha o domínio pronto (Marketing, Vendas, Suporte, Financeiro, Estoque) ou crie um novo (`references/extensao.md`).
 - Conecte a fonte: planilha (gviz CSV), upload CSV, Meta Ads (token; card só no domínio Marketing) ou
@@ -372,7 +444,7 @@ Pra corrigir na hora, clique em "Reconfigurar", ajuste no passo Finalizar e salv
   mudar o padrão pra todo mundo, e o teste do layout é atualizado junto, de propósito.
 
 ```bash
-node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-local-ou-publicada>" --out prova-parcial
+node <dir-da-skill>/scripts/prova-dash.js "<URL-local-ou-publicada>" --out prova-parcial
 ```
 
 É o único momento em que corrigir é barato: a faixa define densidade, escala e ritmo, e todos
@@ -390,7 +462,7 @@ montar o resto. Replicar padrão errado é o jeito mais caro de errar. <<<**
 
 ### 6. Deploy e verificação
 
-Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 6 --arquivo evidencias/etapa-6.json`.
+Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 6 --arquivo evidencias/etapa-6.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 - Publique na conta DA PESSOA (`wrangler pages deploy public --project-name=<NOME>`).
 - O gate da etapa 6 só fecha com a URL `https://` publicada em `prova_publicada` e o PNG do
@@ -407,7 +479,7 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
   Registre os usos (6.1).
 - **GATE de tela (bloqueia a entrega).** Rode contra o dashboard PUBLICADO, não contra o local:
 ```
-node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-DO-DASHBOARD>" [--senha <SENHA>]
+node <dir-da-skill>/scripts/prova-dash.js "<URL-DO-DASHBOARD>" [--senha <SENHA>]
 ```
   Ele abre no navegador de verdade, autentica se precisar, espera os dados chegarem e reprova se
   QUALQUER card de KPI estiver com hífen, travessão, vazio, `NaN`, erro ou "Não mapeada", ou se algum
@@ -428,7 +500,7 @@ node ~/.claude/skills/criador-dash/scripts/prova-dash.js "<URL-DO-DASHBOARD>" [-
   entrega traz um vídeo de 10 a 15 s do painel publicado (abrir, trocar de aba, filtrar), no desktop
   (1440x900) e no celular (390x844):
 ```
-node ~/.claude/skills/criador-dash/scripts/gravar-video.js "<URL-DO-DASHBOARD>" --saida prova [--senha <SENHA>]
+node <dir-da-skill>/scripts/gravar-video.js "<URL-DO-DASHBOARD>" --saida prova [--senha <SENHA>]
 ```
   Usa a gravação nativa do Playwright (o mesmo navegador de teste do `prova-dash.js`): sem ffmpeg seu e
   sem ferramenta só de Mac, e a pasta de saída pode ter espaço e acento. O roteiro é
@@ -446,7 +518,7 @@ node ~/.claude/skills/criador-dash/scripts/gravar-video.js "<URL-DO-DASHBOARD>" 
 ### 6.1 GATE DE USO: ferramenta viva não se pula
 
 ```bash
-node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar
+node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar
 ```
 
 **A regra, e ela não tem exceção:** toda ferramenta que o Passo 0 mediu como RESPONDENDO
@@ -472,14 +544,14 @@ atalho guardado numa variável (`U="node ... py.mjs ..."`) e chamado depois queb
 
 ```bash
 # artefato no disco
-node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash registrar Playwright --arquivo prova/dash-desktop.png --detalhe "prova de tela lida"
-node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash registrar "skill frontend-design" --arquivo evidencias/plano-visual.md --detalhe "plano visual antes do código"
+node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash registrar Playwright --arquivo prova/dash-desktop.png --detalhe "prova de tela lida"
+node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash registrar "skill frontend-design" --arquivo evidencias/plano-visual.md --detalhe "plano visual antes do código"
 ```
 
 **Não se aplica a este painel? DISPENSE, com motivo, e o motivo vai na entrega:**
 
 ```bash
-node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash dispensar "skill animate" --motivo "este painel não tem série temporal: o widget de tendência não entra"
+node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash dispensar "skill animate" --motivo "este painel não tem série temporal: o widget de tendência não entra"
 ```
 
 Dispensa exige motivo de verdade (o script recusa "não usei") e sai marcada no relatório e no
@@ -491,10 +563,10 @@ erro de cobrar direção de arte pra corrigir o nome de uma coluna:
 
 ```bash
 # CRIAR, CLONAR e MELHORAR: cobra tudo que estiver vivo
-node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar --caminho criar
+node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar --caminho criar
 
 # EDITAR (mudança pontual): cobra só a PROVA do ponto alterado
-node ~/.claude/skills/criador-dash/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar --caminho editar
+node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checar --caminho editar
 ```
 
 Exigir passe de gosto pra trocar um rótulo não melhora nada, e gate impossível de passar
@@ -509,7 +581,7 @@ está faltando. Nenhuma explicação substitui rodar de novo verde. <<<**
 
 ### 7. Encerramento
 
-Ao concluir, execute `node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 7 --arquivo evidencias/etapa-7.json`.
+Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil dash --projeto ~/meu-dash registrar 7 --arquivo evidencias/etapa-7.json`.
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Salve o contexto do projeto da pessoa em `~/meu-dash/projetos/YYYYMMDD-descricao.md` (crie a
 pasta com `mkdir -p ~/meu-dash/projetos`). Ela fica de fora do git pelo `~/meu-dash/.gitignore`,
@@ -586,7 +658,7 @@ no DOM:
 Faixa de duração deles: nenhum passa de 2,4 s e a troca de período inteira termina em até 1,0 s
 (`test/efeitos-duracao.test.js`). Os tetos de 120 a 700 ms seguem valendo para o resto do painel.
 A medida no navegador (pixels do cartão na meta batida, dígitos por casa na roleta, ordem da tabela)
-está em `node scripts/test-efeitos-no-navegador.cjs`.
+está em `node <dir-da-skill>/scripts/test-efeitos-no-navegador.cjs`.
 
 Presença (o que faz o painel não parecer modelo pronto; CSS em `public/assets/css/presenca.css`):
 - FUNDO VIVO na cor da marca (`config.accent` e `accent2`): manchas e curvas de gráfico derivando devagar
