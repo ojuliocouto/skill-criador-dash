@@ -91,7 +91,8 @@ mesma imagem). Formato:
 }
 ```
 
-Liste em `arquivos` o JSON medido e os PNG dos itens. Os PNG `passe-*.png` não contam como o print da prova de tela.
+Liste em `arquivos` o `video-info.json` do `gravar-video.js` (3.7.2): o gate lê dele em quantos quadros de cada perfil há número de
+verdade na tela e recusa vídeo cujos quadros são só o esqueleto de carregamento. Liste também o JSON medido e os PNG dos itens. Os PNG `passe-*.png` não contam como o print da prova de tela.
 O gate confere formato, coerência (o total bate com os sinais, a medição é do painel publicado, cobre os dois temas e os
 dois perfis) e que os prints existem; não prova sozinho que alguém olhou. Para campos sem pendência, escreva `"Nenhuma"`.
 Para trabalho futuro, como métricas após tráfego, registre o plano e a limitação atual.
@@ -194,7 +195,7 @@ sozinho que o arquivo veio do comando.
                                "olhado_escuro": {"print": "evidencias/passe-escuro-desktop.png", "visto": "painel inteiro no escuro"}}},
   "pendencias": "Nenhuma",
   "arquivos": ["prova/dash-desktop.png", "prova/dash-mobile.png", "prova/video-desktop.webm", "prova/video-mobile.webm", "prova/prancha-desktop.png", "prova/prancha-mobile.png",
-               "evidencias/passe-de-gosto-medido.json", "evidencias/passe-claro-desktop.png", "evidencias/passe-escuro-desktop.png"]
+               "prova/video-info.json", "evidencias/passe-de-gosto-medido.json", "evidencias/passe-claro-desktop.png", "evidencias/passe-escuro-desktop.png"]
 }
 ```
 

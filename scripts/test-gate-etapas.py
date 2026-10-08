@@ -61,8 +61,16 @@ def medido_json(achados=None, url='https://meu-dash.pages.dev/dashboard.html'):
             'passes': passes, 'total': sum(s['achados'] for s in sinais.values())}
 
 
+def gravar_info_do_video(pasta, desktop=3, mobile=3):
+    """video-info.json como o gravar-video.js grava: quantos quadros de cada perfil têm número de verdade na tela."""
+    info = {'url': URL_PUBLICADA, 'perfis': {p: {'quadros': ['q.png'] * 6, 'quadrosComNumero': ['q.png'] * n, 'totalQuadrosComNumero': n} for p, n in (('desktop', desktop), ('mobile', mobile))}}
+    (pasta / 'video-info.json').write_text(json.dumps(info), encoding='utf-8')
+
+
 def gravar_passe(pasta, achados=None, url='https://meu-dash.pages.dev/dashboard.html'):
     """Escreve os arquivos que o passe de gosto medido deixa e devolve (passe_de_gosto, arquivos)."""
+    if not (pasta / 'video-info.json').exists():
+        gravar_info_do_video(pasta)
     (pasta / 'passe-de-gosto-medido.json').write_text(json.dumps(medido_json(achados, url)), encoding='utf-8')
     (pasta / 'passe-claro-desktop.png').write_bytes(b'\x89PNG claro desktop')
     (pasta / 'passe-escuro-desktop.png').write_bytes(b'\x89PNG escuro desktop')
@@ -117,8 +125,11 @@ class EtapasDash(unittest.TestCase):
             with self.subTest(valor=valor):
                 self.assertEqual(self.registrar('4', {**self.DOCS['4'], 'conta_confirmada': valor}), 1)
 
-    def etapa6(self, prova, arquivos, passe=None, achados=None):
+    def etapa6(self, prova, arquivos, passe=None, achados=None, info=(3, 3)):
         self.ate('6')
+        if info is not None:
+            gravar_info_do_video(self.pasta, *info)
+            arquivos = list(arquivos) + ['video-info.json']
         self.assertEqual(self.registrar('5', self.DOCS['5']), 0)
         if passe is None:  # com `passe` dado, os arquivos já foram gravados (e possivelmente adulterados) por quem chamou
             passe, extras = gravar_passe(self.pasta, achados)
@@ -201,7 +212,7 @@ class PasseDeGostoMedido(unittest.TestCase):
     def test_a_mensagem_diz_o_sinal_e_a_quantidade(self):
         self.ate('6'); self.registrar('5', self.DOCS['5'])
         passe, extras = gravar_passe(self.pasta, {'caixa_alta_espacada': 3})
-        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + [e for e in extras if e.startswith('passe-')]}
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + ['video-info.json'] + [e for e in extras if e.startswith('passe-')]}
         (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
         r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
                            capture_output=True, text=True, encoding='utf-8', errors='replace')
@@ -231,7 +242,7 @@ class PasseDeGostoMedido(unittest.TestCase):
     def test_medicao_de_outro_painel_barra(self):
         self.ate('6'); self.registrar('5', self.DOCS['5'])
         passe, extras = gravar_passe(self.pasta, url='https://outro-painel.pages.dev/dashboard.html')
-        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + [e for e in extras if e.startswith('passe-')]}
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + ['video-info.json'] + [e for e in extras if e.startswith('passe-')]}
         (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
         r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
                            capture_output=True, text=True, encoding='utf-8', errors='replace')
@@ -244,7 +255,7 @@ class PasseDeGostoMedido(unittest.TestCase):
         m = json.loads((self.pasta / 'passe-de-gosto-medido.json').read_text(encoding='utf-8'))
         m['passes'] = [x for x in m['passes'] if x['tema'] == 'claro']
         (self.pasta / 'passe-de-gosto-medido.json').write_text(json.dumps(m), encoding='utf-8')
-        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + [e for e in extras if e.startswith('passe-')]}
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + ['video-info.json'] + [e for e in extras if e.startswith('passe-')]}
         (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
         r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
                            capture_output=True, text=True, encoding='utf-8', errors='replace')
@@ -272,7 +283,52 @@ class PasseDeGostoMedido(unittest.TestCase):
         passe, _ = gravar_passe(self.pasta)
         self.ate('6'); self.registrar('5', self.DOCS['5'])
         doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe,
-               'arquivos': self.BASE + ['passe-claro-desktop.png', 'passe-escuro-desktop.png']}  # falta o json
+               'arquivos': self.BASE + ['video-info.json', 'passe-claro-desktop.png', 'passe-escuro-desktop.png']}  # falta o json
+        (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+        self.assertEqual(r.returncode, 1)
+
+
+class VideoComNumero(unittest.TestCase):
+    """3.7.2: a prova de vídeo que só mostra o esqueleto de carregamento não vale. O gate lê o video-info.json."""
+    DOCS = EtapasDash.DOCS
+    URL = URL_PUBLICADA
+    setUp = EtapasDash.setUp
+    registrar = EtapasDash.registrar
+    ate = EtapasDash.ate
+    etapa6 = EtapasDash.etapa6
+    BASE = ['dash-desktop.png', 'video-desktop.webm', 'video-mobile.webm']
+
+    def test_positivo_com_numero_nos_dois_perfis(self):
+        self.assertEqual(self.etapa6(self.URL, self.BASE, info=(2, 4)), 0)
+
+    def test_mutante_sem_video_info_barra(self):
+        self.assertEqual(self.etapa6(self.URL, self.BASE, info=None), 1)
+
+    def test_mutante_desktop_so_com_esqueleto_barra(self):
+        self.assertEqual(self.etapa6(self.URL, self.BASE, info=(0, 3)), 1)
+
+    def test_mutante_celular_so_com_esqueleto_barra(self):
+        self.assertEqual(self.etapa6(self.URL, self.BASE, info=(3, 0)), 1)
+
+    def test_a_mensagem_diz_qual_perfil_e_o_que_fazer(self):
+        self.ate('6'); self.registrar('5', self.DOCS['5'])
+        gravar_info_do_video(self.pasta, 0, 3)
+        passe, extras = gravar_passe(self.pasta)
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + ['video-info.json'] + [e for e in extras if e.startswith('passe-')]}
+        (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('desktop', r.stdout)
+        self.assertIn('número', r.stdout)
+
+    def test_video_info_sem_a_contagem_barra(self):
+        self.ate('6'); self.registrar('5', self.DOCS['5'])
+        (self.pasta / 'video-info.json').write_text(json.dumps({'perfis': {'desktop': {}, 'mobile': {}}}), encoding='utf-8')
+        passe, extras = gravar_passe(self.pasta)
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + ['video-info.json'] + [e for e in extras if e.startswith('passe-')]}
         (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
         r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
                            capture_output=True, text=True, encoding='utf-8', errors='replace')

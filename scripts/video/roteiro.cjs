@@ -11,6 +11,7 @@
  *   mover_mouse      seletor | x,y  leva o mouse até o elemento ou ao ponto
  *   rolar            y            rola a página até a posição y (pixels)
  *   escolher         seletor + indice | valor   escolhe uma opção de <select> (o filtro)
+ *   esperar_numero   [ms]   espera (até 45 s por padrão, teto de 60 s) aparecer um .kpi__value visível com número de verdade; NÃO é opcional: o esqueleto de carregamento não conta, e sem número a gravação não vale
  *   digitar          seletor + texto   clica no campo e digita o texto aos poucos (ex.: as datas do filtro Personalizado)
  *   cruzar_meta      (sem campos)   procura, entre os atalhos de período, um par que leva a meta de "não batida" a "batida" e mostra o cruzamento; se o painel não tem meta ou nenhum par cruza, o passo é pulado e diz por quê
  *   teclar           tecla        aperta uma tecla no elemento em foco (ex.: ArrowRight muda o atalho de período sem voltar ao topo da página)
@@ -24,13 +25,13 @@
  */
 const path = require('node:path');
 
-const ACOES = ['abrir', 'esperar', 'esperar_seletor', 'clicar', 'mover_mouse', 'rolar', 'escolher', 'digitar', 'cruzar_meta', 'teclar', 'print'];
+const ACOES = ['abrir', 'esperar', 'esperar_seletor', 'clicar', 'mover_mouse', 'rolar', 'escolher', 'esperar_numero', 'digitar', 'cruzar_meta', 'teclar', 'print'];
 const MIN_PRINTS = 6;
 const FAIXA_S = { min: 10, max: 15 };
 const ESPERA_MAX_MS = 10000;
 
 // Custo médio de cada ação (ms) além das esperas explícitas: o mouse se move, a página responde.
-const CUSTO_MS = { abrir: 2000, esperar: 0, esperar_seletor: 500, clicar: 500, mover_mouse: 500, rolar: 700, escolher: 500, digitar: 500, cruzar_meta: 4000, teclar: 300, print: 300 };
+const CUSTO_MS = { abrir: 2000, esperar: 0, esperar_seletor: 500, esperar_numero: 800, clicar: 500, mover_mouse: 500, rolar: 700, escolher: 500, digitar: 500, cruzar_meta: 4000, teclar: 300, print: 300 };
 
 const PERFIS = Object.freeze({
   desktop: Object.freeze({ viewport: Object.freeze({ width: 1440, height: 900 }), isMobile: false, hasTouch: false, deviceScaleFactor: 1 }),
@@ -60,6 +61,9 @@ function erroDoPasso(p, i) {
     case 'escolher':
       if (!ehTexto(p.seletor)) return `${rotulo} (escolher): falta "seletor"`;
       if (!ehNumero(p.indice) && !ehTexto(p.valor)) return `${rotulo} (escolher): use "indice" ou "valor"`;
+      break;
+    case 'esperar_numero':
+      if (p.ms !== undefined && !(ehNumero(p.ms) && p.ms >= 1 && p.ms <= 60000)) return `${rotulo} (esperar_numero): "ms" precisa ser um número de 1 a 60000`;
       break;
     case 'digitar':
       if (!ehTexto(p.seletor)) return `${rotulo} (digitar): falta "seletor"`;
@@ -119,6 +123,10 @@ const nomeDoVideo = (perfil) => { conferirPerfil(perfil); return `video-${perfil
 const nomeDoPrint = (perfil, n, nome) => { conferirPerfil(perfil); return `${perfil}-${String(n).padStart(2, '0')}-${nomeSeguro(nome)}.png`; };
 const caminhoDeSaida = (pasta, arquivo) => path.join(pasta, arquivo);
 
+/** O texto tem número de verdade (um dígito)? Esqueleto, traço e "Não mapeada" não têm. */
+const textoTemNumero = (texto) => /\d/.test(String(texto == null ? '' : texto));
+const ESPERA_NUMERO_MS = 45000;
+
 // Pares de atalhos de período (de, para) que o cruzar_meta tenta, nesta ordem: sai de um período em que a meta
 // não está batida e vai para um maior (ou outro) em que pode estar.
 const PARES_DE_ATALHOS = Object.freeze([['mes', 'tudo'], ['30d', 'tudo'], ['7d', 'mes'], ['7d', '30d']].map((p) => Object.freeze(p)));
@@ -132,4 +140,4 @@ function resolverRoteiro(valor, pastaDosScripts) {
   return path.resolve(v);
 }
 
-module.exports = { PARES_DE_ATALHOS, cruzouAMeta, resolverRoteiro, ACOES, MIN_PRINTS, FAIXA_S, PERFIS, validarRoteiro, duracaoPrevistaMs, montarPassos, nomeDoVideo, nomeDoPrint, caminhoDeSaida };
+module.exports = { textoTemNumero, ESPERA_NUMERO_MS, PARES_DE_ATALHOS, cruzouAMeta, resolverRoteiro, ACOES, MIN_PRINTS, FAIXA_S, PERFIS, validarRoteiro, duracaoPrevistaMs, montarPassos, nomeDoVideo, nomeDoPrint, caminhoDeSaida };

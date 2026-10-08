@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.7.2
+
+- Prova de vídeo que não mente: o gravador espera o número de verdade (`esperar_numero`, obrigatório, até 45 s), conta os quadros com número e guarda no `video-info.json`; sem número em nenhum quadro, reprova. O gate da etapa 6 lê o arquivo (desktop e celular). Medido no dash local: 1,4 s até o primeiro número, 5 cargas seguidas (1482, 1397, 1409, 1412, 1406 ms).
+
 ## 3.7.1
 
 Correções do teste de ponta a ponta de 02/10/2026 (achados D1 a D15).

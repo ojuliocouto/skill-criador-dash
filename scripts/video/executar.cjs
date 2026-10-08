@@ -87,6 +87,16 @@ async function executar(page, passos, o) {
           break;
         }
         case 'esperar': await page.waitForTimeout(p.ms); break;
+        case 'esperar_numero': {
+          const teto = p.ms || roteiro.ESPERA_NUMERO_MS;
+          const t0 = Date.now();
+          try {
+            await page.waitForFunction(() => [...document.querySelectorAll('.kpi__value')].some((e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1 && /\d/.test(e.textContent || ''); }), null, { timeout: teto });
+          } catch (_) {
+            throw new Error(`o dash não mostrou número em ${Math.round((Date.now() - t0) / 1000)} s: a gravação não vale`);
+          }
+          break;
+        }
         case 'esperar_seletor': {
           const alvo = await aparecer(page, p.seletor, p.opcional);
           if (!alvo) throw new Error(`"${p.seletor}" não apareceu`);
@@ -121,8 +131,10 @@ async function executar(page, passos, o) {
         case 'teclar': await page.keyboard.press(p.tecla); break;
         case 'print': {
           const arquivo = roteiro.caminhoDeSaida(o.pastaDeQuadros, roteiro.nomeDoPrint(o.perfil, quadros.length + 1, p.nome));
+          // Quantos indicadores com número de verdade (dígito) estão visíveis neste quadro: prova que o quadro não é só o esqueleto.
+          const numeros = await page.evaluate(() => [...document.querySelectorAll('.kpi__value')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1 && /\d/.test(e.textContent || ''); }).length);
           await page.screenshot({ path: arquivo });
-          quadros.push({ nome: p.nome, arquivo, bytes: fs.statSync(arquivo).size });
+          quadros.push({ nome: p.nome, arquivo, bytes: fs.statSync(arquivo).size, numeros });
           break;
         }
         default: throw new Error(`ação desconhecida: ${p.acao}`);
