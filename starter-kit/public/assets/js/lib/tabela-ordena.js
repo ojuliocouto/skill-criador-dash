@@ -75,6 +75,12 @@ export function reconciliarOrdem(estado, aba, assinatura) {
 
 // ---------------------------------------------------------------- DOM
 
+// Todas as tabelas do painel ordenam (3.7.1, D11): a de dados linha a linha (.table__el) e as resumidas por
+// canal e por semana (.resumo__el). A linha de TOTAL da resumida mora no <tfoot>: fica fixa no fim e nunca
+// entra na ordenação (só o <tbody> se mexe).
+const TABELAS = '.table .table__el, .resumo .resumo__el';
+const CABECALHOS = '.table .table__el thead th, .resumo .resumo__el thead th';
+
 function ordenar(tabela, indiceDaColuna, direcao, animar = true) {
   const corpo = tabela.tBodies[0];
   if (!corpo) return;
@@ -111,7 +117,7 @@ export function ligarTabelaOrdena(raiz, opcoes = {}) {
   const cabecalhosDe = (tabela) => [...tabela.querySelectorAll('thead th')].map((th) => th.textContent);
   // Tabela recém-nascida (filtro, período, Atualizar, troca de aba): devolve a ordem guardada, sem deslizar.
   const reaplicar = () => {
-    raiz.querySelectorAll('.table .table__el').forEach((tabela) => {
+    raiz.querySelectorAll(TABELAS).forEach((tabela) => {
       if (tabela.dataset.ordemChecada) return;
       tabela.dataset.ordemChecada = '1';
       const r = reconciliarOrdem(estado, abaAtual(), assinaturaDaTabela(cabecalhosDe(tabela)));
@@ -124,7 +130,7 @@ export function ligarTabelaOrdena(raiz, opcoes = {}) {
     });
   };
   const preparar = () => {
-    raiz.querySelectorAll('.table .table__el thead th').forEach((th) => {
+    raiz.querySelectorAll(CABECALHOS).forEach((th) => {
       if (th.dataset.ordenavel) return;
       th.dataset.ordenavel = '1';
       th.tabIndex = 0;
@@ -143,8 +149,8 @@ export function ligarTabelaOrdena(raiz, opcoes = {}) {
     estado = registrarOrdem(estado, abaAtual(), assinaturaDaTabela(cabecalhosDe(tabela)), indice, nova);
     ordenar(tabela, indice, nova);
   };
-  const aoClicar = (e) => { const th = e.target.closest ? e.target.closest('.table .table__el thead th') : null; if (th) { preparar(); alternar(th); } };
-  const aoTeclar = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.table .table__el thead th')) { e.preventDefault(); alternar(e.target); } };
+  const aoClicar = (e) => { const th = e.target.closest ? e.target.closest(CABECALHOS) : null; if (th) { preparar(); alternar(th); } };
+  const aoTeclar = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches(CABECALHOS)) { e.preventDefault(); alternar(e.target); } };
   raiz.addEventListener('click', aoClicar);
   raiz.addEventListener('keydown', aoTeclar);
   // Cada repintar do corpo traz tabela nova: o observador deixa os cabeçalhos prontos (foco e aria).

@@ -24,7 +24,8 @@ import { marcarMetaBatida } from '/assets/js/lib/meta-batida.js';
 import { rolarIndicadores } from '/assets/js/lib/numero-roleta.js';
 import { ligarTabelaOrdena } from '/assets/js/lib/tabela-ordena.js';
 import { render as renderTabela } from '/assets/js/widgets/table.js';
-window.__efeitos = { render, marcarMetaBatida, rolarIndicadores, ligarTabelaOrdena, renderTabela };
+import { render as renderResumo } from '/assets/js/widgets/resumo.js';
+window.__efeitos = { render, marcarMetaBatida, rolarIndicadores, ligarTabelaOrdena, renderTabela, renderResumo };
 window.__pronto = true;
 </script></body></html>`;
 
