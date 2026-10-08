@@ -13,6 +13,7 @@ import { getDashboard, fetchDataForSource, fetchD1, setDashboardAuth } from './l
 import { getTemplate } from './templates/index.js';
 import { computeAll, computeAllMapped, timeSeries } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
+import { alvoDaMeta } from './lib/meta-periodo.js';
 import { sha256Hex } from './lib/auth.js';
 import { render as renderKpi } from './widgets/kpi.js';
 import { getWidget } from './widgets/index.js';
@@ -29,7 +30,7 @@ import { sincronizarModoDoPainel } from './lib/theme.js';
 import { TEMPOS } from './lib/saudacao.js';
 import { esc } from './lib/html.js';
 import { brandInnerHtml } from './lib/brand.js';
-import { areaDoPainel, trilhaHtml, acoesHtml, ligarCopiarLink } from './lib/barra-topo.js';
+import { areaDoPainel, trilhaHtml, acoesHtml, ligarCopiarLink, ligarBarraSolida } from './lib/barra-topo.js';
 import { aplicarPersonalizacao } from './lib/personalizacao.js';
 import { aplicarRotulos } from './lib/rotulos.js';
 import { DURACAO, CURVA, textoDaContagemEntre, transformDoMarcador, menosMovimento, animar } from './lib/movimento.js';
@@ -50,6 +51,7 @@ import { atalhosHtml, ligarAtalhos } from './lib/periodo-atalhos.js';
 import { cruzouMeta, marcarMetaBatida } from './lib/meta-batida.js';
 import { prepararCapa, levantarCapa } from './lib/cartao-vira-tela.js';
 import { ligarTabelaOrdena } from './lib/tabela-ordena.js';
+import { ligarBordas } from './lib/rolagem-borda.js';
 
 /**
  * Agrupa itens de layout: kpis consecutivos viram um unico bloco 'kpis';
@@ -154,13 +156,17 @@ export function resolveDateSlot(template) {
 
 /**
  * Monta o progresso da meta (meta vs realizado) para a metrica configurada.
- * config.goal = { metricKey, value }. Retorna { metricKey, pct, text } ou null.
+ * config.goal = { metricKey, value, periodo? }. Retorna { metricKey, pct, text, justa } ou null.
+ * `janela` ({min,max} ISO das linhas na tela) permite comparar a meta com o período certo (3.7.1, D6):
+ * com goal.periodo 'mensal', 400 por mês contra 3 meses de dados é contra 1200. Config sem periodo
+ * compara com o período filtrado, como sempre foi. `justa` false = comparação proporcional: o percentual
+ * aparece, mas o marco e o selo "Meta batida" não valem.
  * `mapped` (opcional, key->boolean vindo de computeAllMapped) evita montar a
  * barra de progresso contra um valor que so e 0 por falta de coluna mapeada:
  * chave ausente do mapa e tratada como mapeada (compatibilidade com chamadas
  * antigas que nao passam `mapped`).
  */
-export function buildGoal(config, computed, mapped = {}, template = null) {
+export function buildGoal(config, computed, mapped = {}, template = null, janela = null) {
   const g = config && config.goal;
   if (!g || !g.metricKey) return null;
   if (mapped[g.metricKey] === false) return null;
@@ -174,8 +180,17 @@ export function buildGoal(config, computed, mapped = {}, template = null) {
   const def = template && findMetricDef(template, g.metricKey);
   const menorMelhor = def && def.betterWhen === 'lower';
   if (menorMelhor && val <= 0) return null;
-  const pct = menorMelhor ? target / val : val / target;
-  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} da meta` };
+  // Meta de custo (menor é melhor) não escala com o tamanho do período: o CPA do mês é o CPA do mês.
+  if (menorMelhor) {
+    const pctCusto = target / val;
+    return { metricKey: g.metricKey, pct: pctCusto, text: `${fmtPercent(pctCusto)} da meta`, justa: true };
+  }
+  const { alvo, rotulo, justa } = alvoDaMeta(g, janela);
+  const pct = val / alvo;
+  // Comparação proporcional que passou de 100%: o percentual sozinho parece meta batida. O texto diz que é ritmo;
+  // o selo e o marco ficam para a meta de verdade batida (mês cheio, mês em curso já acima da meta inteira, período, total).
+  const acima = justa === false && pct >= 1 ? ', acima do ritmo' : '';
+  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} ${rotulo}${acima}`, justa };
 }
 
 /**
@@ -299,6 +314,8 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
       const value = computed[key];
       const goalForKpi = isMapped && goal && goal.metricKey === key ? goal : undefined;
       const isHero = temHero && key === heroKey;
+      // Destaque largo estica os vizinhos da mesma linha: cada um ganha o minigráfico da própria série (3.7.1).
+      const miniOk = heroLargo && !isHero && isMapped && Array.isArray(sparks && sparks[key]) && sparks[key].length >= 2;
       return renderKpi(
         {
           label,
@@ -308,7 +325,8 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
           goal: goalForKpi,
           unmapped: !isMapped,
           hero: isHero,
-          spark: isHero ? sparks[key] : undefined,
+          spark: isHero || miniOk ? sparks[key] : undefined,
+          mini: miniOk,
           heroCompacto: isHero && !heroLargo,
         },
         value,
@@ -408,25 +426,39 @@ export function resolveActiveTab(tabs, requested) {
 // precisa de teste.
 export function sparkForHero(template, rows, colMap) {
   const key = template && template.primaryMetric;
+  return key ? sparksDaFaixa(template, rows, colMap, [key]) : {};
+}
+
+/** Séries por dia de várias métricas de uma vez (o destaque e os vizinhos). Chave sem série honesta fica de fora. */
+export function sparksDaFaixa(template, rows, colMap, keys) {
+  const saida = {};
+  for (const key of Array.isArray(keys) ? keys : []) {
+    const serie = serieDaMetrica(template, rows, colMap, key);
+    if (serie) saida[key] = serie;
+  }
+  return saida;
+}
+
+function serieDaMetrica(template, rows, colMap, key) {
   const dateSlot = template && template.dateSlot;
-  if (!key || !dateSlot || !Array.isArray(rows) || rows.length < 2) return {};
+  if (!key || !dateSlot || !Array.isArray(rows) || rows.length < 2) return null;
   const def = findMetricDef(template, key);
-  if (!def) return {};
+  if (!def) return null;
   if (def.column) {
-    if (!colMap || !colMap[def.column]) return {};   // coluna nao mapeada
+    if (!colMap || !colMap[def.column]) return null;   // coluna nao mapeada
     const pontos = timeSeries(rows, colMap, dateSlot, def.column, def.agg || 'sum');
-    if (!pontos || pontos.length < 2) return {};
-    return { [key]: pontos.map((p) => p.value) };
+    if (!pontos || pontos.length < 2) return null;
+    return pontos.map((p) => p.value);
   }
   // Derivada (T7): CPA ou ROAS como heroi ficavam sem sparkline e com metade do card vazia.
   // A serie honesta e a MESMA conta feita dia a dia (CPA de cada dia), so quando a gente
   // sabe do que ela depende: ratio (ratioOf) ou derived com dependsOn. Dia sem denominador
   // fica de fora: um zero ali seria dado inventado.
   const deps = def.agg === 'ratio' ? def.ratioOf : (def.agg === 'derived' ? def.dependsOn : null);
-  if (!Array.isArray(deps) || !deps.length) return {};
+  if (!Array.isArray(deps) || !deps.length) return null;
   const metrics = Array.isArray(template.metrics) ? template.metrics : [];
   const col = colMap && colMap[dateSlot];
-  if (!col) return {};
+  if (!col) return null;
   const porDia = new Map();
   for (const r of rows) {
     const iso = parseDateBR(r[col]);
@@ -437,12 +469,12 @@ export function sparkForHero(template, rows, colMap) {
   const serie = [];
   for (const iso of [...porDia.keys()].sort()) {
     const { computed, mapped } = computeAllMapped(metrics, porDia.get(iso), colMap);
-    if (mapped[key] === false) return {};
+    if (mapped[key] === false) return null;
     if (def.agg === 'ratio' && !Number(computed[def.ratioOf[1]])) continue;
     const v = computed[key];
     if (Number.isFinite(v)) serie.push(v);
   }
-  return serie.length >= 2 ? { [key]: serie } : {};
+  return serie.length >= 2 ? serie : null;
 }
 
 // Monta so o corpo de widgets (grid + sections de kpi) a partir de um ctx JA
@@ -469,7 +501,7 @@ function buildBodyHtml(ctx) {
     if (block.type === 'kpis') {
       flush();
       parts.push(`<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.mapped, ctx.trends, ctx.goal,
-        sparkForHero(template, ctx.dataset && ctx.dataset.rows, ctx.colMap))}</section>`);
+        sparksDaFaixa(template, ctx.dataset && ctx.dataset.rows, ctx.colMap, [template.primaryMetric, ...block.items.map((it) => it && it.props && it.props.metricKey)]))}</section>`);
       continue;
     }
     const html = renderSingle(block.item, ctx);
@@ -568,6 +600,14 @@ function readFilterState() {
   return { from: brParaISO(val('fb-from')), to: brParaISO(val('fb-to')), dims, atalho: barra && barra.dataset.periodo ? barra.dataset.periodo : null };
 }
 
+// Primeira e última data (ISO) das linhas que estão na tela: a janela contra a qual a meta é comparada.
+function janelaDasLinhas(rows, colMap, dateSlot) {
+  const col = colMap && colMap[dateSlot];
+  if (!col) return null;
+  const { min, max } = dateBounds(rows, col);
+  return min && max ? { min, max } : null;
+}
+
 // Monta o ctx de render (métricas, tendência e meta JÁ calculadas em cima das linhas
 // filtradas pelo estado de filtro). Separado do renderBody porque o renderDashboard também
 // precisa dele pra descobrir, antes de desenhar a barra, quais abas têm o que mostrar.
@@ -578,7 +618,7 @@ function montarCtx(baseCtx, state) {
   const dateSlot = resolveDateSlot(template);
   const { current, previous } = splitByPeriod(rows, colMap, dateSlot);
   const trends = buildTrends(template.metrics, current, previous, colMap);
-  const goal = buildGoal(config, computed, mapped, template);
+  const goal = buildGoal(config, computed, mapped, template, janelaDasLinhas(rows, colMap, dateSlot));
   const ds = { columns: dataset.columns, rows, meta: dataset.meta };
   // ui = o que sobrevive ao repaint: as abas em uso, a aba ativa e o que foi digitado na
   // calculadora de meta. O corpo é trocado inteiro a cada mudança de filtro, então nada disso
@@ -638,8 +678,10 @@ function renderBody(baseCtx, state, modo = 'quieto', extra = {}) {
   // Meta batida (efeito 5): o marco toca quando a barra CRUZA 100%, uma vez; continuar batida
   // depois não repete. A primeira carga só registra de onde se parte.
   if (ctx.goal && baseCtx.ui) {
-    const cruzou = cruzouMeta(baseCtx.ui.pctMeta, ctx.goal.pct);
-    baseCtx.ui.pctMeta = ctx.goal.pct;
+    // Só comparação justa conta para o marco: 400 por mês, 7 dias, 100% da proporção não é meta batida.
+    const pctDoMarco = ctx.goal.justa === false ? 0 : ctx.goal.pct;
+    const cruzou = cruzouMeta(baseCtx.ui.pctMeta, pctDoMarco);
+    baseCtx.ui.pctMeta = pctDoMarco;
     if (cruzou && (modo === 'filtro' || modo === 'entrada') && !extra.semMarco) marcarMetaBatida(bodyEl);
   }
 }
@@ -717,6 +759,13 @@ function posicionarMarcador(app, { deslizar = false } = {}) {
   marcador.style.width = `${para.width}px`;
   marcador.style.height = `${para.height}px`;
   barra.classList.add('abas--marcador');
+  // As abas rolam por dentro em tela estreita: a aba ativa nunca fica escondida (sem mexer na rolagem da página).
+  if (barra.scrollWidth > barra.clientWidth) {
+    const esquerda = ativa.offsetLeft - 12;
+    const direita = ativa.offsetLeft + ativa.offsetWidth + 12 - barra.clientWidth;
+    if (esquerda < barra.scrollLeft) barra.scrollLeft = Math.max(0, esquerda);
+    else if (direita > barra.scrollLeft) barra.scrollLeft = direita;
+  }
   if (!deslizar) return;
   const saida = transformDoMarcador(de, para);
   if (saida !== 'none') animar(marcador, [{ transform: saida }, { transform: 'none' }], { duration: DURACAO.troca, easing: CURVA.vaiVolta });
@@ -815,6 +864,8 @@ function wireAbas(app, baseCtx) {
   marcador.setAttribute('aria-hidden', 'true');
   barra.insertBefore(marcador, barra.firstChild);
   posicionarMarcador(app);
+  // Em tela estreita as abas rolam por dentro (nunca quebram de linha): a borda esmaecida avisa que há mais.
+  ouvintesDaJanela.push(ligarBordas(barra));
   const reposicionar = () => posicionarMarcador(app);
   window.addEventListener('resize', reposicionar);
   ouvintesDaJanela.push(() => window.removeEventListener('resize', reposicionar));
@@ -1167,6 +1218,7 @@ async function loadDashboardInto(container, config, id, opts = {}) {
 // filhos sao buscadas sob demanda e cacheadas. A aba ativa reflete/atualiza ?tab=.
 async function initGroup(app, group, groupId) {
   renderTopbar(group, groupId);
+  ligarBarraSolida(document.querySelector('.topbar'));
 
   const tabs = (group.tabs || []).filter((t) => t && t.id);
   if (!tabs.length) {
@@ -1282,6 +1334,7 @@ async function init() {
 
   // Dashboard comum: topbar + carrega e renderiza no #app.
   renderTopbar(config, id);
+  ligarBarraSolida(document.querySelector('.topbar'));
   await loadDashboardInto(app, config, id);
 }
 

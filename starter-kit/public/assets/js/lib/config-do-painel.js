@@ -2,6 +2,7 @@
 // A prévia ao vivo e o salvar usam a MESMA função: o que a pessoa vê é o que vai ser gravado.
 // A senha fica de fora de propósito (não muda o desenho e nunca passa pela prévia).
 
+import { PERIODOS_DA_META } from './meta-periodo.js';
 import { getSource } from '../sources/index.js';
 import { parseNumberBR } from './format.js';
 import { rotulosParaSalvar } from './rotulos.js';
@@ -67,7 +68,11 @@ export function montarConfig(estado, tpl) {
 
   const destaque = config.heroMetric || (tpl && tpl.primaryMetric);
   const meta = lerMeta(e.goal);
-  if (destaque && meta) config.goal = { metricKey: destaque, value: meta };
+  if (destaque && meta) {
+    config.goal = { metricKey: destaque, value: meta };
+    // Período da meta (3.7.1): vazio = painel antigo, que continua comparando com o período filtrado.
+    if (PERIODOS_DA_META.some((p) => p.valor === e.goalPeriodo)) config.goal.periodo = e.goalPeriodo;
+  }
 
   const labels = rotulosParaSalvar(tpl, e.labels);
   if (Object.keys(labels).length) config.labels = labels;

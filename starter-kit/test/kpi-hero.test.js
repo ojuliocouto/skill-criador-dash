@@ -112,9 +112,10 @@ test('bloco de kpi: herói com coluna não mapeada não vira herói (seria desta
 test('bloco de kpi: a série do herói chega na sparkline', () => {
   const html = renderKpiBlock(ITENS, TPL, VALORES, {}, {}, null, { leads: [10, 20, 15, 31] });
   assert.ok(html.includes('kpi__spark'), 'sparkline do herói desenhada');
-  // só o herói ganha série, mesmo que outras métricas venham no mapa
+  // 3.7.1: o herói largo estica os vizinhos, então o vizinho que tem série ganha o minigráfico (kpi--mini); quem não tem, não.
   const html2 = renderKpiBlock(ITENS, TPL, VALORES, {}, {}, null, { leads: [1, 2, 3], CPL: [4, 5, 6] });
-  assert.equal((html2.match(/kpi__spark/g) || []).length, 1, 'sparkline só no herói');
+  assert.equal((html2.match(/kpi__spark/g) || []).length, 2, 'herói e o vizinho CPL, que tem série');
+  assert.equal((html2.match(/kpi--mini/g) || []).length, 1, 'só o vizinho com série vira mini');
 });
 
 // ---------- a série do herói: só existe quando é honesto calcular ----------

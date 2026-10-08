@@ -15,6 +15,7 @@ import { validarPersonalizacao } from '../lib/personalizacao-shape.mjs';
 import { validarLabels } from '../lib/labels-shape.mjs';
 import { validarFundoDoLogo } from '../lib/logo-shape.mjs';
 import { validarAparencia } from '../lib/aparencia-shape.mjs';
+import { validarMeta } from '../lib/meta-shape.mjs';
 export { needsAuth, authOk } from '../lib/auth-config.mjs';
 
 /**
@@ -409,6 +410,10 @@ async function create(kv, request, providedHash, env) {
   // vira texto na tela de abertura: só a forma conhecida passa (functions/lib/aparencia-shape.mjs).
   const aparenciaInvalida = validarAparencia(config);
   if (aparenciaInvalida) return erro(aparenciaInvalida, 400);
+
+  // Meta (goal): a forma e o período dela (mensal, semanal, periodo, total). Ausente é válido.
+  const metaInvalida = validarMeta(config);
+  if (metaInvalida) return erro(metaInvalida, 400);
 
   // SEGURANCA do id. Regras que convivem aqui:
   //

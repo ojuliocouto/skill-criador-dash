@@ -1,0 +1,98 @@
+{
+  "nome": "efeitos",
+  "descricao": "Mostra os efeitos da 3.7.0 que o painel tiver: números de roleta e gráfico que se transforma na troca de período, meta batida (procura o par de atalhos que cruza a meta; sem meta ou sem par, pula e diz por quê), gráfico que responde ao mouse e o filtro Personalizado com datas digitadas. Tudo opcional. O cartão que vira a tela só existe saindo da lista de painéis (grave a página da lista com este mesmo gravador e um roteiro próprio) e a tabela que reordena está no roteiro padrão.",
+  "duracao_minima_s": 11,
+  "passos": [
+    {
+      "acao": "abrir"
+    },
+    {
+      "acao": "esperar_seletor",
+      "seletor": ".kpi__value"
+    },
+    {
+      "acao": "esperar",
+      "ms": 800
+    },
+    {
+      "acao": "print",
+      "nome": "abriu"
+    },
+    {
+      "acao": "clicar",
+      "seletor": ".atalho[data-atalho=\"7d\"]",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 300
+    },
+    {
+      "acao": "print",
+      "nome": "7 dias, números de roleta"
+    },
+    {
+      "acao": "cruzar_meta",
+      "opcional": true
+    },
+    {
+      "acao": "print",
+      "nome": "meta batida"
+    },
+    {
+      "acao": "clicar",
+      "seletor": ".abas [role=\"tab\"] >> nth=2",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 300
+    },
+    {
+      "acao": "mover_mouse",
+      "seletor": ".chart--timeseries .chart__svg",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 250
+    },
+    {
+      "acao": "print",
+      "nome": "gráfico que responde"
+    },
+    {
+      "acao": "clicar",
+      "seletor": ".atalho[data-atalho=\"personalizado\"]",
+      "opcional": true
+    },
+    {
+      "acao": "digitar",
+      "seletor": "#fb-from",
+      "texto": "01/08/2026",
+      "opcional": true
+    },
+    {
+      "acao": "digitar",
+      "seletor": "#fb-to",
+      "texto": "31/08/2026",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 400
+    },
+    {
+      "acao": "print",
+      "nome": "agosto inteiro"
+    },
+    {
+      "acao": "esperar",
+      "ms": 250
+    },
+    {
+      "acao": "print",
+      "nome": "filtro Personalizado"
+    }
+  ]
+}

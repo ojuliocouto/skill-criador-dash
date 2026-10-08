@@ -6,7 +6,7 @@
  *  - saíram 6 quadros e a prancha, e o painel falso mostra o número, a aba trocou e o filtro mudou nos quadros;
  *  - um roteiro inválido é recusado antes de abrir o navegador.
  * Sem Playwright, avisa que foi PULADO (não finge que passou).
- * Uso: node scripts/test-gravar-video-integracao.cjs
+ * Uso: node <dir-da-skill>/scripts/test-gravar-video-integracao.cjs
  */
 const fs = require('node:fs');
 const http = require('node:http');
@@ -98,7 +98,7 @@ const roteiro = {
   const ruim = path.join(raiz, 'ruim.json');
   fs.writeFileSync(ruim, JSON.stringify({ passos: [{ acao: 'clicar', seletor: 'a' }] }), 'utf8');
   const r2 = await rodar([GRAVADOR, url, '--saida', path.join(raiz, 'saida2'), '--roteiro', ruim], 30000);
-  checa('roteiro inválido é recusado com código 2', r2.status === 2 && /Roteiro inválido/.test(r2.stderr), `código ${r2.status}`);
+  checa('roteiro inválido é recusado com código 2', r2.status === 2 && /Roteiro inválido/.test(r2.stdout), `código ${r2.status}`);
 
   servidor.close();
   console.log(`\nPasta de saída do teste: ${saida}`);

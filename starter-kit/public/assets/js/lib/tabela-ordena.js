@@ -7,6 +7,7 @@
 
 import { parseNumberBR, parseDateBR } from './format.js';
 import { menosMovimento, CURVA } from './movimento.js';
+import { esc } from './html.js';
 
 export const DURACAO_DA_ORDEM = 460;
 
@@ -46,6 +47,35 @@ export function ordemDasLinhas(textos, direcao) {
   return itens.map((x) => x.i);
 }
 
+// ---------------------------------------------------------------- "Ordenar por" (celular)
+// No celular a tabela vira cartões e o cabeçalho some: quem ordena é um seletor "Ordenar por" no topo da tabela
+// (3.7.1, D12). Valor da opção: "<coluna>:<asc|desc>"; vazio = ordem original.
+
+/** @param {string[]} cabecalhos @returns {{valor:string, rotulo:string}[]} */
+export function opcoesDaOrdem(cabecalhos) {
+  const lista = [{ valor: '', rotulo: 'Ordem original' }];
+  (Array.isArray(cabecalhos) ? cabecalhos : []).forEach((c, i) => {
+    const nome = String(c).trim();
+    lista.push({ valor: `${i}:asc`, rotulo: `${nome} (crescente)` });
+    lista.push({ valor: `${i}:desc`, rotulo: `${nome} (decrescente)` });
+  });
+  return lista;
+}
+
+/** @returns {{coluna:number, direcao:'asc'|'desc'}|null} */
+export function ordemDoValor(valor) {
+  const m = /^(\d+):(asc|desc)$/.exec(String(valor == null ? '' : valor));
+  return m ? { coluna: Number(m[1]), direcao: m[2] } : null;
+}
+
+/** HTML do seletor (some em tela larga, por CSS). Vazio quando não há coluna. */
+export function seletorDeOrdemHtml(cabecalhos) {
+  if (!Array.isArray(cabecalhos) || !cabecalhos.length) return '';
+  const opcoes = opcoesDaOrdem(cabecalhos).map((o) => `<option value="${esc(o.valor)}">${esc(o.rotulo)}</option>`).join('');
+  return `<label class="ordenar-por"><span class="ordenar-por__rotulo">Ordenar por</span>` +
+    `<select class="input ordenar-por__select" data-ordenar-por>${opcoes}</select></label>`;
+}
+
 // ---------------------------------------------------------------- a ordem sobrevive ao repintar
 // Filtro, troca de período e Atualizar repintam o corpo inteiro (tabela nova). A ordem que a
 // pessoa escolheu fica guardada por aba e por tabela, e é devolvida a cada tabela que nasce,
@@ -74,6 +104,12 @@ export function reconciliarOrdem(estado, aba, assinatura) {
 }
 
 // ---------------------------------------------------------------- DOM
+
+// Todas as tabelas do painel ordenam (3.7.1, D11): a de dados linha a linha (.table__el) e as resumidas por
+// canal e por semana (.resumo__el). A linha de TOTAL da resumida mora no <tfoot>: fica fixa no fim e nunca
+// entra na ordenação (só o <tbody> se mexe).
+const TABELAS = '.table .table__el, .resumo .resumo__el';
+const CABECALHOS = '.table .table__el thead th, .resumo .resumo__el thead th';
 
 function ordenar(tabela, indiceDaColuna, direcao, animar = true) {
   const corpo = tabela.tBodies[0];
@@ -111,7 +147,7 @@ export function ligarTabelaOrdena(raiz, opcoes = {}) {
   const cabecalhosDe = (tabela) => [...tabela.querySelectorAll('thead th')].map((th) => th.textContent);
   // Tabela recém-nascida (filtro, período, Atualizar, troca de aba): devolve a ordem guardada, sem deslizar.
   const reaplicar = () => {
-    raiz.querySelectorAll('.table .table__el').forEach((tabela) => {
+    raiz.querySelectorAll(TABELAS).forEach((tabela) => {
       if (tabela.dataset.ordemChecada) return;
       tabela.dataset.ordemChecada = '1';
       const r = reconciliarOrdem(estado, abaAtual(), assinaturaDaTabela(cabecalhosDe(tabela)));
@@ -121,10 +157,26 @@ export function ligarTabelaOrdena(raiz, opcoes = {}) {
       if (!th) return;
       th.setAttribute('aria-sort', r.aplicar.direcao === 'asc' ? 'ascending' : 'descending');
       ordenar(tabela, r.aplicar.coluna, r.aplicar.direcao, false);
+      sincronizar(tabela);
     });
   };
+  // O seletor "Ordenar por" (celular) acompanha a coluna ordenada, venha o clique do cabeçalho ou do próprio seletor.
+  const sincronizar = (tabela) => {
+    const caixa = tabela.closest('.table, .resumo');
+    const sel = caixa && caixa.querySelector('[data-ordenar-por]');
+    if (!sel) return;
+    const ths = [...tabela.querySelectorAll('thead th')];
+    const i = ths.findIndex((th) => th.getAttribute('aria-sort') && th.getAttribute('aria-sort') !== 'none');
+    sel.value = i < 0 ? '' : `${i}:${ths[i].getAttribute('aria-sort') === 'ascending' ? 'asc' : 'desc'}`;
+  };
+  // No celular a tabela vira um cartão por linha e o nome da coluna de cada célula vem do cabeçalho (CSS: td::before).
+  const rotular = (tabela) => {
+    const nomes = [...tabela.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+    tabela.querySelectorAll('tbody tr').forEach((tr) => [...tr.cells].forEach((td, i) => { if (!td.hasAttribute('data-label') && nomes[i]) td.setAttribute('data-label', nomes[i]); }));
+  };
   const preparar = () => {
-    raiz.querySelectorAll('.table .table__el thead th').forEach((th) => {
+    raiz.querySelectorAll(TABELAS).forEach(rotular);
+    raiz.querySelectorAll(CABECALHOS).forEach((th) => {
       if (th.dataset.ordenavel) return;
       th.dataset.ordenavel = '1';
       th.tabIndex = 0;
@@ -142,14 +194,30 @@ export function ligarTabelaOrdena(raiz, opcoes = {}) {
     th.setAttribute('aria-sort', nova === 'asc' ? 'ascending' : nova === 'desc' ? 'descending' : 'none');
     estado = registrarOrdem(estado, abaAtual(), assinaturaDaTabela(cabecalhosDe(tabela)), indice, nova);
     ordenar(tabela, indice, nova);
+    sincronizar(tabela);
   };
-  const aoClicar = (e) => { const th = e.target.closest ? e.target.closest('.table .table__el thead th') : null; if (th) { preparar(); alternar(th); } };
-  const aoTeclar = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.table .table__el thead th')) { e.preventDefault(); alternar(e.target); } };
+  const aoEscolher = (e) => {
+    const sel = e.target && e.target.matches && e.target.matches('[data-ordenar-por]') ? e.target : null;
+    if (!sel) return;
+    const caixa = sel.closest('.table, .resumo');
+    const tabela = caixa && caixa.querySelector('table');
+    if (!tabela) return;
+    preparar();
+    const o = ordemDoValor(sel.value);
+    const ths = [...tabela.querySelectorAll('thead th')];
+    ths.forEach((th) => th.setAttribute('aria-sort', 'none'));
+    if (o && ths[o.coluna]) ths[o.coluna].setAttribute('aria-sort', o.direcao === 'asc' ? 'ascending' : 'descending');
+    estado = registrarOrdem(estado, abaAtual(), assinaturaDaTabela(cabecalhosDe(tabela)), o ? o.coluna : 0, o ? o.direcao : null);
+    ordenar(tabela, o ? o.coluna : 0, o ? o.direcao : null);
+  };
+  const aoClicar = (e) => { const th = e.target.closest ? e.target.closest(CABECALHOS) : null; if (th) { preparar(); alternar(th); } };
+  const aoTeclar = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches(CABECALHOS)) { e.preventDefault(); alternar(e.target); } };
   raiz.addEventListener('click', aoClicar);
   raiz.addEventListener('keydown', aoTeclar);
+  raiz.addEventListener('change', aoEscolher);
   // Cada repintar do corpo traz tabela nova: o observador deixa os cabeçalhos prontos (foco e aria).
   const obs = typeof MutationObserver === 'function' ? new MutationObserver(preparar) : null;
   if (obs) obs.observe(raiz, { childList: true, subtree: true });
   preparar();
-  return () => { raiz.removeEventListener('click', aoClicar); raiz.removeEventListener('keydown', aoTeclar); if (obs) obs.disconnect(); };
+  return () => { raiz.removeEventListener('click', aoClicar); raiz.removeEventListener('keydown', aoTeclar); raiz.removeEventListener('change', aoEscolher); if (obs) obs.disconnect(); };
 }

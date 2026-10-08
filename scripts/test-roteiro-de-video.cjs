@@ -1,7 +1,7 @@
 /**
  * Parte pura do gravador de vídeo de prova (scripts/video/roteiro.cjs e scripts/video/duracao-webm.cjs):
  * validação do roteiro, montagem dos passos, nomes de arquivo e leitura da duração de um WebM.
- * Uso: node scripts/test-roteiro-de-video.cjs
+ * Uso: node <dir-da-skill>/scripts/test-roteiro-de-video.cjs
  */
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -154,6 +154,73 @@ teste('duracaoDoWebm: lixo ou arquivo vazio devolve null, nunca inventa número'
   assert.equal(webm.duracaoDoWebm(Buffer.alloc(0)), null);
   assert.equal(webm.duracaoDoWebm(Buffer.from('isto não é um vídeo')), null);
   assert.equal(webm.duracaoDoWebm(arquivoFalso([], false)), null);
+});
+
+// ---- 3.7.1 (D10): o roteiro mostra os efeitos da 3.7.0, e o gravador sabe digitar ----
+const fs = require('node:fs');
+const efeitos = require('./roteiro-efeitos.json');
+const { spawnSync } = require('node:child_process');
+
+teste('ação digitar: exige seletor e texto, e entra na duração prevista', () => {
+  const erros = (p) => roteiro.validarRoteiro({ passos: [{ acao: 'abrir' }, p] }).erros.join();
+  assert.ok(roteiro.ACOES.includes('digitar'));
+  assert.match(erros({ acao: 'digitar', texto: '01/08/2026' }), /seletor/);
+  assert.match(erros({ acao: 'digitar', seletor: '#fb-from' }), /texto/);
+  assert.doesNotMatch(erros({ acao: 'digitar', seletor: '#fb-from', texto: '01/08/2026' }), /seletor|texto|desconhecida/);
+  assert.ok(roteiro.duracaoPrevistaMs([{ acao: 'digitar', seletor: 'x', texto: '01/08/2026' }]) > 0);
+});
+
+teste('ação cruzar_meta: existe, custa tempo e não pede campo nenhum', () => {
+  assert.ok(roteiro.ACOES.includes('cruzar_meta'));
+  assert.deepEqual(roteiro.validarRoteiro({ passos: [{ acao: 'abrir' }, { acao: 'cruzar_meta' }] }).erros.filter((e) => /cruzar_meta/.test(e)), []);
+  assert.ok(roteiro.duracaoPrevistaMs([{ acao: 'cruzar_meta' }]) >= 3000, 'o cruzamento da meta leva alguns segundos');
+});
+
+teste('cruzar_meta: tenta pares de atalhos que partem de "meta não batida" e dá o motivo quando nenhum cruza', () => {
+  assert.ok(roteiro.PARES_DE_ATALHOS.length >= 3);
+  assert.ok(roteiro.PARES_DE_ATALHOS.every(([a, b]) => a !== b && ['hoje', '7d', '30d', 'mes', 'tudo'].includes(a) && ['hoje', '7d', '30d', 'mes', 'tudo'].includes(b)));
+  assert.equal(roteiro.cruzouAMeta(false, true), true);
+  assert.equal(roteiro.cruzouAMeta(true, true), false, 'já batida antes não é cruzamento');
+  assert.equal(roteiro.cruzouAMeta(false, false), false);
+  assert.equal(roteiro.cruzouAMeta(null, true), false, 'sem meta no painel não há o que cruzar');
+});
+
+teste('roteiro padrão mostra período, gráfico, tabela que reordena (todas as abas com tabela) e a aba Dados, tudo opcional', () => {
+  const sel = (re) => padrao.passos.filter((p) => re.test(p.seletor || ''));
+  const ordena = sel(/data-ordenavel/);
+  assert.ok(ordena.length >= 2, 'clica em cabeçalho ordenável pelo menos duas vezes (cresce, desce)');
+  assert.ok(ordena.every((p) => p.acao === 'clicar' && p.opcional === true));
+  const iAbaEvolucao = padrao.passos.findIndex((p) => /role=\\"tab\\"\] >> nth=2|nth=2/.test(p.seletor || ''));
+  const iGrafico = padrao.passos.findIndex((p) => p.acao === 'mover_mouse' && /chart/.test(p.seletor || ''));
+  assert.ok(iAbaEvolucao >= 0 && iGrafico > iAbaEvolucao, 'o mouse vai ao gráfico DEPOIS de abrir a aba que tem gráfico (antes caía na aba Canais e era pulado)');
+});
+
+teste('roteiro de efeitos: oficial, válido, de 10 a 15 s, com meta batida e Personalizado, tudo o que depende do painel é opcional', () => {
+  const v = roteiro.validarRoteiro(efeitos);
+  assert.deepEqual(v.erros, []);
+  const s = roteiro.duracaoPrevistaMs(efeitos.passos) / 1000;
+  assert.ok(s >= 10 && s <= 15, `previsto ${s} s`);
+  const acoes = efeitos.passos.map((p) => p.acao);
+  for (const a of ['cruzar_meta', 'digitar']) assert.ok(acoes.includes(a), `o roteiro de efeitos usa ${a}`);
+  assert.ok(efeitos.passos.filter((p) => p.acao !== 'abrir' && p.acao !== 'esperar' && p.acao !== 'print' && p.acao !== 'esperar_seletor').every((p) => p.opcional === true), 'todo passo que depende do painel é opcional');
+  assert.ok(efeitos.passos.some((p) => /personalizado/.test(p.seletor || '')), 'abre o filtro Personalizado');
+});
+
+teste('--roteiro aceita o nome de um roteiro oficial (padrao, efeitos) além de um arquivo', () => {
+  assert.equal(path.basename(roteiro.resolverRoteiro('efeitos', __dirname)), 'roteiro-efeitos.json');
+  assert.equal(path.basename(roteiro.resolverRoteiro('padrao', __dirname)), 'roteiro-padrao.json');
+  assert.equal(roteiro.resolverRoteiro('meu.json', __dirname), path.resolve('meu.json'));
+  assert.equal(path.basename(roteiro.resolverRoteiro(undefined, __dirname)), 'roteiro-padrao.json');
+});
+
+teste('roteiro inválido: os erros saem na saída normal (não somem se o aluno filtra o stderr)', () => {
+  const pasta = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'roteiro-invalido-'));
+  const arq = path.join(pasta, 'ruim.json');
+  fs.writeFileSync(arq, JSON.stringify({ passos: [{ acao: 'abrir' }, { acao: 'print', nome: 'a' }] }), 'utf8');
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'gravar-video.js'), 'http://localhost:1/x', '--roteiro', arq, '--saida', pasta], { encoding: 'utf8' });
+  assert.equal(r.status, 2);
+  assert.match(r.stdout, /Roteiro inválido/);
+  assert.match(r.stdout, /6 prints/);
 });
 
 process.exitCode = falhas ? 1 : 0;

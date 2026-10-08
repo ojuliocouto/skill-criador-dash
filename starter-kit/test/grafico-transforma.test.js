@@ -70,3 +70,14 @@ test('o main.css e o efeitos.css não animam largura nem pontos do gráfico por 
   assert.ok(!/transition[^;]*\bwidth\b/.test(css));
   assert.ok(!/@keyframes[^{]*\{[^}]*width:/.test(css));
 });
+
+// 3.7.1: minigráfico dos indicadores
+import { textoParaPontos } from '../public/assets/js/lib/grafico-transforma.js';
+test('textoParaPontos: lê o atributo points do SVG e devolve o mesmo texto de volta', () => {
+  const txt = '0,12.5 50,3 100,26';
+  assert.deepEqual(textoParaPontos(txt), [{ x: 0, y: 12.5 }, { x: 50, y: 3 }, { x: 100, y: 26 }]);
+  assert.equal(pontosParaTexto(textoParaPontos(txt)), txt);
+});
+test('textoParaPontos: lixo vira lista vazia, nunca NaN', () => {
+  for (const ruim of ['', null, undefined, 'a,b', '1,2 x', '1']) assert.deepEqual(textoParaPontos(ruim), [], String(ruim));
+});

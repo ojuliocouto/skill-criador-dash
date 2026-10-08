@@ -7,7 +7,7 @@ que ele esta certo". Varre as strings dos scripts (.py pelo tokenize; prova-dash
 literais fora de comentário) e reprova palavra sem acento. Docstring e comentário ficam de
 fora: não aparecem pra ninguém. A lista de palavras é a mesma do teste do starter-kit.
 
-    node scripts/py.mjs test-acentuacao.py
+    node <dir-da-skill>/scripts/py.mjs test-acentuacao.py
 """
 import io
 import json

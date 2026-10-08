@@ -40,7 +40,7 @@ function sparkSvg(serie) {
 }
 
 export function render(props = {}, value) {
-  const { label = '', format = 'number', hint, trend, goal, unmapped = false, hero = false, spark, heroCompacto = false } = props;
+  const { label = '', format = 'number', hint, trend, goal, unmapped = false, hero = false, spark, heroCompacto = false, mini = false } = props;
   // unmapped: a metrica depende de um slot SEM coluna mapeada (ex: export sem
   // "Leads" faz CPL depender de leads). O valor calculado nessa hora e sempre 0
   // pelo fallback de agregacao, mas 0 e um numero: mostrar "R$ 0,00" tem cara de
@@ -65,7 +65,8 @@ export function render(props = {}, value) {
   let goalHtml = '';
   if (!unmapped && goal && Number.isFinite(goal.pct)) {
     const w = Math.max(0, Math.min(100, goal.pct * 100));
-    const done = goal.pct >= 1 ? ' is-done' : '';
+    // Comparação proporcional (justa === false) mostra o percentual, mas nunca o selo "Meta batida".
+    const done = goal.pct >= 1 && goal.justa !== false ? ' is-done' : '';
     goalHtml =
       `<div class="kpi__goal">` +
         `<div class="kpi__goal-track"><div class="kpi__goal-fill${done}" style="width:${w.toFixed(1)}%"></div></div>` +
@@ -74,7 +75,9 @@ export function render(props = {}, value) {
   }
   // Sem coluna mapeada o valor e 0 por fallback: desenhar a serie disso mostraria um
   // grafico de dado que nao existe. Mesma regra que ja vale pra trend e goal.
-  const sparkHtml = !unmapped && hero ? sparkSvg(spark) : '';
+  const sparkHtml = !unmapped && (hero || mini) ? sparkSvg(spark) : '';
+  // Vizinho do destaque com série: minigráfico e variação lado a lado. Sem série não há o que desenhar: o cartão fica como era.
+  const ehMini = mini && !hero && !!sparkHtml;
   // Contagem visual do indicador (dashboard.js): o texto final já sai aqui, pronto pra leitor de
   // tela e pra quem copia. O valor e o formato vão em atributos só pra animação saber até onde
   // contar. Indicador sem coluna não conta (seria animar um zero que não existe).
@@ -82,12 +85,12 @@ export function render(props = {}, value) {
     ? ` data-conta-valor="${esc(Number(value))}" data-conta-formato="${esc(format)}"`
     : '';
   return (
-    `<div class="kpi${hero ? ' kpi--hero' : ''}${hero && heroCompacto ? ' kpi--hero-compacto' : ''}${unmapped ? ' is-unmapped' : ''}"${unmapped ? ' data-estado="nao-mapeada"' : ''}${contaAttrs}>` +
+    `<div class="kpi${ehMini ? ' kpi--mini' : ''}${hero ? ' kpi--hero' : ''}${hero && heroCompacto ? ' kpi--hero-compacto' : ''}${unmapped ? ' is-unmapped' : ''}"${unmapped ? ' data-estado="nao-mapeada"' : ''}${contaAttrs}>` +
       `<div class="kpi__label">${esc(label)}</div>` +
       `<div class="kpi__value">${esc(valor)}</div>` +
-      sparkHtml +
+      (ehMini ? `<div class="kpi__linha">${sparkHtml}${trendHtml}</div>` : sparkHtml) +
       goalHtml +
-      trendHtml +
+      (ehMini ? '' : trendHtml) +
       hintHtml +
     `</div>`
   );

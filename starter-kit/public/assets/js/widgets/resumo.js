@@ -6,6 +6,7 @@
 // em blocos (um por linha) quando o cartão fica estreito. A página nunca rola de lado.
 
 import { esc, fmtBy } from './_util.js';
+import { seletorDeOrdemHtml } from '../lib/tabela-ordena.js';
 
 // Quantas colunas de métrica: decide em que largura do cartão a tabela vira blocos empilhados.
 function classeDeTamanho(n) {
@@ -63,6 +64,7 @@ export function render(props = {}, dados) {
   return (
     `<div class="resumo ${classeDeTamanho(colunas.length)}" data-widget="resumo">` +
       titleHtml +
+      seletorDeOrdemHtml([dimLabel, ...colunas.map((c) => c.label)]) +
       `<div class="resumo__scroll">` +
         `<table class="resumo__el">` +
           `<thead><tr>${head}</tr></thead>` +

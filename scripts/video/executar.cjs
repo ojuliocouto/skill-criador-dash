@@ -20,13 +20,47 @@ async function aparecer(page, seletor, opcional) {
 }
 
 async function levarMouse(page, alvo) {
-  await alvo.scrollIntoViewIfNeeded().catch(() => {});
+  // No meio da tela: com o alvo rente ao topo, a barra fixa do painel fica por cima e o clique cai nela (as abas, depois de rolar a página).
+  await alvo.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
+  await page.waitForTimeout(80);
   const caixa = await alvo.boundingBox();
   if (!caixa) return null;
   const x = caixa.x + caixa.width / 2;
   const y = caixa.y + Math.min(caixa.height / 2, 40);
   await page.mouse.move(x, y, { steps: 12 });
   return { x, y };
+}
+
+const metaBatida = (page) => page.evaluate(() => {
+  const f = document.querySelector('.kpi__goal-fill');
+  return f ? f.classList.contains('is-done') : null;
+});
+
+async function clicarAtalho(page, id) {
+  const alvo = await aparecer(page, `.atalho[data-atalho="${id}"]`, true);
+  if (!alvo) return false;
+  const ponto = await levarMouse(page, alvo);
+  if (ponto) await page.mouse.click(ponto.x, ponto.y); else await alvo.click();
+  return true;
+}
+
+/**
+ * Procura um par de atalhos de período que leva a meta de "não batida" a "batida" e deixa o cruzamento
+ * acontecer na tela (o marco dura cerca de 1,9 s). Sem meta no painel, ou sem par que cruze, devolve o motivo.
+ */
+async function cruzarMeta(page) {
+  if ((await metaBatida(page)) === null) return { ok: false, motivo: 'o painel não tem meta para cruzar' };
+  const limite = Date.now() + 4500;
+  for (const [de, para] of roteiro.PARES_DE_ATALHOS) {
+    if (Date.now() > limite) break;
+    if (!(await clicarAtalho(page, de))) continue;
+    await page.waitForTimeout(900);
+    if ((await metaBatida(page)) !== false) continue; // já batida (ou sem meta) neste período: não dá para cruzar daqui
+    if (!(await clicarAtalho(page, para))) continue;
+    await page.waitForTimeout(450);
+    if (roteiro.cruzouAMeta(false, await metaBatida(page))) { await page.waitForTimeout(1500); return { ok: true }; }
+  }
+  return { ok: false, motivo: 'nenhum par de atalhos de período leva a meta de não batida a batida (a meta pode ser mensal e o painel não ter um período que a ultrapasse)' };
 }
 
 /**
@@ -65,6 +99,20 @@ async function executar(page, passos, o) {
           const ponto = await levarMouse(page, alvo);
           if (p.acao === 'clicar') { if (ponto) await page.mouse.click(ponto.x, ponto.y); else await alvo.click(); }
           if (p.acao === 'escolher') await alvo.selectOption(typeof p.indice === 'number' ? { index: p.indice } : { value: p.valor });
+          break;
+        }
+        case 'digitar': {
+          const alvo = await aparecer(page, p.seletor, p.opcional);
+          if (!alvo) throw new Error(`"${p.seletor}" não apareceu`);
+          await levarMouse(page, alvo);
+          await alvo.click();
+          await alvo.fill('');
+          await alvo.pressSequentially(p.texto, { delay: 45 });
+          break;
+        }
+        case 'cruzar_meta': {
+          const r = await cruzarMeta(page);
+          if (!r.ok) throw new Error(r.motivo);
           break;
         }
         case 'rolar':

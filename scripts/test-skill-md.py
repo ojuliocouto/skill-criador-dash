@@ -5,7 +5,7 @@
 Cada teste nasce de uma travada real do teste com aluno de 02/10/2026
 (relatórios em sandbox-aluno-dash-20261002/relatorios/RELATORIO-dash.md).
 
-    node scripts/py.mjs test-skill-md.py
+    node <dir-da-skill>/scripts/py.mjs test-skill-md.py
 """
 import pathlib
 import re
@@ -53,16 +53,19 @@ class Roteiro(unittest.TestCase):
     def test_t5_pasta_do_projeto_e_explicita(self):
         # "<dir>", "<dir-da-skill>" e "projeto do aluno" nunca eram definidos, e o Quickstart
         # mandava trabalhar dentro da pasta da skill.
-        self.assertTrue("cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash" in SKILL,
+        self.assertTrue("lancador.py iniciar ~/meu-dash" in SKILL and "<dir-da-skill>/starter-kit ~/meu-dash" in SKILL,
                         "falta o passo de copiar o starter-kit pra pasta do aluno")
-        sobra = sorted(set(re.findall(r"<dir[^>]*>", SKILL)))
+        # 3.7.1: <dir-da-skill> passou a existir, DEFINIDO na tabela de pastas; qualquer outro <dir...> segue proibido.
+        sobra = sorted(set(re.findall(r"<dir[^>]*>", SKILL)) - {"<dir-da-skill>"})
         self.assertFalse(sobra, f"placeholder de pasta sem definição: {sobra}")
+        self.assertTrue(re.search(r"\| `<dir-da-skill>` \| a pasta onde está ESTE `SKILL.md`", SKILL),
+                        "<dir-da-skill> precisa estar definido na tabela de pastas")
         self.assertFalse(re.search(r"cd starter-kit\b", SKILL), "SKILL.md ainda manda trabalhar dentro da pasta da skill")
         for etapa in ("1", "2", "2.5", "3", "4", "5", "6", "7"):
             with self.subTest(etapa=etapa):
                 self.assertTrue(f"evidencias/etapa-{etapa}.json" in GATE_ETAPAS,
                                 f"gate-etapas.md sem exemplo da etapa {etapa} do perfil dash")
-        self.assertFalse(re.search(r"<dir[^>]*>", GATE_ETAPAS), "gate-etapas.md com placeholder de pasta")
+        self.assertFalse(set(re.findall(r"<dir[^>]*>", GATE_ETAPAS)) - {"<dir-da-skill>"}, "gate-etapas.md com placeholder de pasta")
 
     def test_t6_preflight_do_passo_1_nao_assusta_e_o_do_deploy_bloqueia(self):
         # Passo 1 gritava BLOQUEIO por placeholder do wrangler.toml, que só vale no passo 4.
@@ -80,8 +83,11 @@ class Roteiro(unittest.TestCase):
 
     def test_t8_porta_ocupada_tem_saida(self):
         # "Address already in use (127.0.0.1:8788)", em inglês, e o aluno não sabe o que fazer.
-        self.assertTrue("Address already in use" in SKILL and "npm run dev -- --port 8790" in SKILL,
+        # D4 (02/10/2026): a porta "alternativa" escrita no texto (8790) era justamente uma ocupada.
+        # A saída agora é pedir uma porta LIVRE ao lançador, sem número fixo.
+        self.assertTrue("Address already in use" in SKILL and "lancador.py porta-livre" in SKILL,
                         "falta a saída pra porta 8788 ocupada")
+        self.assertFalse(re.search(r"npm run dev -- --port 879\d", SKILL), "não mande o aluno para uma porta fixa que pode estar ocupada")
 
     def test_t9_skill_explica_biblioteca_x_layout_padrao(self):
         # O aluno não sabia se revertia a decisão da dona ou editava o teste.
@@ -102,10 +108,35 @@ class Roteiro(unittest.TestCase):
                          "o roteiro ainda manda o aluno pro Quickstart em inglês do README")
         self.assertTrue("#### Quickstart (primeira vez, só no seu computador)" in SKILL, "falta o Quickstart em português")
         bloco = SKILL.split("#### Quickstart (primeira vez, só no seu computador)", 1)[-1].split("###", 1)[0]
-        for trecho in ("cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash", "npm test",
+        for trecho in ("lancador.py iniciar ~/meu-dash", "npm test",
                        ".dev.vars", "npm run dev", "http://localhost:8788/config.html", "examples/marketing-exemplo.csv"):
             with self.subTest(trecho=trecho):
                 self.assertTrue(trecho in bloco, f"Quickstart sem: {trecho}")
+
+    def test_d4_avisos_do_preflight_e_porta_explicados_antes_de_aparecer(self):
+        # D4 (02/10/2026): o aviso de CLOUDFLARE_API_TOKEN e a porta 8788 apareciam como surpresa.
+        passo1 = SKILL.split("### 1. Onboarding e checklist", 1)[1].split("#### Quickstart", 1)[0]
+        for trecho in ("CLOUDFLARE_API_TOKEN exportado no shell", "SOBREPÕE", "unset CLOUDFLARE_API_TOKEN",
+                       "porta 8788 ocupada", "porta-livre", "wrangler whoami"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, passo1, f"o passo 1 precisa explicar: {trecho}")
+        quick = SKILL.split("#### Quickstart", 1)[1].split("### 2.", 1)[0]
+        self.assertLess(quick.index("porta-livre"), quick.index("npm run dev"),
+                        "a porta tem que ser escolhida ANTES de subir o servidor")
+
+    def test_d2_passo_1_cria_a_pasta_antes_do_preflight(self):
+        passo1 = SKILL.split("### 1. Onboarding e checklist", 1)[1].split("#### Quickstart", 1)[0]
+        self.assertLess(passo1.index("lancador.py iniciar ~/meu-dash"), passo1.index("preflight.py --starter-kit ~/meu-dash"),
+                        "o comando que cria a pasta tem que vir ANTES do primeiro preflight")
+        self.assertNotIn("Antes de qualquer outro comando deste passo", passo1,
+                         "o texto não pode prometer 'antes de qualquer outro comando' depois do comando")
+
+    def test_d1_texto_diz_quais_etapas_fecham_sem_conta(self):
+        self.assertIn("Sem conta Cloudflare: o que fecha e o que espera", SKILL)
+        bloco = SKILL.split("Sem conta Cloudflare: o que fecha e o que espera", 1)[1].split("\n### ", 1)[0]
+        for trecho in ("modo\": \"local", "1, 2, 2.5, 3, 5", "4 e 6", "não existe publicação falsa"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, bloco)
 
     def test_t15_glossario_no_topo(self):
         # "namespace KV", "binding", "secret", "Worker cron", "D1", "gviz CSV" e "fail-closed"

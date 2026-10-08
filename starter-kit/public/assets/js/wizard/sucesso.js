@@ -3,6 +3,7 @@
 // se desenha e o conteúdo que entra em sequência curta (sem confete, sem emoji).
 
 import { el, limpar, campo, entrar, SVG_CHECK_GRANDE } from './dom.js';
+import { textoDaEntrega } from '../lib/entrega-texto.js';
 
 async function copiar(texto, entrada) {
   try {
@@ -28,7 +29,9 @@ export function renderSucesso(corpo, { id, nome, editando, comSenha }) {
   const retorno = el('p', { class: 'hint sucesso__retorno', role: 'status' });
   const marca = el('div', { class: 'sucesso__marca' });
   marca.innerHTML = SVG_CHECK_GRANDE;
-  const titulo = el('h2', { class: 'sucesso__titulo', tabindex: '-1', text: editando ? 'Alterações salvas' : 'Seu painel está no ar' });
+  // O que a tela promete depende de onde o endereço está: localhost não é "no ar".
+  const dito = textoDaEntrega({ host: window.location.hostname, nome, editando, comSenha });
+  const titulo = el('h2', { class: 'sucesso__titulo', tabindex: '-1', text: dito.titulo });
 
   const btnCopiar = el('button', { class: 'btn ghost', type: 'button', text: 'Copiar link' });
   btnCopiar.addEventListener('click', async () => {
@@ -40,9 +43,8 @@ export function renderSucesso(corpo, { id, nome, editando, comSenha }) {
   const blocos = [
     marca,
     titulo,
-    el('p', { class: 'sucesso__texto', text: comSenha
-      ? `"${nome}" está pronto. Quem receber o link vai precisar da senha para abrir.`
-      : `"${nome}" está pronto. Qualquer pessoa com o link abaixo abre o painel.` }),
+    el('p', { class: 'sucesso__texto', text: dito.texto }),
+    ...(dito.proximoPasso ? [el('p', { class: 'hint sucesso__proximo', text: dito.proximoPasso })] : []),
     campo({ id: 'linkDoPainel', rotulo: 'Link do painel', controle: entrada }),
     el('div', { class: 'row-actions sucesso__acoes' }, [
       el('a', { class: 'btn', id: 'abrirPainel', href: caminho, text: 'Abrir painel' }),

@@ -83,7 +83,10 @@ html[data-cobertura] .cobertura { display: flex; }
 .list-item[data-aberto] { cursor: pointer; }
 
 /* EFEITO 7: tabela que reordena. Cabeçalho clicável com a seta da ordem; as linhas deslizam por JS (transform). */
-.table .table__el thead th[data-ordenavel] { cursor: pointer; user-select: none; }
-.table .table__el thead th[data-ordenavel]:hover, .table .table__el thead th[aria-sort="ascending"], .table .table__el thead th[aria-sort="descending"] { color: var(--text); }
+.table .table__el thead th[data-ordenavel], .resumo .resumo__el thead th[data-ordenavel] { cursor: pointer; user-select: none; }
+.table .table__el thead th[data-ordenavel]:hover, .table .table__el thead th[aria-sort="ascending"], .table .table__el thead th[aria-sort="descending"],
+.resumo .resumo__el thead th[data-ordenavel]:hover, .resumo .resumo__el thead th[aria-sort="ascending"], .resumo .resumo__el thead th[aria-sort="descending"] { color: var(--text); }
 .table .table__el thead th[aria-sort="ascending"]::after { content: " \2191"; }
 .table .table__el thead th[aria-sort="descending"]::after { content: " \2193"; }
+.resumo .resumo__el thead th[aria-sort="ascending"]::after { content: " \2191"; }
+.resumo .resumo__el thead th[aria-sort="descending"]::after { content: " \2193"; }

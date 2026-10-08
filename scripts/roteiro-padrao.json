@@ -1,6 +1,6 @@
 {
   "nome": "padrao",
-  "descricao": "Abre o painel, troca dois atalhos de período (7 e 30 dias), troca de aba passando o mouse no gráfico, volta à primeira, filtra e rola. Serve a qualquer painel de fábrica sem editar: o que não existir (atalhos, abas, gráfico, filtro) é pulado.",
+  "descricao": "Abre o painel, troca dois atalhos de período (7 e 30 dias, com números de roleta e gráfico que se transforma), abre a aba Evolução passando o mouse no gráfico, abre a aba Dados e ordena a tabela duas vezes, volta à primeira e filtra. Serve a qualquer painel de fábrica sem editar: o que não existir (atalhos, abas, gráfico, tabela, filtro) é pulado e avisado. Meta batida e filtro Personalizado estão no roteiro \"efeitos\" (--roteiro efeitos).",
   "duracao_minima_s": 11,
   "passos": [
     {
@@ -12,7 +12,7 @@
     },
     {
       "acao": "esperar",
-      "ms": 1200
+      "ms": 1100
     },
     {
       "acao": "print",
@@ -32,10 +32,6 @@
       "nome": "7 dias no meio da troca"
     },
     {
-      "acao": "esperar",
-      "ms": 450
-    },
-    {
       "acao": "clicar",
       "seletor": ".atalho[data-atalho=\"30d\"]",
       "opcional": true
@@ -49,17 +45,13 @@
       "nome": "30 dias no meio da troca"
     },
     {
-      "acao": "esperar",
-      "ms": 400
-    },
-    {
       "acao": "clicar",
-      "seletor": ".abas [role=\"tab\"] >> nth=1",
+      "seletor": ".abas [role=\"tab\"] >> nth=2",
       "opcional": true
     },
     {
       "acao": "esperar",
-      "ms": 500
+      "ms": 400
     },
     {
       "acao": "mover_mouse",
@@ -72,11 +64,20 @@
     },
     {
       "acao": "print",
-      "nome": "segunda aba, mouse no grafico"
+      "nome": "aba Evolução, mouse no gráfico"
     },
     {
       "acao": "clicar",
-      "seletor": ".abas [role=\"tab\"] >> nth=2",
+      "seletor": ".abas [role=\"tab\"] >> nth=4",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 400
+    },
+    {
+      "acao": "clicar",
+      "seletor": "th[data-ordenavel] >> nth=1",
       "opcional": true
     },
     {
@@ -85,7 +86,20 @@
     },
     {
       "acao": "print",
-      "nome": "terceira aba"
+      "nome": "tabela ordenada"
+    },
+    {
+      "acao": "clicar",
+      "seletor": "th[data-ordenavel] >> nth=1",
+      "opcional": true
+    },
+    {
+      "acao": "esperar",
+      "ms": 500
+    },
+    {
+      "acao": "print",
+      "nome": "tabela na ordem contrária"
     },
     {
       "acao": "clicar",
@@ -94,7 +108,7 @@
     },
     {
       "acao": "esperar",
-      "ms": 500
+      "ms": 400
     },
     {
       "acao": "escolher",
@@ -104,23 +118,11 @@
     },
     {
       "acao": "esperar",
-      "ms": 600
+      "ms": 500
     },
     {
       "acao": "print",
       "nome": "filtro aplicado"
-    },
-    {
-      "acao": "rolar",
-      "y": 500
-    },
-    {
-      "acao": "esperar",
-      "ms": 300
-    },
-    {
-      "acao": "print",
-      "nome": "rolou"
     }
   ]
 }

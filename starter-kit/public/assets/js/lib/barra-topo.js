@@ -46,3 +46,19 @@ export function ligarCopiarLink(raiz, endereco) {
     }, 1800);
   });
 }
+
+/** A página saiu do topo? Pura: um respiro de 8 px evita piscar com o tremor da rolagem. */
+export function paginaRolada(scrollY) {
+  return Number(scrollY) > 8;
+}
+
+/** Põe `is-rolado` na barra fixa quando a página sai do topo (o CSS a deixa opaca). Devolve quem desliga. */
+export function ligarBarraSolida(barra) {
+  if (!barra || typeof window === 'undefined') return () => {};
+  let esperando = false;
+  const atualizar = () => { esperando = false; barra.classList.toggle('is-rolado', paginaRolada(window.scrollY)); };
+  const aoRolar = () => { if (!esperando) { esperando = true; requestAnimationFrame(atualizar); } };
+  window.addEventListener('scroll', aoRolar, { passive: true });
+  atualizar();
+  return () => window.removeEventListener('scroll', aoRolar);
+}

@@ -64,6 +64,7 @@
   /* Quase opaco e sem desfoque: a barra fica sobre o fundo em movimento, e desfoque de fundo
      ali seria recalculado a cada quadro. */
   --topbar-bg: rgba(12, 14, 18, 0.9);
+  --topbar-solido: rgb(12, 14, 18);
   --radius: 10px;
   --radius-sm: 7px;
   /* Sombra tingida (nao preto puro) e minima: elevacao discreta de ferramenta. */
@@ -86,6 +87,7 @@
   /* Escurecido de #8b93a1 (reprovava AA, ~2.9:1) pra 6.13:1 sobre --bg-elev e 5.67:1 sobre --bg. */
   --text-faint: #5b6270;
   --topbar-bg: rgba(255, 255, 255, 0.92);
+  --topbar-solido: rgb(255, 255, 255);
   --shadow: 0 1px 3px rgba(23, 31, 48, 0.08);
   /* Tons escurecidos de good/bad so no claro: os originais (verde/vermelho claros)
      reprovam no contraste WCAG AA sobre fundo branco. */
@@ -135,6 +137,9 @@ a:hover { text-decoration: underline; }
      barra nasce desse tamanho e o conteúdo abaixo não desce quando eles chegam. */
   min-height: 78.75px;
 }
+/* Rolada a página, o conteúdo passaria por trás da barra como texto fantasma (fundo translúcido, e desfoque é proibido):
+   a barra fica OPACA assim que sai do topo. No topo, a aparência de sempre. */
+.topbar.is-rolado { background: var(--topbar-solido); }
 /* Barra do topo em trilha: "Meus painéis / [marca] Nome  Área" à esquerda e UM grupo de
    utilidades à direita. Sem avatar de iniciais, sem fileira de botões contornados iguais. */
 .topbar .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; font-weight: 650; letter-spacing: -0.01em; }
@@ -299,9 +304,24 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 .kpi__spark polyline { stroke: var(--accent-graph); stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round; }
 /* Faixa estreita: o span 2 do heroi espremeria os vizinhos abaixo do minimo legivel. */
 @media (max-width: 1100px) { .kpi--hero { grid-column: span 1; } }
+/* Cartão vizinho do destaque (3.7.1): minigráfico de tendência do período e a variação ao lado, ocupando o que sobra do
+   cartão (nunca meio vazio). Mesmo traço fino do destaque, na cor de texto secundária, sem eixo. */
+.kpi--mini { display: flex; flex-direction: column; }
+.kpi--mini .kpi__linha { flex: 1 1 auto; min-height: 44px; display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
+.kpi--mini .kpi__spark { flex: 1 1 auto; min-width: 0; height: 100%; min-height: 44px; margin-top: 0; align-self: stretch; }
+.kpi--mini .kpi__spark polyline { stroke: var(--text-dim); }
+.kpi--mini .kpi__trend { flex: 0 0 auto; margin-top: 0; text-align: right; }
+@container (max-width: 230px) {
+  .kpi--mini .kpi__linha { flex-direction: column; align-items: stretch; gap: 6px; }
+  .kpi--mini .kpi__trend { text-align: left; }
+}
+@container (max-width: 120px) {
+  .kpi--mini .kpi__spark { display: none; }
+  .kpi--mini .kpi__linha { flex: 0 0 auto; min-height: 0; }
+}
 @media (prefers-reduced-motion: no-preference) {
   /* Só na entrada (primeira carga e troca de aba): repintar por filtro não redesenha a linha. */
-  .anima-entrada .kpi--hero .kpi__spark polyline { stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: spark-in 0.7s ease-out forwards; }
+  .anima-entrada .kpi__spark polyline { stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: spark-in 0.7s ease-out forwards; }
   /* 3000: o traco e medido em pixel de tela (non-scaling-stroke); 200 cortava a linha no heroi largo. */
   @keyframes spark-in { to { stroke-dashoffset: 0; } }
 }
@@ -624,7 +644,8 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
   .grid.kpis > * { flex: 1 1 190px; min-width: 0; }
 }
 @media (max-width: 560px) {
-  .grid.kpis > * { flex-basis: 100%; }
+  /* 2 colunas no celular (3.7.1); o cartão ímpar do fim cresce e ocupa a linha inteira. */
+  .grid.kpis > * { flex-basis: calc(50% - 1px); }
 }
 
 /* Tablet: a regra geral transforma cartão de 4 colunas em meia largura, o que quebra o par
@@ -773,3 +794,52 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
    absoluta mostra o número do quadro (dashboard.js). Nada muda de tamanho nem empurra vizinho. */
 .kpi__value.is-contando { position: relative; color: transparent; }
 .kpi__conta { position: absolute; left: 0; top: 0; color: var(--text); white-space: nowrap; user-select: none; pointer-events: none; }
+
+/* D12 (3.7.1): "Dados linha a linha" no celular vira um cartão por linha, como as tabelas por canal e por semana
+   (nunca uma tabela virada de lado). Sem cabeçalho clicável, quem ordena é o seletor "Ordenar por". */
+.table { container-type: inline-size; container-name: tabela; }
+.ordenar-por { display: none; flex-direction: column; gap: 5px; margin: 0 0 12px; color: var(--text-dim); font-size: 12.5px; font-weight: 500; }
+.ordenar-por__select { width: 100%; min-height: 44px; }
+.resumo .ordenar-por { display: none; }
+@container tabela (max-width: 480px) {
+  .table--p .table__el, .table--p .table__el tbody { display: block; }
+  .table--p .table__el thead { display: none; }
+  .table--p .table__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .table--p .table__el tbody tr:hover { background: transparent; }
+  .table--p .table__el tbody tr:last-child { border-bottom: 0; }
+  .table--p .table__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; white-space: normal; }
+  .table--p .table__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .table--p .table__el td:first-child { grid-column: 1 / -1; font-size: 14px; font-weight: 600; color: var(--text); }
+  .table--p .table__el td:first-child::before { display: none; }
+  .table--p .ordenar-por { display: flex; }
+  .table--p .table__arrasta { display: none; }
+}
+@container tabela (max-width: 740px) {
+  .table--m .table__el, .table--m .table__el tbody { display: block; }
+  .table--m .table__el thead { display: none; }
+  .table--m .table__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .table--m .table__el tbody tr:hover { background: transparent; }
+  .table--m .table__el tbody tr:last-child { border-bottom: 0; }
+  .table--m .table__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; white-space: normal; }
+  .table--m .table__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .table--m .table__el td:first-child { grid-column: 1 / -1; font-size: 14px; font-weight: 600; color: var(--text); }
+  .table--m .table__el td:first-child::before { display: none; }
+  .table--m .ordenar-por { display: flex; }
+  .table--m .table__arrasta { display: none; }
+}
+@container tabela (max-width: 1120px) {
+  .table--g .table__el, .table--g .table__el tbody { display: block; }
+  .table--g .table__el thead { display: none; }
+  .table--g .table__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .table--g .table__el tbody tr:hover { background: transparent; }
+  .table--g .table__el tbody tr:last-child { border-bottom: 0; }
+  .table--g .table__el td { display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 0; border: 0; background: transparent; text-align: left; white-space: normal; }
+  .table--g .table__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
+  .table--g .table__el td:first-child { grid-column: 1 / -1; font-size: 14px; font-weight: 600; color: var(--text); }
+  .table--g .table__el td:first-child::before { display: none; }
+  .table--g .ordenar-por { display: flex; }
+  .table--g .table__arrasta { display: none; }
+}
+@container resumo (max-width: 480px) { .resumo--p .ordenar-por { display: flex; } }
+@container resumo (max-width: 740px) { .resumo--m .ordenar-por { display: flex; } }
+@container resumo (max-width: 1120px) { .resumo--g .ordenar-por { display: flex; } }

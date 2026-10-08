@@ -5,9 +5,9 @@ Não verifica sozinho se a copy é boa, se uma aprovação é autêntica ou se a
 Essas responsabilidades continuam com o usuário e as lentes de auditoria.
 
 Crie uma pasta `evidencias/` dentro da pasta do projeto. No dashboard, a pasta do projeto é a
-cópia do starter-kit feita no passo 1 (`cp -R ~/.claude/skills/criador-dash/starter-kit ~/meu-dash`),
+cópia do starter-kit feita no passo 1 (`cp -R <dir-da-skill>/starter-kit ~/meu-dash`),
 e todo caminho abaixo é relativo a `~/meu-dash`. Nunca use a pasta da skill
-(`~/.claude/skills/criador-dash`) para guardar dados de cliente. Cada etapa recebe um JSON próprio
+(`<dir-da-skill>`) para guardar dados de cliente. Cada etapa recebe um JSON próprio
 e arquivos de evidência.
 Use cópias estáveis dos documentos aprovados: modificar a evidência invalida a etapa.
 
@@ -60,16 +60,46 @@ Todas as etapas também exigem `arquivos`: lista de arquivos não vazios dentro 
 No perfil `dash`, "Não" não é prova: `conta_confirmada` começando com "Não" bloqueia a etapa 4, e
 a etapa 6 só passa com a URL `https://` do dashboard publicado em `prova_publicada` e o PNG do
 `prova-dash.js` (ex: `prova/dash-desktop.png`) e os vídeos de prova do desktop e do celular
-(`prova/video-desktop.webm` e `prova/video-mobile.webm`, de `gravar-video.js`) em `arquivos`. Sem conta da pessoa, o roteiro para
-na etapa 4 e a entrega fica pendente, declarada como tal.
-Para `passe_de_gosto`, use `{"antes": 0, "depois": 0, "inspecao": "Itens efetivamente inspecionados"}`.
-A contagem final precisa ser zero. Para campos sem pendência, escreva `"Nenhuma"`.
+(`prova/video-desktop.webm` e `prova/video-mobile.webm`, de `gravar-video.js`) em `arquivos`.
+
+**Modo local (sem conta Cloudflare, 3.7.1).** As etapas de construção e prova (1, 2, 2.5, 3, 5) não precisam de
+conta; só a publicação (4 e 6) precisa. Sem conta, a etapa 4 registra com `"modo": "local"` e
+`"publicacao_pendente"` (o que fica por fazer); `conta_confirmada` pode dizer "Não". Aí a 5 e a 7 fecham, a 6
+recusa (não existe publicação falsa) e cada passada imprime `MODO LOCAL ... NÃO publicado`. Sem o campo
+`"modo": "local"`, "Não" em `conta_confirmada` continua bloqueando. A 7 em local exige `publicacao_pendente` também.
+Refazer a etapa 4 sem o campo `modo` (conta de verdade) volta a exigir a 6.
+Para `passe_de_gosto` no perfil `paginas`, use `{"antes": 0, "depois": 0, "inspecao": "Itens efetivamente inspecionados"}`.
+A contagem final precisa ser zero.
+
+**`passe_de_gosto` no dashboard (3.7.1): medido, não autodeclarado.** O que a lista de tells permite medir no navegador
+é medido por `passe-de-gosto.js` contra o painel PUBLICADO (10 sinais: fundo tingido, barrinha no topo, gradiente atrás de
+número, ícone por métrica, sombra sem hairline, "Sem dados" solto, caixa alta espaçada, número em mono esticado, card com metade
+vazia, data americana; em cada aba, nos dois temas, no desktop e no celular). O gate lê o arquivo: sinal medido na tela com
+`depois: 0` declarado é recusado, dizendo qual sinal e quantos. O que é gosto não se mede e não finge: cada item vem com o
+print que foi olhado e o que se viu, e o gate recusa contagem zerada sem os itens (e recusa o claro e o escuro com a
+mesma imagem). Formato:
+
+```json
+"passe_de_gosto": {
+  "antes": 2, "depois": 0, "inspecao": "10 sinais medidos nos dois temas e perfis; 3 itens olhados",
+  "medido": "evidencias/passe-de-gosto-medido.json",
+  "itens": {
+    "cor_como_enfeite": {"print": "evidencias/passe-claro-desktop.png", "visto": "cor só em estado bom, ruim e marca"},
+    "olhado_claro": {"print": "evidencias/passe-claro-desktop.png", "visto": "painel inteiro no tema claro, desktop e celular"},
+    "olhado_escuro": {"print": "evidencias/passe-escuro-desktop.png", "visto": "painel inteiro no tema escuro, desktop e celular"}
+  }
+}
+```
+
+Liste em `arquivos` o JSON medido e os PNG dos itens. Os PNG `passe-*.png` não contam como o print da prova de tela.
+O gate confere formato, coerência (o total bate com os sinais, a medição é do painel publicado, cobre os dois temas e os
+dois perfis) e que os prints existem; não prova sozinho que alguém olhou. Para campos sem pendência, escreva `"Nenhuma"`.
 Para trabalho futuro, como métricas após tráfego, registre o plano e a limitação atual.
 Não coloque tokens, senhas ou identificadores de conta em evidências destinadas ao Git.
 
 ```bash
-node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash registrar 0 --arquivo evidencias/etapa-0.json
-node ~/.claude/skills/criador-dash/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash checar 0
+node <dir-da-skill>/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash registrar 0 --arquivo evidencias/etapa-0.json
+node <dir-da-skill>/scripts/py.mjs gate-etapas.py --projeto ~/meu-dash checar 0
 ```
 
 No dashboard, acrescente `--perfil dash` e comece pela etapa 1. O gate de ferramentas
@@ -133,6 +163,13 @@ feito de verdade. `arquivos` aponta arquivos reais e não vazios dentro de `~/me
 }
 ```
 
+O gate da etapa 4 (3.7.1) **confere os arquivos**, não só o texto: `arquivos` precisa ter a saída crua do
+`wrangler whoami` (um arquivo com `whoami` no nome, com o e-mail da conta e o Account ID de 32 caracteres; "not
+authenticated" ou texto inventado são recusados) e o `wrangler.toml` do projeto, com o binding `DASHBOARDS_KV` com id real
+(32 hex) e nenhum placeholder ativo. Salve com `wrangler whoami > evidencias/whoami.txt`. A pasta `evidencias/` fica
+fora do git (`.gitignore` do kit), então o Account ID ali é aceitável. O gate confere formato e coerência; não prova
+sozinho que o arquivo veio do comando.
+
 `evidencias/etapa-5.json`:
 
 ```json
@@ -150,9 +187,14 @@ feito de verdade. `arquivos` aponta arquivos reais e não vazios dentro de `~/me
 ```json
 {
   "prova_publicada": "https://<NOME-DO-PROJETO>.pages.dev/dashboard.html?id=<ID>",
-  "passe_de_gosto": {"antes": 4, "depois": 0, "inspecao": "tells de painel da Fase 3, nos dois temas"},
+  "passe_de_gosto": {"antes": 4, "depois": 0, "inspecao": "tells da Fase 3 medidos e olhados, nos dois temas",
+                     "medido": "evidencias/passe-de-gosto-medido.json",
+                     "itens": {"cor_como_enfeite": {"print": "evidencias/passe-claro-desktop.png", "visto": "cor só em estado e marca"},
+                               "olhado_claro": {"print": "evidencias/passe-claro-desktop.png", "visto": "painel inteiro no claro"},
+                               "olhado_escuro": {"print": "evidencias/passe-escuro-desktop.png", "visto": "painel inteiro no escuro"}}},
   "pendencias": "Nenhuma",
-  "arquivos": ["prova/dash-desktop.png", "prova/dash-mobile.png", "prova/video-desktop.webm", "prova/video-mobile.webm", "prova/prancha-desktop.png", "prova/prancha-mobile.png"]
+  "arquivos": ["prova/dash-desktop.png", "prova/dash-mobile.png", "prova/video-desktop.webm", "prova/video-mobile.webm", "prova/prancha-desktop.png", "prova/prancha-mobile.png",
+               "evidencias/passe-de-gosto-medido.json", "evidencias/passe-claro-desktop.png", "evidencias/passe-escuro-desktop.png"]
 }
 ```
 

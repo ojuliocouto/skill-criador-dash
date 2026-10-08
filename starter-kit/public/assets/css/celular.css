@@ -1,0 +1,13 @@
+/* Celular (3.7.1, D12). Carregado depois de efeitos.css: sobrescreve a altura dos atalhos e o quebra-linha das abas. */
+/* D12 (3.7.1), celular: alvo de toque de 44 px nos atalhos de período e nas abas; as abas e os atalhos nunca
+   quebram de linha, rolam por dentro, e a borda esmaecida avisa que há mais para o lado (rolagem-borda.js). */
+@media (max-width: 620px) {
+  .atalhos { height: auto; }
+  .atalho { min-height: 44px; padding: 0 14px; }
+  .abas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .abas::-webkit-scrollbar { display: none; }
+  .aba { flex: 1 0 auto; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 14px; }
+}
+.atalhos.rola-dir:not(.rola-esq), .abas.rola-dir:not(.rola-esq) { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); }
+.atalhos.rola-esq:not(.rola-dir), .abas.rola-esq:not(.rola-dir) { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); }
+.atalhos.rola-esq.rola-dir, .abas.rola-esq.rola-dir { -webkit-mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); }

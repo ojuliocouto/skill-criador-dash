@@ -6,6 +6,7 @@
 // dados até 04/10 não pode mostrar "Hoje" vazio. A parte pura (faixa de datas, atalho ativo, HTML)
 // fica no topo e tem teste; a ligação com o DOM vem depois.
 
+import { ligarBordas } from './rolagem-borda.js';
 import { esc } from './html.js';
 import { isoParaBR } from './data-br.js';
 import { transformDoMarcador, animar, DURACAO, CURVA } from './movimento.js';
@@ -87,6 +88,8 @@ export function ligarAtalhos(barra, limites, aoMudar) {
   pilula.className = 'atalhos__pilula';
   pilula.setAttribute('aria-hidden', 'true');
   grupo.insertBefore(pilula, grupo.firstChild);
+  // Em tela estreita o controle rola por dentro: a borda esmaecida diz que há mais atalhos (Personalizado).
+  ligarBordas(grupo);
   const botoes = () => [...grupo.querySelectorAll('[data-atalho]')];
   const marcado = () => grupo.querySelector('[aria-checked="true"]');
 

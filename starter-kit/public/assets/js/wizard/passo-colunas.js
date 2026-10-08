@@ -5,8 +5,8 @@
 
 import { el, limpar, campo, erro, chamarAtencao, acoes } from './dom.js';
 import { getTemplate } from '../templates/index.js';
-import { autoMap } from '../lib/automap.js';
-import { placarDoMapa, textoDoPlacar, exemplosDaColuna, fraseDoQueSePerde, validateRequired } from '../lib/mapa-colunas.js';
+import { autoMapDetalhado } from '../lib/automap.js';
+import { placarDoMapa, textoDoPlacar, exemplosDaColuna, fraseDoQueSePerde, validateRequired, pendentesDeConfirmacao } from '../lib/mapa-colunas.js';
 import { listaEmFrase } from '../lib/area-resumo.js';
 import { LIMITE_DO_ROTULO, rotuloValido } from '../lib/rotulos.js';
 
@@ -25,7 +25,13 @@ export function renderColunas(corpo, ctx) {
   const columns = state.dataset.columns || [];
   const rows = state.dataset.rows || [];
   // Primeira vez com este arquivo: o reconhecimento automático preenche.
-  if (!state.colMap || Object.keys(state.colMap).length === 0) state.colMap = autoMap(tpl.slots, columns);
+  if (!state.colMap || Object.keys(state.colMap).length === 0) {
+    const r = autoMapDetalhado(tpl.slots, columns);
+    state.colMap = r.mapa;
+    // O que foi ligado só por semelhança de nome ("contatos" para Leads) a pessoa precisa confirmar.
+    state.mapaFraco = r.fracos;
+    state.mapaConfirmado = {};
+  }
   if (!state.labels) state.labels = {};
 
   const placar = el('p', { class: 'placar', id: 'placar', role: 'status' });
@@ -63,11 +69,13 @@ export function renderColunas(corpo, ctx) {
     const titulo = el('strong', { class: 'coluna__nome', text: nomePadrao });
     const tipo = el('span', { class: 'coluna__tipo', text: campoDoModelo.required ? 'obrigatória' : 'opcional' });
     const nomeArea = el('div', { class: 'coluna__renomear' });
+    const aviso = el('div', { class: 'coluna__confirmar', 'data-confirmar': chave });
     const linha = el('div', { class: 'coluna', 'data-linha': chave }, [
       el('div', { class: 'coluna__dado' }, [titulo, tipo]),
       el('div', { class: 'coluna__escolha' }, [
         campo({ id: `coluna-${chave}`, rotulo: `Coluna de ${nomePadrao}`, controle: seletor, soLeitor: true }),
         exemplos,
+        aviso,
       ]),
       nomeArea,
     ]);
@@ -95,6 +103,17 @@ export function renderColunas(corpo, ctx) {
       }));
     }
 
+    // Ligado só por nome parecido: diz o que ligou e espera um "Está certo". Trocar a coluna também resolve.
+    function desenharAviso() {
+      limpar(aviso);
+      if (!pendentesDeConfirmacao(state.mapaFraco, state.colMap, state.mapaConfirmado).includes(chave)) return;
+      aviso.appendChild(el('p', { class: 'hint', role: 'status', text: `Ligamos "${state.colMap[chave]}" a ${nomePadrao} só pelo nome parecido. Confira os exemplos ao lado.` }));
+      aviso.appendChild(el('button', {
+        class: 'btn ghost', type: 'button', 'data-confirmar-coluna': chave, text: 'Está certo',
+        onclick: () => { state.mapaConfirmado = { ...(state.mapaConfirmado || {}), [chave]: true }; limpar(retorno); desenharAviso(); },
+      }));
+    }
+
     function atualizar() {
       const col = seletor.value;
       state.colMap[chave] = col === '' ? null : col;
@@ -109,6 +128,7 @@ export function renderColunas(corpo, ctx) {
         exemplos.textContent = `Não encontramos. ${fraseDoQueSePerde(tpl, chave)}`;
       }
       desenharNome(false);
+      desenharAviso();
       atualizarPlacar();
     }
     seletor.addEventListener('change', () => { limpar(retorno); atualizar(); });
@@ -128,6 +148,13 @@ export function renderColunas(corpo, ctx) {
         for (const m of faltam) chamarAtencao(lista.querySelector(`[data-linha="${m.key}"]`));
         const primeiro = lista.querySelector(`#coluna-${faltam[0].key}`);
         if (primeiro) primeiro.focus();
+        return;
+      }
+      const pendentes = pendentesDeConfirmacao(state.mapaFraco, state.colMap, state.mapaConfirmado);
+      if (pendentes.length) {
+        const nomes = pendentes.map((k) => (tpl.slots.find((s) => s.key === k) || { label: k }).label);
+        retorno.appendChild(erro(`Confirme as colunas de ${listaEmFrase(nomes)}: ligamos só pelo nome parecido. Toque em "Está certo" na linha de cada uma, ou escolha outra coluna.`));
+        for (const k of pendentes) chamarAtencao(lista.querySelector(`[data-linha="${k}"]`));
         return;
       }
       ctx.ir(4);

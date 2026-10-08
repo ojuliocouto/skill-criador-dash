@@ -5,7 +5,7 @@
  *  - ROLETA: em 5 quadros durante o giro, cada casa mostra no máximo 2 dígitos e só o que sai e o
  *    que entra, separadores não rolam, a largura do número não varia mais de 2 px.
  * As animações são pausadas e o relógio delas é posto em cada instante: a medida não depende de tempo real.
- * Uso: node scripts/test-efeitos-no-navegador.cjs   (EFEITOS_QUADROS=<pasta> guarda os PNG dos quadros)
+ * Uso: node <dir-da-skill>/scripts/test-efeitos-no-navegador.cjs   (EFEITOS_QUADROS=<pasta> guarda os PNG dos quadros)
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -147,7 +147,7 @@ async function main() {
     ];
     const FILTRADAS = [LINHAS[3], LINHAS[0], LINHAS[1], LINHAS[4]]; // outro período: outra seleção, outra ordem
     const colunaLeads = (pagina) => pagina.evaluate(() => [...document.querySelectorAll('.table__el tbody tr')].map((tr) => tr.cells[1].textContent));
-    const pintar = (pagina, linhas) => pagina.evaluate((linhas) => { document.getElementById('grade').innerHTML = window.__efeitos.renderTabela({ title: 'Canais' }, { columns: ['Canal', 'Leads', 'Receita'], rows: linhas }); }, linhas);
+    const pintar = (pagina, linhas) => pagina.evaluate((linhas) => { document.getElementById('grade').innerHTML = '<div style="grid-column:1/-1">' + window.__efeitos.renderTabela({ title: 'Canais' }, { columns: ['Canal', 'Leads', 'Receita'], rows: linhas }) + '</div>'; }, linhas); // largura de computador: a tabela só vira cartão em cartão estreito (D12)
     const montarTabela = async (pagina) => {
       await pagina.evaluate(() => { window.__aba = 'canais'; window.__efeitos.ligarTabelaOrdena(document.getElementById('grade'), { aba: () => window.__aba }); });
       await pintar(pagina, LINHAS);
@@ -188,6 +188,52 @@ async function main() {
       await pagina.evaluate(() => { window.__aba = 'canais'; });
       await pintar(pagina, LINHAS);
       assert.deepEqual(await colunaLeads(pagina), ['120', '480', '75', '300', '15'], 'ao voltar à aba antiga a ordem não pode reaparecer');
+      await ctx.close();
+    });
+
+    // D11: a tabela que reordena vale para TODAS as tabelas do painel (por canal, por semana, dados).
+    // A "resumo" (por canal e por semana) tem linha de total: ela fica fixa no fim e não entra na ordenação.
+    const COLUNAS_RESUMO = [{ key: 'leads', label: 'Leads', format: 'integer' }, { key: 'receita', label: 'Receita', format: 'currency' }];
+    const DADOS_RESUMO = (ordem) => ({ ok: true, colunas: COLUNAS_RESUMO, dimLabel: 'Canal', totalDeGrupos: ordem.length,
+      linhas: ordem.map(([l, leads, receita]) => ({ label: l, valores: { leads, receita } })),
+      total: { label: 'Total', valores: { leads: 990, receita: 19500 } } });
+    const GRUPOS = [['Google', 120, 4000], ['Instagram', 480, 900], ['Email', 75, 12000], ['Direto', 300, 2500]];
+    const pintarResumo = (pagina, ordem) => pagina.evaluate(({ dados }) => { document.getElementById('grade').innerHTML = '<div style="grid-column:1/-1">' + window.__efeitos.renderResumo({ title: 'Por canal' }, dados) + '</div>'; }, { dados: DADOS_RESUMO(ordem) });
+    const leadsDoResumo = (pagina) => pagina.evaluate(() => [...document.querySelectorAll('.resumo__el tbody tr')].map((tr) => tr.cells[1].textContent));
+    const totalDoResumo = (pagina) => pagina.evaluate(() => { const f = [...document.querySelectorAll('.resumo__el tfoot tr')]; return { linhas: f.length, ultima: f[f.length - 1] && f[f.length - 1].cells[1].textContent, rotulo: f[f.length - 1] && f[f.length - 1].cells[0].textContent }; });
+
+    await teste('tabela por canal ou semana (resumo): clicar no cabeçalho ordena, o total fica fixo no fim e não entra na ordenação', async () => {
+      const { ctx, pagina } = await abrir(browser, bancada.url);
+      await pagina.evaluate(() => { window.__aba = 'visao'; window.__efeitos.ligarTabelaOrdena(document.getElementById('grade'), { aba: () => window.__aba }); });
+      await pintarResumo(pagina, GRUPOS);
+      assert.equal(await pagina.locator('.resumo__el thead th[data-ordenavel]').count(), 3, 'os 3 cabeçalhos da tabela por canal são ordenáveis');
+      await pagina.locator('.resumo__el thead th').nth(1).click();
+      await esperarFim(pagina);
+      assert.deepEqual(await leadsDoResumo(pagina), ['75', '120', '300', '480'], 'crescente por Leads');
+      assert.deepEqual(await totalDoResumo(pagina), { linhas: 1, ultima: '990', rotulo: 'Total' }, 'o total continua sozinho no rodapé, com o valor dele');
+      await pagina.locator('.resumo__el thead th').nth(1).click();
+      await esperarFim(pagina);
+      assert.deepEqual(await leadsDoResumo(pagina), ['480', '300', '120', '75'], 'decrescente');
+      assert.equal((await totalDoResumo(pagina)).ultima, '990');
+      await pagina.locator('.resumo__el thead th').nth(0).click(); // primeira coluna (texto)
+      await esperarFim(pagina);
+      assert.deepEqual(await pagina.evaluate(() => [...document.querySelectorAll('.resumo__el tbody tr')].map((tr) => tr.cells[0].textContent)), ['Direto', 'Email', 'Google', 'Instagram']);
+      assert.ok(!(await pagina.evaluate(() => [...document.querySelectorAll('.resumo__el tbody tr')].some((tr) => /Total/.test(tr.textContent)))), 'o Total nunca entra no meio das linhas');
+      await pagina.locator('.resumo__el thead th').nth(0).click(); await esperarFim(pagina); // desc
+      await pagina.locator('.resumo__el thead th').nth(0).click(); await esperarFim(pagina); // volta à original
+      assert.deepEqual(await leadsDoResumo(pagina), ['120', '480', '75', '300'], 'terceira volta: ordem original');
+      await ctx.close();
+    });
+
+    await teste('tabela por canal: a ordem sobrevive ao filtro (tabela nova) e o total segue no rodapé', async () => {
+      const { ctx, pagina } = await abrir(browser, bancada.url);
+      await pagina.evaluate(() => { window.__aba = 'visao'; window.__efeitos.ligarTabelaOrdena(document.getElementById('grade'), { aba: () => window.__aba }); });
+      await pintarResumo(pagina, GRUPOS);
+      await pagina.locator('.resumo__el thead th').nth(1).click();
+      await esperarFim(pagina);
+      await pintarResumo(pagina, [GRUPOS[3], GRUPOS[0], GRUPOS[1]]);
+      assert.deepEqual(await leadsDoResumo(pagina), ['120', '300', '480']);
+      assert.equal((await totalDoResumo(pagina)).rotulo, 'Total');
       await ctx.close();
     });
 

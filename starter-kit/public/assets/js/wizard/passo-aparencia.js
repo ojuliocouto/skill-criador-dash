@@ -10,6 +10,7 @@ import { aplicarRotulos } from '../lib/rotulos.js';
 import { safeLogoSrc } from '../lib/brand.js';
 import { ACEITA_NO_SELETOR } from '../lib/logo.js';
 import { montarConfig } from '../lib/config-do-painel.js';
+import { PERIODOS_DA_META } from '../lib/meta-periodo.js';
 import { prepararLogo } from './logo-arquivo.js';
 import { criarPrevia } from './previa.js';
 import { criarEscolhaDeModo, criarCamposDePresenca } from './passo-modo.js';
@@ -192,7 +193,15 @@ export function renderAparencia(corpo, ctx) {
   heroi.value = destaque() || '';
   const meta = el('input', { class: 'input', type: 'text', inputmode: 'decimal', placeholder: 'Em branco se não tiver meta', value: state.goal || '' });
   const metaCampo = campo({ id: 'dashGoal', rotulo: '', controle: meta, dica: 'Com a meta, o painel mostra quanto dela já foi alcançado.' });
-  const rotuloDaMeta = () => { metaCampo.querySelector('label').textContent = `Meta de ${nomeDe(destaque())} no período (opcional)`; };
+  const rotuloDaMeta = () => { metaCampo.querySelector('label').textContent = `Meta de ${nomeDe(destaque())} (opcional)`; };
+  // A meta tem período: 400 por mês não é 400 em 90 dias. Padrão mensal; painel antigo reaberto mantém o que tinha.
+  const periodoMeta = el('select', { class: 'input' }, [
+    ...(state.goalPeriodo === '' && state.goal ? [el('option', { value: '', text: 'Como estava: vale para o período que o painel mostrar' })] : []),
+    ...PERIODOS_DA_META.map((p) => el('option', { value: p.valor, text: p.rotulo, title: p.dica })),
+  ]);
+  periodoMeta.value = state.goalPeriodo === '' && !state.goal ? PERIODO_PADRAO : state.goalPeriodo;
+  const periodoCampo = campo({ id: 'dashGoalPeriodo', rotulo: 'Essa meta vale para', controle: periodoMeta, dica: 'Só conta se você preencheu a meta. Com "Por mês", o painel compara com a meta de cada mês do período que estiver na tela e escreve contra o quê.' });
+  periodoMeta.addEventListener('change', () => { state.goalPeriodo = periodoMeta.value; repintar(false); });
   rotuloDaMeta();
   heroi.addEventListener('change', () => { state.heroMetric = heroi.value === tpl.primaryMetric ? '' : heroi.value; rotuloDaMeta(); desenharOcultos(); repintar(true); });
   meta.addEventListener('input', () => { state.goal = meta.value; repintar(false); });
@@ -209,7 +218,7 @@ export function renderAparencia(corpo, ctx) {
   function desenharOcultos() {
     limpar(ocultos);
     state.hiddenMetrics = (state.hiddenMetrics || []).filter((k) => k !== destaque());
-    for (const m of numeros.filter((x) => x.naFaixa && x.key !== destaque())) {
+    for (const m of numeros.filter((x) => x.exibido && x.key !== destaque())) {
       const id = `oculta-${m.key}`;
       const chk = el('input', { id, type: 'checkbox', value: m.key, 'data-oculta': m.key });
       chk.checked = state.hiddenMetrics.includes(m.key);
@@ -240,11 +249,6 @@ export function renderAparencia(corpo, ctx) {
       el('label', { class: 'marcar', for: 'dashAccent2Usar' }, [usarSegunda, el('span', { text: 'Usar uma segunda cor' })]),
       campo({ id: 'dashAccent2', rotulo: 'Segunda cor', controle: segunda, soLeitor: true, dica: 'Tinge de leve o fundo dos gráficos. Sem ela, vale a cor principal.' }),
     ]),
-    el('fieldset', { class: 'campo ocultos__grupo' }, [
-      el('legend', { class: 'campo__rotulo', text: 'Números que não aparecem (opcional)' }),
-      ocultos,
-      el('p', { class: 'hint', text: 'Marque o que ninguém usa para decidir. Sai da faixa de números, das tabelas e do funil deste painel.' }),
-    ]),
     campo({
       id: 'dashPassword', rotulo: 'Senha para abrir o painel (opcional)', controle: senha,
       dica: state.protegido
@@ -256,7 +260,7 @@ export function renderAparencia(corpo, ctx) {
       dica: 'O histórico precisa de um banco de dados e de uma atualização automática ligados no servidor. Se você não instalou isso, deixe em Ao vivo.',
     }) : null,
   ]);
-  if (state.accent2 || (state.hiddenMetrics || []).length || state.storage === 'd1' || state.saudacao || state.saudacaoLigada === false || state.fundoAnimado === false) mais.open = true;
+  if (state.accent2 || state.storage === 'd1' || state.saudacao || state.saudacaoLigada === false || state.fundoAnimado === false) mais.open = true;
 
   // ---- montagem ----
   const criar = el('button', { class: 'btn', id: 'criarPainel', type: 'button', text: state.id ? 'Salvar alterações' : 'Criar painel' });
@@ -283,6 +287,12 @@ export function renderAparencia(corpo, ctx) {
     modo.el,
     campo({ id: 'dashHero', rotulo: 'Número em destaque', controle: heroi, dica: 'É o número que aparece maior, no começo do painel.' }),
     metaCampo,
+    periodoCampo,
+    el('fieldset', { class: 'campo ocultos__grupo' }, [
+      el('legend', { class: 'campo__rotulo', text: 'Números que não aparecem (opcional)' }),
+      ocultos,
+      el('p', { class: 'hint', text: 'Marque o que ninguém usa para decidir. Sai da faixa de números, das tabelas e do funil deste painel.' }),
+    ]),
     mais,
     retorno,
     acoes({ aoVoltar: () => ctx.ir(3) }, criar),

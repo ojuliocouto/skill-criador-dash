@@ -18,6 +18,20 @@ const escolhida = (v) => v != null && String(v).trim() !== '';
  * @param {{ [chave:string]: string|null }} colMap
  * @returns {{key:string,label:string}[]}
  */
+/**
+ * O que foi ligado só por sinônimo fraco e a pessoa ainda não confirmou. Some da lista quando ela confirma
+ * ou troca a coluna daquele dado.
+ * @param {{[slot:string]:string}|null} fracos slot -> coluna ligada por semelhança de nome
+ * @param {{[slot:string]:string|null}} colMap o mapeamento atual
+ * @param {{[slot:string]:boolean}|null} confirmados slots que a pessoa confirmou
+ * @returns {string[]} chaves dos dados que ainda pedem confirmação
+ */
+export function pendentesDeConfirmacao(fracos, colMap, confirmados) {
+  if (!fracos || typeof fracos !== 'object') return [];
+  const ok = confirmados && typeof confirmados === 'object' ? confirmados : {};
+  return Object.keys(fracos).filter((k) => colMap && colMap[k] === fracos[k] && !ok[k]);
+}
+
 export function validateRequired(slots, colMap) {
   const map = colMap || {};
   return (slots || [])
