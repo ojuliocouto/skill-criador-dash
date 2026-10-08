@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.7.1
+version: 3.7.2
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -529,6 +529,9 @@ node <dir-da-skill>/scripts/gravar-video.js "<URL-DO-DASHBOARD>" --saida prova [
   `prova/prancha-desktop.png`, `prova/prancha-mobile.png` e os PNG soltos em `prova/quadros/`.
   **Leia as duas pranchas** (há número no painel? a aba trocou? o filtro mudou os números?). Os primeiros
   segundos do vídeo podem estar em branco enquanto a página carrega: é o carregamento, não defeito.
+  O gravador espera o NÚMERO de verdade (até 45 s; o esqueleto de carregamento não conta), conta em cada quadro os indicadores com
+  dígito visíveis e guarda isso no `video-info.json`; sem número em nenhum quadro, ele sai com código diferente de zero ("a gravação não vale") e o
+  gate da etapa 6 lê o mesmo arquivo. Grave sempre depois de o dash carregar (logo após um deploy a primeira carga pode demorar).
   Liste os dois vídeos em `arquivos` da etapa 6: **sem eles o `gate-etapas.py` recusa o registro.**
 
 ### 6.1 GATE DE USO: ferramenta viva não se pula

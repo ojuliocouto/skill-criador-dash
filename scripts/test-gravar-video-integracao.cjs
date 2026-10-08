@@ -46,7 +46,7 @@ document.getElementById('canal').addEventListener('change', (e) => { document.ge
 const roteiro = {
   nome: 'teste',
   passos: [
-    { acao: 'abrir' }, { acao: 'esperar_seletor', seletor: '.kpi__value' }, { acao: 'esperar', ms: 1500 },
+    { acao: 'abrir' }, { acao: 'esperar_numero', ms: 20000 }, { acao: 'esperar', ms: 1000 },
     { acao: 'print', nome: 'abriu' }, { acao: 'mover_mouse', seletor: '.kpi' }, { acao: 'print', nome: 'numero' },
     { acao: 'clicar', seletor: '.abas [role="tab"] >> nth=1' }, { acao: 'esperar', ms: 1500 }, { acao: 'print', nome: 'aba canais' },
     { acao: 'clicar', seletor: '.abas [role="tab"] >> nth=2' }, { acao: 'esperar', ms: 1500 }, { acao: 'print', nome: 'aba funil' },
@@ -93,6 +93,21 @@ const roteiro = {
     checa('a prancha foi montada', !!d.prancha && fs.statSync(path.join(saida, d.prancha)).size > 0, d.prancha);
   }
   checa('a pasta temporária de gravação foi limpa', !fs.existsSync(path.join(saida, '.gravando-desktop')));
+
+  // 3.7.2: a gravação que só mostra o esqueleto de carregamento NÃO vale (já aconteceu: 7 quadros sem número, "Vídeos gravados", saída 0).
+  const ESQUELETO = '<!doctype html><meta charset="utf-8"><title>carregando</title><div class="abas"></div><div class="kpi"><div class="kpi__value esq-barra">&nbsp;</div></div><p>Carregando...</p>';
+  const servEsq = http.createServer((_, res) => { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(ESQUELETO); });
+  await new Promise((r2) => servEsq.listen(0, '127.0.0.1', r2));
+  const urlEsq = `http://127.0.0.1:${servEsq.address().port}/`;
+  const rotEsq = path.join(raiz, 'roteiro esqueleto.json');
+  fs.writeFileSync(rotEsq, JSON.stringify({ nome: 'esqueleto', duracao_minima_s: 10, passos: [{ acao: 'abrir' }, { acao: 'esperar_numero', ms: 3000 }, ...[1, 2, 3, 4, 5, 6].flatMap((n) => [{ acao: 'print', nome: `q${n}` }, { acao: 'esperar', ms: 1500 }])] }), 'utf8');
+  const rEsq = await rodar([GRAVADOR, urlEsq, '--saida', path.join(raiz, 'saida-esqueleto'), '--roteiro', rotEsq, '--perfis', 'desktop'], 90000);
+  checa('página que nunca sai do esqueleto: o gravador REPROVA (saída diferente de zero)', rEsq.status !== 0, `código ${rEsq.status}`);
+  checa('a mensagem diz que o dash não mostrou número e que a gravação não vale', /não mostrou número em \d+ s: a gravação não vale/.test(rEsq.stdout + rEsq.stderr), (rEsq.stdout || '').slice(-200));
+  servEsq.close();
+
+  // Página normal: passa, e o número por quadro fica guardado no video-info.json (o gate da etapa 6 lê isso).
+  checa('página normal: video-info.json guarda os quadros com número', !!d && Array.isArray(d.quadrosComNumero) && d.quadrosComNumero.length >= 1 && typeof d.totalQuadrosComNumero === 'number' && d.totalQuadrosComNumero >= 1, JSON.stringify(d && d.quadrosComNumero));
 
   // Roteiro inválido: recusado antes de abrir o navegador (código 2, nenhuma pasta de vídeo).
   const ruim = path.join(raiz, 'ruim.json');

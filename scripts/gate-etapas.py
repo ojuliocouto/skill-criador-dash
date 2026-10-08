@@ -105,6 +105,28 @@ def _sem_query(url):
     return re.sub(r"[?#].*$", "", str(url)).rstrip("/")
 
 
+def conferir_video_com_numero(projeto, arquivos):
+    """3.7.2: vídeo gravado só com o esqueleto de carregamento já foi aceito como prova. O gravar-video.js conta, em cada
+    quadro, os indicadores com número de verdade na tela e guarda em video-info.json; o gate exige pelo menos um quadro com
+    número no desktop e no celular."""
+    nomes = [str(a) for a in arquivos]
+    info_rel = next((a for a in nomes if Path(a).name == "video-info.json"), None)
+    if not info_rel:
+        raise ValueError("Etapa 6: liste em arquivos o video-info.json que o gravar-video.js grava (ele diz em quantos quadros há número de verdade).")
+    try:
+        info = json.loads((projeto / info_rel).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise ValueError(f"Etapa 6: não consegui ler {info_rel} ({e}).")
+    perfis = info.get("perfis") if isinstance(info, dict) and isinstance(info.get("perfis"), dict) else {}
+    for perfil in ("desktop", "mobile"):
+        total = perfis.get(perfil, {}).get("totalQuadrosComNumero") if isinstance(perfis.get(perfil), dict) else None
+        if type(total) is not int:
+            raise ValueError(f"Etapa 6: {info_rel} não diz em quantos quadros do {perfil} há número. Grave de novo com o gravar-video.js desta versão.")
+        if total < 1:
+            raise ValueError(f"Etapa 6: nenhum quadro do vídeo do {perfil} tem número na tela (só esqueleto de carregamento): a prova não vale. "
+                             "Espere o dash carregar e grave de novo.")
+
+
 def conferir_passe_de_gosto(projeto, doc):
     """D13: o passe de gosto da etapa 6 deixou de ser autodeclarado.
 
@@ -206,6 +228,7 @@ def validar_dash(etapa, doc, local=False, projeto=None):
                                  f"{lancador.comando('gravar-video.js', chr(34) + '<URL-DO-DASHBOARD>' + chr(34), '--saida', 'prova')} "
                                  f"(gera prova/video-desktop.webm e prova/video-mobile.webm), e liste os dois em arquivos.")
         if projeto is not None:
+            conferir_video_com_numero(projeto, arquivos)
             conferir_passe_de_gosto(projeto, doc)
 
 
@@ -234,7 +257,7 @@ def validar(projeto, arquivo, etapa, campos, perfil, local=False):
         p = (projeto / nome).resolve()
         if not p.is_relative_to(projeto) or p == arquivo or p.name == REGISTRO:
             raise ValueError("A evidência precisa estar dentro do projeto e não pode ser o próprio registro.")
-        hashes[str(p.relative_to(projeto))] = digest(p)
+        hashes[p.relative_to(projeto).as_posix()] = digest(p)
     return hashes
 
 
@@ -292,7 +315,7 @@ def main():
             if not arquivo.is_relative_to(projeto):
                 raise ValueError("O JSON precisa estar dentro do projeto.")
             hashes = validar(projeto, arquivo, args.etapa, etapas[args.etapa], args.perfil, local)
-            hashes[str(arquivo.relative_to(projeto))] = digest(arquivo)
+            hashes[arquivo.relative_to(projeto).as_posix()] = digest(arquivo)
             # Corrigir uma etapa invalida as seguintes; um resultado antigo não prova a versão nova.
             registro = {e: registro[e] for e in ordem[:indice] if e in registro}
             registro[args.etapa] = {"hashes": hashes}

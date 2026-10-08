@@ -60,7 +60,7 @@ const irPara = (pagina, t) => pagina.evaluate((t) => { const as = document.getAn
 
 async function main() {
   const pw = acharPlaywright();
-  if (!pw) { console.error('Playwright não encontrado'); return 1; }
+  if (!pw) { console.log('PULADO: Playwright não encontrado (npm i -g playwright && npx playwright install chromium). Esta bancada NÃO rodou.'); return 0; }
   const bancada = await subir();
   const browser = await pw.chromium.launch();
   try {

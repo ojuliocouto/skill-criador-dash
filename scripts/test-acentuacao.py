@@ -3,18 +3,17 @@
 """Texto que o aluno lê no terminal sai com acento.
 
 T14 do teste com aluno (02/10/2026): "Pecas do starter-kit", "Pode comecar", "ha numero, nao
-que ele esta certo". Varre as strings dos scripts (.py pelo tokenize; prova-dash.js pelos
+que ele esta certo". Varre as strings dos scripts (.py pela árvore ast; prova-dash.js pelos
 literais fora de comentário) e reprova palavra sem acento. Docstring e comentário ficam de
 fora: não aparecem pra ninguém. A lista de palavras é a mesma do teste do starter-kit.
 
     node <dir-da-skill>/scripts/py.mjs test-acentuacao.py
 """
-import io
+import ast
 import json
 import pathlib
 import re
 import sys
-import tokenize
 
 for _fluxo in (sys.stdout, sys.stderr):  # console cp1252 ou ASCII não pode derrubar o teste num acento
     try:
@@ -29,27 +28,23 @@ RE = re.compile(r"(?<![\w-])(" + "|".join(re.escape(k) for k in sorted(MAPA, key
 
 
 def strings_python(fonte):
-    toks = list(tokenize.generate_tokens(io.StringIO(fonte).readline))
-    for i, t in enumerate(toks):
-        if t.type != tokenize.STRING:
-            continue
-        # Docstring: string sozinha num statement. Dentro de parênteses as quebras são NL (não
-        # NEWLINE), então string de mensagem quebrada em várias linhas não passa por docstring.
-        j = i - 1
-        while j >= 0 and toks[j].type in (tokenize.NL, tokenize.COMMENT):
-            j -= 1
-        anterior = toks[j].type if j >= 0 else tokenize.NEWLINE
-        seguinte = toks[i + 1].type if i + 1 < len(toks) else tokenize.NEWLINE
-        if anterior in (tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT, tokenize.ENCODING) and seguinte in (tokenize.NEWLINE, tokenize.ENDMARKER):
-            continue
-        texto = t.string
-        if re.match(r"[A-Za-z]*[fF]", texto):
-            # {expressão} de f-string não é texto; só o que estiver entre aspas lá dentro é.
-            texto = re.sub(r"\{([^{}]*)\}",
-                           lambda m: " " + " ".join(a or b for a, b in re.findall(r"'([^']*)'|\"([^\"]*)\"", m.group(1))) + " ",
-                           texto)
-        if re.search(r"\s", texto):
-            yield t.start[0], texto
+    """Textos de tela dos scripts .py, pela árvore do Python (ast). No Python 3.12 o tokenize separa o f-string em pedaços
+    (FSTRING_START, FSTRING_MIDDLE...) e a conta por token deixa de valer; a árvore é a mesma em toda versão."""
+    arvore = ast.parse(fonte)
+    docstrings = set()
+    for no in ast.walk(arvore):
+        if isinstance(no, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and no.body:
+            primeiro = no.body[0]
+            if isinstance(primeiro, ast.Expr) and isinstance(primeiro.value, ast.Constant) and isinstance(primeiro.value.value, str):
+                docstrings.add(id(primeiro.value))
+        # string solta como statement (docstring de atributo, comentário em forma de texto): ninguém lê
+        if isinstance(no, ast.Expr) and isinstance(no.value, ast.Constant) and isinstance(no.value.value, str):
+            docstrings.add(id(no.value))
+    achados = []
+    for no in ast.walk(arvore):
+        if isinstance(no, ast.Constant) and isinstance(no.value, str) and id(no) not in docstrings and re.search(r"\s", no.value):
+            achados.append((no.lineno, no.value))
+    return sorted(achados)
 
 
 def strings_js(fonte):
@@ -102,6 +97,14 @@ def main():
     caso_do_aluno = list(RE.finditer("isto prova que ha numero, nao que ele esta certo"))
     if len(caso_do_aluno) != 3:
         print("FALHA: o detector não pegou o caso do aluno")
+        return 1
+    # O leitor de strings se prova em f-string e string comum, em qualquer versão do Python (a 3.12 separa o f-string em tokens).
+    for amostra in ('x = f"voce nao {n} sabe"', 'x = "voce nao sabe"', 'x = ("voce "\n     f"nao {n}")'):
+        if not any(RE.search(texto) for _, texto in strings_python(amostra)):
+            print(f"FALHA: o leitor de strings não viu o texto sem acento em: {amostra!r}")
+            return 1
+    if list(strings_python('def f():\n    """voce nao docstring"""\n')):
+        print("FALHA: docstring não pode contar como texto de tela")
         return 1
     if erros:
         print(f"FALHA: {len(erros)} palavra(s) sem acento em texto visível dos scripts:")

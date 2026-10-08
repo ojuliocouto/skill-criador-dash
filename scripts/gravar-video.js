@@ -37,9 +37,10 @@ function dicaDeInstalacao(e) {
 
 async function main() {
   const pw = acharPlaywright();
-  if (!pw) { console.error('Playwright não encontrado (nem local, nem na pasta do `npm root -g`). Instale: npm i -g playwright'); return 1; }
+  const semPlaywright = () => { console.error('Playwright não encontrado (nem local, nem na pasta do `npm root -g`). Instale: npm i -g playwright'); return 1; };
 
   if (args.includes('--check')) {
+    if (!pw) return semPlaywright();
     let bin;
     try { bin = pw.chromium.executablePath(); } catch (e) { console.error('Playwright resolve, mas não sabe o caminho do Chromium: ' + e.message); return 1; }
     if (!bin || !fs.existsSync(bin)) { console.error('Playwright instalado, mas o Chromium não foi baixado: npx playwright install chromium'); return 1; }
@@ -61,6 +62,8 @@ async function main() {
   // Na saída normal (e não só no stderr): quem filtra a saída do comando não pode perder o motivo.
   if (!v.ok) { console.log('Roteiro inválido:\n' + v.erros.map((e) => '  - ' + e).join('\n')); return 2; }
   for (const p of perfis) if (!roteiro.PERFIS[p]) { console.error(`perfil desconhecido: ${p} (use desktop e/ou mobile)`); return 2; }
+  // Só depois de conferir o pedido: roteiro errado se conserta sem instalar nada, e o motivo não fica atrás do aviso do Playwright.
+  if (!pw) return semPlaywright();
 
   const pastaDeQuadros = roteiro.caminhoDeSaida(saida, 'quadros');
   fs.mkdirSync(pastaDeQuadros, { recursive: true });
@@ -108,12 +111,17 @@ async function main() {
       arquivo: path.basename(destino), formato: 'webm', bytes, mb: Number((bytes / 1048576).toFixed(2)),
       duracaoWebmMs, duracaoDasMarcasMs, quadros: r.quadros.map((q) => path.basename(q.arquivo)),
       prancha: prancha ? path.basename(prancha) : null, passosPulados: r.pulados, falha: r.falha,
+      // Em quantos quadros há número de verdade (indicador visível com dígito). O gate da etapa 6 lê isto.
+      quadrosComNumero: r.quadros.filter((q) => q.numeros > 0).map((q) => path.basename(q.arquivo)),
+      totalQuadrosComNumero: r.quadros.filter((q) => q.numeros > 0).length,
     };
     const s = (duracaoWebmMs ?? duracaoDasMarcasMs) / 1000;
     console.log(`  ${nome}: ${destino} (${info.perfis[nome].mb} MB, ${s.toFixed(1)} s, ${r.quadros.length} quadros, prancha ${prancha || 'não montada'})`);
     r.pulados.forEach((p) => console.log(`    passo opcional pulado: ${p}`));
     if (s < AVISO_FAIXA_S.min || s > AVISO_FAIXA_S.max) console.log(`    aviso: duração de ${s.toFixed(1)} s fora de ${AVISO_FAIXA_S.min} a ${AVISO_FAIXA_S.max} s (rede lenta? ajuste os "esperar" do roteiro)`);
     if (r.falha) falhas.push(`[${nome}] ${r.falha}`);
+    // Prova que mente: quadros só com o esqueleto de carregamento não provam nada. Sem número em NENHUM quadro, reprova.
+    else if (doc.exige_numero !== false && info.perfis[nome].totalQuadrosComNumero === 0) falhas.push(`[${nome}] nenhum quadro tem número na tela (só esqueleto de carregamento ou "sem dado"): a gravação não vale`);
   }
   await browser.close();
   fs.writeFileSync(roteiro.caminhoDeSaida(saida, 'video-info.json'), JSON.stringify(info, null, 2), 'utf8');

@@ -7,8 +7,8 @@
       "acao": "abrir"
     },
     {
-      "acao": "esperar_seletor",
-      "seletor": ".kpi__value"
+      "acao": "esperar_numero",
+      "ms": 45000
     },
     {
       "acao": "esperar",

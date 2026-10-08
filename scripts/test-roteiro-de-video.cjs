@@ -202,7 +202,7 @@ teste('roteiro de efeitos: oficial, válido, de 10 a 15 s, com meta batida e Per
   assert.ok(s >= 10 && s <= 15, `previsto ${s} s`);
   const acoes = efeitos.passos.map((p) => p.acao);
   for (const a of ['cruzar_meta', 'digitar']) assert.ok(acoes.includes(a), `o roteiro de efeitos usa ${a}`);
-  assert.ok(efeitos.passos.filter((p) => p.acao !== 'abrir' && p.acao !== 'esperar' && p.acao !== 'print' && p.acao !== 'esperar_seletor').every((p) => p.opcional === true), 'todo passo que depende do painel é opcional');
+  assert.ok(efeitos.passos.filter((p) => p.acao !== 'abrir' && p.acao !== 'esperar' && p.acao !== 'print' && p.acao !== 'esperar_seletor' && p.acao !== 'esperar_numero').every((p) => p.opcional === true), 'todo passo que depende do painel é opcional');
   assert.ok(efeitos.passos.some((p) => /personalizado/.test(p.seletor || '')), 'abre o filtro Personalizado');
 });
 
@@ -221,6 +221,38 @@ teste('roteiro inválido: os erros saem na saída normal (não somem se o aluno 
   assert.equal(r.status, 2);
   assert.match(r.stdout, /Roteiro inválido/);
   assert.match(r.stdout, /6 prints/);
+});
+
+// ---- 3.7.2: a gravação que só mostra o esqueleto de carregamento não vale ----
+teste('ação esperar_numero: existe, aceita teto em ms de 1 a 60000 e custa tempo previsto', () => {
+  assert.ok(roteiro.ACOES.includes('esperar_numero'));
+  const erros = (p) => roteiro.validarRoteiro({ passos: [{ acao: 'abrir' }, p] }).erros.filter((e) => /esperar_numero/.test(e)).join();
+  assert.equal(erros({ acao: 'esperar_numero' }), '');
+  assert.equal(erros({ acao: 'esperar_numero', ms: 45000 }), '');
+  assert.match(erros({ acao: 'esperar_numero', ms: 0 }), /ms/);
+  assert.match(erros({ acao: 'esperar_numero', ms: 999999 }), /ms/);
+  assert.ok(roteiro.duracaoPrevistaMs([{ acao: 'esperar_numero' }]) > 0);
+});
+
+teste('os dois roteiros oficiais esperam o NÚMERO de verdade, obrigatório e com teto de 45 s (não só o seletor do esqueleto)', () => {
+  for (const [nome, r] of [['padrão', padrao], ['efeitos', efeitos]]) {
+    const i = r.passos.findIndex((p) => p.acao === 'esperar_numero');
+    assert.ok(i > 0, `${nome}: falta esperar_numero`);
+    assert.equal(r.passos[i].opcional, undefined, `${nome}: a espera pelo número não pode ser opcional`);
+    assert.equal(r.passos[i].ms, 45000, `${nome}: teto de 45 s`);
+    assert.ok(!r.passos.some((p) => p.acao === 'esperar_seletor' && p.seletor === '.kpi__value'), `${nome}: o seletor sozinho aceita o esqueleto`);
+  }
+});
+
+teste('o teto de espera pelo número não conta na duração prevista do roteiro (só o tempo normal)', () => {
+  const s = roteiro.duracaoPrevistaMs(padrao.passos) / 1000;
+  assert.ok(s >= 10 && s <= 15, `previsto ${s} s`);
+});
+
+teste('quadroTemNumero: conta número de verdade (dígito) e recusa esqueleto, traço e vazio', () => {
+  assert.equal(roteiro.textoTemNumero('R$ 1.234,00'), true);
+  assert.equal(roteiro.textoTemNumero('0'), true);
+  for (const ruim of ['', '   ', '—', '-', 'Não mapeada', 'sem dado', null, undefined]) assert.equal(roteiro.textoTemNumero(ruim), false, String(ruim));
 });
 
 process.exitCode = falhas ? 1 : 0;
