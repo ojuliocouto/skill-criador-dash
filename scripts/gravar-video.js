@@ -37,9 +37,10 @@ function dicaDeInstalacao(e) {
 
 async function main() {
   const pw = acharPlaywright();
-  if (!pw) { console.error('Playwright não encontrado (nem local, nem na pasta do `npm root -g`). Instale: npm i -g playwright'); return 1; }
+  const semPlaywright = () => { console.error('Playwright não encontrado (nem local, nem na pasta do `npm root -g`). Instale: npm i -g playwright'); return 1; };
 
   if (args.includes('--check')) {
+    if (!pw) return semPlaywright();
     let bin;
     try { bin = pw.chromium.executablePath(); } catch (e) { console.error('Playwright resolve, mas não sabe o caminho do Chromium: ' + e.message); return 1; }
     if (!bin || !fs.existsSync(bin)) { console.error('Playwright instalado, mas o Chromium não foi baixado: npx playwright install chromium'); return 1; }
@@ -61,6 +62,8 @@ async function main() {
   // Na saída normal (e não só no stderr): quem filtra a saída do comando não pode perder o motivo.
   if (!v.ok) { console.log('Roteiro inválido:\n' + v.erros.map((e) => '  - ' + e).join('\n')); return 2; }
   for (const p of perfis) if (!roteiro.PERFIS[p]) { console.error(`perfil desconhecido: ${p} (use desktop e/ou mobile)`); return 2; }
+  // Só depois de conferir o pedido: roteiro errado se conserta sem instalar nada, e o motivo não fica atrás do aviso do Playwright.
+  if (!pw) return semPlaywright();
 
   const pastaDeQuadros = roteiro.caminhoDeSaida(saida, 'quadros');
   fs.mkdirSync(pastaDeQuadros, { recursive: true });
