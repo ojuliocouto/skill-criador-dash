@@ -32,6 +32,7 @@ const PRECISAM = {
   'test-barra-topo-no-navegador.cjs': 'navegador (mede a barra do topo ao rolar)',
   'test-celular-no-navegador.cjs': 'navegador (mede o celular em 390 e 360)',
   'test-efeitos-no-navegador.cjs': 'navegador (mede os efeitos de movimento)',
+  'test-grupo-no-navegador.cjs': 'navegador (grupo com abas: corrida entre abas e aba com senha)',
   'test-gravar-video-integracao.cjs': 'navegador (grava vídeo de verdade)',
   'test-minigrafico-no-navegador.cjs': 'navegador (mede a faixa de indicadores)',
   'test-passe-de-gosto-no-navegador.cjs': 'navegador (mutantes do passe de gosto)',
