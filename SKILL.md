@@ -507,7 +507,15 @@ node <dir-da-skill>/scripts/gravar-video.js "<URL-DO-DASHBOARD>" --saida prova [
   `scripts/roteiro-padrao.json` (abrir, esperar, trocar dois atalhos de período, clicar nas abas passando o mouse
   no gráfico, escolher no filtro, rolar): serve ao painel de fábrica sem editar nada, e o que não existir no
   seu painel (atalhos, abas, gráfico, filtro) é pulado.
-  Roteiro próprio: `--roteiro meu-roteiro.json` (ações em `scripts/video/roteiro.cjs`). Grava
+  O roteiro padrão mostra, nesta ordem e tudo opcional: dois atalhos de período (roleta e gráfico que se
+  transforma), a aba Evolução com o mouse no gráfico, a aba Dados com a tabela ordenada duas vezes e o filtro.
+  **Dois roteiros oficiais** (3.7.1): `--roteiro padrao` (o de sempre, serve a toda entrega) e `--roteiro efeitos`
+  (meta batida, gráfico que responde e o filtro Personalizado com datas digitadas; a ação `cruzar_meta` procura o
+  par de atalhos que leva a meta de não batida a batida e, se o painel não tem meta ou nenhum par cruza, pula e diz
+  por quê). Use o padrão para a prova de entrega e o de efeitos quando a pessoa quiser ver o movimento. O cartão que
+  vira a tela só existe saindo da lista de painéis: grave a lista com um roteiro próprio.
+  Roteiro próprio: `--roteiro meu-roteiro.json` (ações em `scripts/video/roteiro.cjs`, incluindo `digitar` para
+  preencher campo). Grava
   `prova/video-desktop.webm` e `prova/video-mobile.webm` (WebM, cerca de 1 MB cada) e, porque quem revisa
   lê imagem e não vídeo, uma PRANCHA de 6 quadros tirados durante o mesmo roteiro:
   `prova/prancha-desktop.png`, `prova/prancha-mobile.png` e os PNG soltos em `prova/quadros/`.

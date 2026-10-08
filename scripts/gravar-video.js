@@ -5,10 +5,11 @@
  * Além do vídeo, tira quadros no meio do roteiro e monta a PRANCHA: quem revisa lê imagem.
  *
  * Uso:
- *   node gravar-video.js <url-do-painel> --saida <pasta> [--roteiro arquivo.json] [--senha X] [--perfis desktop,mobile]
+ *   node gravar-video.js <url-do-painel> --saida <pasta> [--roteiro padrao|efeitos|arquivo.json] [--senha X] [--perfis desktop,mobile]
  *   node gravar-video.js --check          só diz se o Playwright (e o gravador de vídeo dele) respondem
  *
  * Sem --roteiro usa scripts/roteiro-padrao.json, que serve ao painel de fábrica sem editar nada.
+ * --roteiro efeitos usa scripts/roteiro-efeitos.json: período, meta batida, gráfico, tabela e o filtro Personalizado.
  * Saída em <pasta>: video-desktop.webm, video-mobile.webm, prancha-desktop.png, prancha-mobile.png,
  * quadros/ (um PNG por print do roteiro) e video-info.json (formato, tamanho, duração, passos pulados).
  * Sai com código diferente de zero se o roteiro for inválido ou um passo obrigatório falhar.
@@ -49,7 +50,7 @@ async function main() {
   const url = args.find((a) => /^https?:/.test(a));
   if (!url) { console.error('uso: node gravar-video.js <url-do-painel> --saida <pasta> [--roteiro arquivo.json] [--senha X] [--perfis desktop,mobile]'); return 2; }
   const saida = path.resolve(String(flag('--saida', path.join(process.cwd(), 'prova'))));
-  const arquivoDoRoteiro = path.resolve(String(flag('--roteiro', path.join(__dirname, 'roteiro-padrao.json'))));
+  const arquivoDoRoteiro = roteiro.resolverRoteiro(flag('--roteiro'), __dirname);
   const perfis = String(flag('--perfis', 'desktop,mobile')).split(',').map((s) => s.trim()).filter(Boolean);
   const senha = flag('--senha');
 
@@ -57,7 +58,8 @@ async function main() {
   try { doc = JSON.parse(fs.readFileSync(arquivoDoRoteiro, 'utf8')); } catch (e) { console.error(`Não consegui ler o roteiro ${arquivoDoRoteiro}: ${e.message}`); return 2; }
   const v = roteiro.validarRoteiro(doc);
   v.avisos.forEach((a) => console.log('  aviso: ' + a));
-  if (!v.ok) { console.error('Roteiro inválido:\n' + v.erros.map((e) => '  - ' + e).join('\n')); return 2; }
+  // Na saída normal (e não só no stderr): quem filtra a saída do comando não pode perder o motivo.
+  if (!v.ok) { console.log('Roteiro inválido:\n' + v.erros.map((e) => '  - ' + e).join('\n')); return 2; }
   for (const p of perfis) if (!roteiro.PERFIS[p]) { console.error(`perfil desconhecido: ${p} (use desktop e/ou mobile)`); return 2; }
 
   const pastaDeQuadros = roteiro.caminhoDeSaida(saida, 'quadros');
