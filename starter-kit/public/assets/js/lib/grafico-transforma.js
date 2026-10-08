@@ -45,6 +45,15 @@ export function interpolarPontos(de, para, t) {
 
 const arredonda = (n) => Math.round(n * 100) / 100;
 
+/** Lê o atributo `points` de um SVG ("x,y x,y ...") como lista de pontos. Lixo vira lista vazia, nunca NaN. */
+export function textoParaPontos(texto) {
+  const lista = String(texto == null ? '' : texto).trim().split(/\s+/).filter(Boolean).map((par) => {
+    const [x, y] = par.split(',').map(Number);
+    return { x, y };
+  });
+  return lista.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)) ? lista : [];
+}
+
 /** Lista de pontos no formato do atributo `points` do SVG. */
 export function pontosParaTexto(pontos) {
   return (Array.isArray(pontos) ? pontos : []).map((p) => `${arredonda(p.x)},${arredonda(p.y)}`).join(' ');
@@ -76,7 +85,7 @@ function pontosDaLinha(grafico) {
 
 /** Foto do que está na tela AGORA (antes do corpo ser trocado): linhas e larguras das barras. */
 export function fotografarDados(raiz) {
-  const foto = { graficos: [], ranking: new Map(), funil: new Map(), meta: [] };
+  const foto = { graficos: [], ranking: new Map(), funil: new Map(), meta: [], sparks: new Map() };
   if (!raiz) return foto;
   raiz.querySelectorAll('.chart--timeseries').forEach((g) => {
     const svg = g.querySelector('.chart__svg');
@@ -93,6 +102,12 @@ export function fotografarDados(raiz) {
     if (chave != null && w != null) foto.funil.set(chave, w);
   });
   raiz.querySelectorAll('.kpi__goal-fill').forEach((b) => foto.meta.push(larguraDe(b)));
+  // Minigráficos dos indicadores (e o do destaque): a linha de cada um, achada pelo nome do indicador.
+  raiz.querySelectorAll('.kpi').forEach((k) => {
+    const linha = k.querySelector('.kpi__spark polyline');
+    const nome = (k.querySelector('.kpi__label') || {}).textContent;
+    if (linha && nome) foto.sparks.set(nome, textoParaPontos(linha.getAttribute('points')));
+  });
   return foto;
 }
 
@@ -145,6 +160,25 @@ function transformarLinha(grafico, antes) {
   setTimeout(() => { if (!feito) { feito = true; fechar(); } }, DURACAO_DOS_DADOS + 250);
 }
 
+// A linha do minigráfico vai do desenho antigo ao novo (mesmos 100 x 26 do viewBox) e fecha no exato.
+function transformarSpark(linha, antes) {
+  const final = linha.getAttribute('points');
+  const novos = textoParaPontos(final);
+  if (!antes || !antes.length || !novos.length) return;
+  linha.setAttribute('points', pontosParaTexto(interpolarPontos(antes, novos, 0)));
+  let feito = false;
+  const inicio = performance.now();
+  const quadro = (agora) => {
+    if (feito || !linha.isConnected) return;
+    const p = (agora - inicio) / DURACAO_DOS_DADOS;
+    if (p >= 1) { feito = true; linha.setAttribute('points', final); return; }
+    linha.setAttribute('points', pontosParaTexto(interpolarPontos(antes, novos, suavizar(p))));
+    requestAnimationFrame(quadro);
+  };
+  requestAnimationFrame(quadro);
+  setTimeout(() => { if (!feito) { feito = true; linha.setAttribute('points', final); } }, DURACAO_DOS_DADOS + 250);
+}
+
 /** Depois do corpo novo na tela: leva linhas e barras do desenho da `foto` ao novo. */
 export function transformarDados(raiz, foto) {
   if (!raiz || !foto || menosMovimento() || typeof requestAnimationFrame !== 'function') return;
@@ -165,4 +199,11 @@ export function transformarDados(raiz, foto) {
     if (barra) crescerBarra(barra, foto.funil.has(chave) ? foto.funil.get(chave) : null);
   });
   raiz.querySelectorAll('.kpi__goal-fill').forEach((b, i) => { if (foto.meta[i] != null) crescerBarra(b, foto.meta[i]); });
+  if (foto.sparks) {
+    raiz.querySelectorAll('.kpi').forEach((k) => {
+      const linha = k.querySelector('.kpi__spark polyline');
+      const nome = (k.querySelector('.kpi__label') || {}).textContent;
+      if (linha && foto.sparks.has(nome)) transformarSpark(linha, foto.sparks.get(nome));
+    });
+  }
 }

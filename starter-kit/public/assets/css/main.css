@@ -304,9 +304,24 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 .kpi__spark polyline { stroke: var(--accent-graph); stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round; }
 /* Faixa estreita: o span 2 do heroi espremeria os vizinhos abaixo do minimo legivel. */
 @media (max-width: 1100px) { .kpi--hero { grid-column: span 1; } }
+/* Cartão vizinho do destaque (3.7.1): minigráfico de tendência do período e a variação ao lado, ocupando o que sobra do
+   cartão (nunca meio vazio). Mesmo traço fino do destaque, na cor de texto secundária, sem eixo. */
+.kpi--mini { display: flex; flex-direction: column; }
+.kpi--mini .kpi__linha { flex: 1 1 auto; min-height: 44px; display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
+.kpi--mini .kpi__spark { flex: 1 1 auto; min-width: 0; height: 100%; min-height: 44px; margin-top: 0; align-self: stretch; }
+.kpi--mini .kpi__spark polyline { stroke: var(--text-dim); }
+.kpi--mini .kpi__trend { flex: 0 0 auto; margin-top: 0; text-align: right; }
+@container (max-width: 230px) {
+  .kpi--mini .kpi__linha { flex-direction: column; align-items: stretch; gap: 6px; }
+  .kpi--mini .kpi__trend { text-align: left; }
+}
+@container (max-width: 120px) {
+  .kpi--mini .kpi__spark { display: none; }
+  .kpi--mini .kpi__linha { flex: 0 0 auto; min-height: 0; }
+}
 @media (prefers-reduced-motion: no-preference) {
   /* Só na entrada (primeira carga e troca de aba): repintar por filtro não redesenha a linha. */
-  .anima-entrada .kpi--hero .kpi__spark polyline { stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: spark-in 0.7s ease-out forwards; }
+  .anima-entrada .kpi__spark polyline { stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: spark-in 0.7s ease-out forwards; }
   /* 3000: o traco e medido em pixel de tela (non-scaling-stroke); 200 cortava a linha no heroi largo. */
   @keyframes spark-in { to { stroke-dashoffset: 0; } }
 }
@@ -629,7 +644,8 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
   .grid.kpis > * { flex: 1 1 190px; min-width: 0; }
 }
 @media (max-width: 560px) {
-  .grid.kpis > * { flex-basis: 100%; }
+  /* 2 colunas no celular (3.7.1); o cartão ímpar do fim cresce e ocupa a linha inteira. */
+  .grid.kpis > * { flex-basis: calc(50% - 1px); }
 }
 
 /* Tablet: a regra geral transforma cartão de 4 colunas em meia largura, o que quebra o par

@@ -314,6 +314,8 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
       const value = computed[key];
       const goalForKpi = isMapped && goal && goal.metricKey === key ? goal : undefined;
       const isHero = temHero && key === heroKey;
+      // Destaque largo estica os vizinhos da mesma linha: cada um ganha o minigráfico da própria série (3.7.1).
+      const miniOk = heroLargo && !isHero && isMapped && Array.isArray(sparks && sparks[key]) && sparks[key].length >= 2;
       return renderKpi(
         {
           label,
@@ -323,7 +325,8 @@ export function renderKpiBlock(items, template, computed, mapped = {}, trends = 
           goal: goalForKpi,
           unmapped: !isMapped,
           hero: isHero,
-          spark: isHero ? sparks[key] : undefined,
+          spark: isHero || miniOk ? sparks[key] : undefined,
+          mini: miniOk,
           heroCompacto: isHero && !heroLargo,
         },
         value,
@@ -423,25 +426,39 @@ export function resolveActiveTab(tabs, requested) {
 // precisa de teste.
 export function sparkForHero(template, rows, colMap) {
   const key = template && template.primaryMetric;
+  return key ? sparksDaFaixa(template, rows, colMap, [key]) : {};
+}
+
+/** Séries por dia de várias métricas de uma vez (o destaque e os vizinhos). Chave sem série honesta fica de fora. */
+export function sparksDaFaixa(template, rows, colMap, keys) {
+  const saida = {};
+  for (const key of Array.isArray(keys) ? keys : []) {
+    const serie = serieDaMetrica(template, rows, colMap, key);
+    if (serie) saida[key] = serie;
+  }
+  return saida;
+}
+
+function serieDaMetrica(template, rows, colMap, key) {
   const dateSlot = template && template.dateSlot;
-  if (!key || !dateSlot || !Array.isArray(rows) || rows.length < 2) return {};
+  if (!key || !dateSlot || !Array.isArray(rows) || rows.length < 2) return null;
   const def = findMetricDef(template, key);
-  if (!def) return {};
+  if (!def) return null;
   if (def.column) {
-    if (!colMap || !colMap[def.column]) return {};   // coluna nao mapeada
+    if (!colMap || !colMap[def.column]) return null;   // coluna nao mapeada
     const pontos = timeSeries(rows, colMap, dateSlot, def.column, def.agg || 'sum');
-    if (!pontos || pontos.length < 2) return {};
-    return { [key]: pontos.map((p) => p.value) };
+    if (!pontos || pontos.length < 2) return null;
+    return pontos.map((p) => p.value);
   }
   // Derivada (T7): CPA ou ROAS como heroi ficavam sem sparkline e com metade do card vazia.
   // A serie honesta e a MESMA conta feita dia a dia (CPA de cada dia), so quando a gente
   // sabe do que ela depende: ratio (ratioOf) ou derived com dependsOn. Dia sem denominador
   // fica de fora: um zero ali seria dado inventado.
   const deps = def.agg === 'ratio' ? def.ratioOf : (def.agg === 'derived' ? def.dependsOn : null);
-  if (!Array.isArray(deps) || !deps.length) return {};
+  if (!Array.isArray(deps) || !deps.length) return null;
   const metrics = Array.isArray(template.metrics) ? template.metrics : [];
   const col = colMap && colMap[dateSlot];
-  if (!col) return {};
+  if (!col) return null;
   const porDia = new Map();
   for (const r of rows) {
     const iso = parseDateBR(r[col]);
@@ -452,12 +469,12 @@ export function sparkForHero(template, rows, colMap) {
   const serie = [];
   for (const iso of [...porDia.keys()].sort()) {
     const { computed, mapped } = computeAllMapped(metrics, porDia.get(iso), colMap);
-    if (mapped[key] === false) return {};
+    if (mapped[key] === false) return null;
     if (def.agg === 'ratio' && !Number(computed[def.ratioOf[1]])) continue;
     const v = computed[key];
     if (Number.isFinite(v)) serie.push(v);
   }
-  return serie.length >= 2 ? { [key]: serie } : {};
+  return serie.length >= 2 ? serie : null;
 }
 
 // Monta so o corpo de widgets (grid + sections de kpi) a partir de um ctx JA
@@ -484,7 +501,7 @@ function buildBodyHtml(ctx) {
     if (block.type === 'kpis') {
       flush();
       parts.push(`<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.mapped, ctx.trends, ctx.goal,
-        sparkForHero(template, ctx.dataset && ctx.dataset.rows, ctx.colMap))}</section>`);
+        sparksDaFaixa(template, ctx.dataset && ctx.dataset.rows, ctx.colMap, [template.primaryMetric, ...block.items.map((it) => it && it.props && it.props.metricKey)]))}</section>`);
       continue;
     }
     const html = renderSingle(block.item, ctx);

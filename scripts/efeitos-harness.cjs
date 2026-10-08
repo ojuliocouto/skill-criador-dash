@@ -104,6 +104,34 @@ ligarBarraSolida(document.querySelector('.topbar'));
 window.__pronto = true;
 </script></body></html>`;
 
+// Faixa de indicadores de verdade (renderKpiBlock) com destaque largo e minigráficos nos vizinhos (3.7.1).
+const PAGINA_FAIXA = (tema) => `<!doctype html>
+<html lang="pt-BR" data-theme="${tema}" style="--accent:#0F5C6E;--accent-solido:#0F5C6E;--accent-graph:#0F5C6E">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bancada da faixa</title>
+<link rel="stylesheet" href="/assets/css/main.css"><link rel="stylesheet" href="/assets/css/presenca.css"><link rel="stylesheet" href="/assets/css/efeitos.css"><link rel="stylesheet" href="/assets/css/celular.css">
+<style>body{margin:0;padding:16px;background:var(--bg)}</style></head>
+<body><div id="faixa" style="max-width:1240px"></div>
+<script type="module">
+import { renderKpiBlock } from '/assets/js/dashboard.js';
+import { getTemplate } from '/assets/js/templates/index.js';
+import { fotografarDados, transformarDados } from '/assets/js/lib/grafico-transforma.js';
+const tpl = getTemplate('marketing');
+const itens = ['investimento', 'leads', 'CPL', 'conversoes', 'CPA', 'receita', 'ROAS'].map((metricKey) => ({ widget: 'kpi', props: { metricKey } }));
+const computed = { investimento: 12000, leads: 480, CPL: 25, conversoes: 168, CPA: 71, receita: 67000, ROAS: 5.6 };
+const trends = Object.fromEntries(Object.keys(computed).map((k) => [k, { text: '▲ 5,71%', good: true }]));
+const serie = (n, f) => Array.from({ length: n }, (_, i) => 10 + Math.round(8 * Math.sin(i / f) + i % 5));
+window.__desenhar = (modo, f = 2.5, goal = null) => {
+  const alvo = document.getElementById('faixa');
+  const foto = modo === 'filtro' ? fotografarDados(alvo) : null;
+  const sparks = { leads: serie(40, f), investimento: serie(40, f + 1), CPL: serie(40, f + 2), conversoes: serie(40, f + 3), CPA: serie(40, f + 4), receita: serie(40, f + 5) };
+  alvo.classList.toggle('anima-entrada', modo === 'entrada');
+  alvo.innerHTML = renderKpiBlock(itens, tpl, computed, {}, trends, goal, sparks);
+  if (foto) transformarDados(alvo, foto);
+};
+window.__desenhar('quieto');
+window.__pronto = true;
+</script></body></html>`;
+
 function subir(opcoes = {}) {
   const tema = opcoes.tema || 'dark';
   const acento = opcoes.acento || '#1F8A70';
@@ -112,6 +140,7 @@ function subir(opcoes = {}) {
     if (url.pathname === '/bancada.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA(url.searchParams.get('tema') || tema, url.searchParams.get('acento') || acento)); return; }
     if (url.pathname === '/gosto.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA_GOSTO(url.searchParams.get('m') || 'limpo', url.searchParams.get('tema') || 'light')); return; }
     if (url.pathname === '/topo.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA_TOPO(url.searchParams.get('tema') || 'light')); return; }
+    if (url.pathname === '/faixa.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA_FAIXA(url.searchParams.get('tema') || 'light')); return; }
     if (url.pathname === '/celular.html') { res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(PAGINA_CELULAR); return; }
     const arq = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
     if (!arq.startsWith(PUBLIC) || !fs.existsSync(arq) || fs.statSync(arq).isDirectory()) { res.writeHead(404); res.end('nao achei'); return; }

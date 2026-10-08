@@ -10,6 +10,8 @@ Correções do teste de ponta a ponta de 02/10/2026 (achados D1 a D15).
 - Tabela que reordena em todas as tabelas, total fixo no fim.
 - Celular (360 e 390): "Dados linha a linha" vira cartões com "Ordenar por", atalhos de período e abas rolam por dentro com borda esmaecida, alvo de 44 px, abas numa linha.
 - Vídeo: roteiro padrão mostra período, gráfico e tabela que reordena; roteiro oficial `efeitos` (meta batida, Personalizado); ações `digitar` e `cruzar_meta`; erro de roteiro sai também na saída normal.
+- Layout de fábrica sem cartão meio vazio: os cartões vizinhos do destaque ganham minigráfico de tendência com a variação ao lado (se desenha na abertura, se transforma na troca de período, parado com movimento reduzido); faixa em 2 colunas no celular. O medidor do passe de gosto dá 0 nos 5 domínios de template (antes: marketing com meta 2, estoque 1).
+- Barra do topo opaca ao rolar (sem texto fantasma por trás). Meta proporcional acima de 100% diz "acima do ritmo" e não ganha selo nem marco.
 - Passe de gosto medido (`scripts/passe-de-gosto.js`): 10 sinais da lista de tells medidos no navegador; o gate da etapa 6 recusa `depois: 0` com sinal na tela e exige o print olhado nos itens de gosto.
 
 ## 3.7.0

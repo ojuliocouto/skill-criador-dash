@@ -685,6 +685,12 @@ andamento, período, total); em comparação proporcional o percentual aparece s
 período. **Compatibilidade:** config sem `periodo` (painel já publicado) continua comparando com o período filtrado, como sempre; o
 assistente reaberto num painel assim mostra "Como estava" e só muda quando a pessoa escolhe. O servidor recusa `periodo` inválido (400).
 
+**Faixa de indicadores sem cartão meio vazio (3.7.1).** Com o número em destaque largo (tem série no tempo), os cartões vizinhos
+ganham um minigráfico de tendência do período (o mesmo traço fino do destaque, em cor de texto secundária, sem eixo) com a variação
+"vs. início" ao lado; o traço se desenha na abertura e se transforma junto na troca de período, e com movimento reduzido nada anima.
+Indicador sem série no tempo (taxa sem dado diário) fica sem minigráfico, com a altura do conteúdo. No celular a faixa tem 2 colunas;
+se o minigráfico não couber (cartão com menos de 120 px), só ele some. A barra do topo fica opaca assim que a página sai do topo.
+
 Presença (o que faz o painel não parecer modelo pronto; CSS em `public/assets/css/presenca.css`):
 - FUNDO VIVO na cor da marca (`config.accent` e `accent2`): manchas e curvas de gráfico derivando devagar
   atrás do conteúdo, nos dois modos. Cartões seguem sólidos. `config.fundoAnimado: false` deixa parado.
