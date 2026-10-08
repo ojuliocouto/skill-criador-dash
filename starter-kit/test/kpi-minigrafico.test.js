@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { render as renderKpi } from '../public/assets/js/widgets/kpi.js';
 import { renderKpiBlock, sparksDaFaixa, sparkForHero } from '../public/assets/js/dashboard.js';
-import { getTemplate } from '../public/assets/js/templates/index.js';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 const css = readFileSync(join(raiz, 'public/assets/css/main.css'), 'utf8');
@@ -40,7 +39,20 @@ test('o destaque continua igual (sem linha, minigráfico direto)', () => {
   assert.match(h, /kpi__spark/);
 });
 
-const marketing = getTemplate('marketing');
+// Modelo próprio do teste: a biblioteca não depende do layout nem do destaque de fábrica de nenhum domínio.
+const marketing = {
+  id: 'teste', primaryMetric: 'leads', dateSlot: 'data',
+  metrics: [
+    { key: 'investimento', label: 'Investimento', agg: 'sum', column: 'investimento', format: 'currency' },
+    { key: 'leads', label: 'Leads', agg: 'sum', column: 'leads', format: 'integer', betterWhen: 'higher' },
+    { key: 'conversoes', label: 'Conversões', agg: 'sum', column: 'conversoes', format: 'integer', betterWhen: 'higher' },
+    { key: 'receita', label: 'Receita', agg: 'sum', column: 'receita', format: 'currency', betterWhen: 'higher' },
+    { key: 'CPL', label: 'CPL', agg: 'ratio', ratioOf: ['investimento', 'leads'], format: 'currency', betterWhen: 'lower' },
+    { key: 'CPA', label: 'CPA', agg: 'ratio', ratioOf: ['investimento', 'conversoes'], format: 'currency', betterWhen: 'lower' },
+    { key: 'ROAS', label: 'ROAS', agg: 'derived', format: 'number', betterWhen: 'higher', dependsOn: ['receita', 'investimento'], denominator: 'investimento',
+      compute: ({ computed }) => (computed.investimento ? computed.receita / computed.investimento : 0) },
+  ],
+};
 const itens = ['investimento', 'leads', 'CPL', 'conversoes', 'CPA', 'receita', 'ROAS'].map((metricKey) => ({ widget: 'kpi', props: { metricKey } }));
 const computed = { investimento: 1000, leads: 40, CPL: 25, conversoes: 8, CPA: 125, receita: 4000, ROAS: 4 };
 const SPARKS = { leads: SERIE, investimento: SERIE, CPL: SERIE, conversoes: SERIE, CPA: SERIE, receita: SERIE };
