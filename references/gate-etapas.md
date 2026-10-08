@@ -68,8 +68,32 @@ conta; só a publicação (4 e 6) precisa. Sem conta, a etapa 4 registra com `"m
 recusa (não existe publicação falsa) e cada passada imprime `MODO LOCAL ... NÃO publicado`. Sem o campo
 `"modo": "local"`, "Não" em `conta_confirmada` continua bloqueando. A 7 em local exige `publicacao_pendente` também.
 Refazer a etapa 4 sem o campo `modo` (conta de verdade) volta a exigir a 6.
-Para `passe_de_gosto`, use `{"antes": 0, "depois": 0, "inspecao": "Itens efetivamente inspecionados"}`.
-A contagem final precisa ser zero. Para campos sem pendência, escreva `"Nenhuma"`.
+Para `passe_de_gosto` no perfil `paginas`, use `{"antes": 0, "depois": 0, "inspecao": "Itens efetivamente inspecionados"}`.
+A contagem final precisa ser zero.
+
+**`passe_de_gosto` no dashboard (3.7.1): medido, não autodeclarado.** O que a lista de tells permite medir no navegador
+é medido por `passe-de-gosto.js` contra o painel PUBLICADO (10 sinais: fundo tingido, barrinha no topo, gradiente atrás de
+número, ícone por métrica, sombra sem hairline, "Sem dados" solto, caixa alta espaçada, número em mono esticado, card com metade
+vazia, data americana; em cada aba, nos dois temas, no desktop e no celular). O gate lê o arquivo: sinal medido na tela com
+`depois: 0` declarado é recusado, dizendo qual sinal e quantos. O que é gosto não se mede e não finge: cada item vem com o
+print que foi olhado e o que se viu, e o gate recusa contagem zerada sem os itens (e recusa o claro e o escuro com a
+mesma imagem). Formato:
+
+```json
+"passe_de_gosto": {
+  "antes": 2, "depois": 0, "inspecao": "10 sinais medidos nos dois temas e perfis; 3 itens olhados",
+  "medido": "evidencias/passe-de-gosto-medido.json",
+  "itens": {
+    "cor_como_enfeite": {"print": "evidencias/passe-claro-desktop.png", "visto": "cor só em estado bom, ruim e marca"},
+    "olhado_claro": {"print": "evidencias/passe-claro-desktop.png", "visto": "painel inteiro no tema claro, desktop e celular"},
+    "olhado_escuro": {"print": "evidencias/passe-escuro-desktop.png", "visto": "painel inteiro no tema escuro, desktop e celular"}
+  }
+}
+```
+
+Liste em `arquivos` o JSON medido e os PNG dos itens. Os PNG `passe-*.png` não contam como o print da prova de tela.
+O gate confere formato, coerência (o total bate com os sinais, a medição é do painel publicado, cobre os dois temas e os
+dois perfis) e que os prints existem; não prova sozinho que alguém olhou. Para campos sem pendência, escreva `"Nenhuma"`.
 Para trabalho futuro, como métricas após tráfego, registre o plano e a limitação atual.
 Não coloque tokens, senhas ou identificadores de conta em evidências destinadas ao Git.
 
@@ -163,9 +187,14 @@ sozinho que o arquivo veio do comando.
 ```json
 {
   "prova_publicada": "https://<NOME-DO-PROJETO>.pages.dev/dashboard.html?id=<ID>",
-  "passe_de_gosto": {"antes": 4, "depois": 0, "inspecao": "tells de painel da Fase 3, nos dois temas"},
+  "passe_de_gosto": {"antes": 4, "depois": 0, "inspecao": "tells da Fase 3 medidos e olhados, nos dois temas",
+                     "medido": "evidencias/passe-de-gosto-medido.json",
+                     "itens": {"cor_como_enfeite": {"print": "evidencias/passe-claro-desktop.png", "visto": "cor só em estado e marca"},
+                               "olhado_claro": {"print": "evidencias/passe-claro-desktop.png", "visto": "painel inteiro no claro"},
+                               "olhado_escuro": {"print": "evidencias/passe-escuro-desktop.png", "visto": "painel inteiro no escuro"}}},
   "pendencias": "Nenhuma",
-  "arquivos": ["prova/dash-desktop.png", "prova/dash-mobile.png", "prova/video-desktop.webm", "prova/video-mobile.webm", "prova/prancha-desktop.png", "prova/prancha-mobile.png"]
+  "arquivos": ["prova/dash-desktop.png", "prova/dash-mobile.png", "prova/video-desktop.webm", "prova/video-mobile.webm", "prova/prancha-desktop.png", "prova/prancha-mobile.png",
+               "evidencias/passe-de-gosto-medido.json", "evidencias/passe-claro-desktop.png", "evidencias/passe-escuro-desktop.png"]
 }
 ```
 

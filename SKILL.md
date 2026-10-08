@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.7.0
+version: 3.7.1
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -470,7 +470,15 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
   na conta da pessoa, a entrega não está pronta (e o gate da etapa 4 já barra "Não" em
   `conta_confirmada`).
 - Modo histórico: deploy do Worker cron e força uma primeira captura (`references/infra.md`).
-- **PASSE DE GOSTO (antes de dizer pronto).** Rode o pré-voo anti-slop de novo sobre o painel
+- **PASSE DE GOSTO (antes de dizer pronto), medido.** Rode, contra o painel PUBLICADO:
+```
+node <dir-da-skill>/scripts/passe-de-gosto.js "<URL-DO-DASHBOARD>" --out evidencias [--senha <SENHA>]
+```
+  Ele mede no navegador os 10 sinais da lista abaixo que dá para medir (cada aba, claro e escuro, desktop e celular), grava
+  `evidencias/passe-de-gosto-medido.json` e os prints `passe-<tema>-<perfil>.png`, e sai com 1 se mediu algum. O gate da
+  etapa 6 lê o arquivo: declarar `depois: 0` com sinal medido na tela é recusado. O que é gosto (cor como enfeite, o painel
+  inteiro olhado em cada tema) o script não finge medir: olhe os prints e registre cada item com o print e o que viu
+  (`references/gate-etapas.md`). Depois rode o pré-voo anti-slop de novo sobre o painel
   publicado, nos DOIS temas: a lista de tells de painel em `references/direcao-de-arte.md`, Fase 3
   (card tingido, barrinha colorida no topo do widget, gradiente atrás de número, ícone colorido
   por métrica, sombra difusa sem hairline, "Sem dados" como único estado vazio, rótulo em caixa
@@ -661,12 +669,21 @@ no DOM:
 3. **Período em um clique** (`periodo-atalhos.js`): Hoje, 7 dias, 30 dias, Este mês, Tudo e Personalizado, com a pílula deslizando ao escolhido.
 4. **Números de roleta** (`numero-roleta.js`): só o dígito que mudou rola, numa janela de uma linha por casa; separadores ficam parados.
 5. **Gráfico que se transforma** (`grafico-transforma.js`): a linha vai do desenho antigo ao novo e as barras de meta, ranking e funil crescem ou encolhem.
-6. **Meta batida** (`meta-batida.js`): uma vez por cruzamento de 100%, em cerca de 1,9 s, o cartão acende na cor da marca, uma faixa de luz o atravessa, um clarão corre pela barra, o número pulsa e o selo "Meta batida" entra. Não repete a cada redesenho.
-7. **Tabela que reordena** (`tabela-ordena.js`): clique no cabeçalho ordena (crescente, decrescente, original) e as linhas deslizam; a ordem escolhida sobrevive a filtro, troca de período e Atualizar até novo clique ou troca de aba.
+6. **Meta batida** (`meta-batida.js`; a meta tem período, ver abaixo): uma vez por cruzamento de 100%, em cerca de 1,9 s, o cartão acende na cor da marca, uma faixa de luz o atravessa, um clarão corre pela barra, o número pulsa e o selo "Meta batida" entra. Não repete a cada redesenho.
+7. **Tabela que reordena** (`tabela-ordena.js`): vale para TODAS as tabelas do painel (por canal, por semana, dados linha a linha). Clique no cabeçalho ordena (crescente, decrescente, original) e as linhas deslizam; a linha de total das tabelas por canal e por semana fica fixa no fim e não entra na ordenação; a ordem escolhida sobrevive a filtro, troca de período e Atualizar até novo clique ou troca de aba. No celular as tabelas viram um cartão por linha (nunca uma tabela virada de lado) e a ordem se escolhe no seletor "Ordenar por".
 Faixa de duração deles: nenhum passa de 2,4 s e a troca de período inteira termina em até 1,0 s
 (`test/efeitos-duracao.test.js`). Os tetos de 120 a 700 ms seguem valendo para o resto do painel.
 A medida no navegador (pixels do cartão na meta batida, dígitos por casa na roleta, ordem da tabela)
 está em `node <dir-da-skill>/scripts/test-efeitos-no-navegador.cjs`.
+
+**A meta tem período (3.7.1).** `config.goal = { metricKey, value, periodo }`, com `periodo` em `mensal` (padrão no assistente),
+`semanal`, `periodo` (vale para o período escolhido, qualquer tamanho) ou `total`. Com meta mensal, o painel compara com a meta de
+cada mês do período na tela e escreve contra o quê: "96% da meta de 3 meses" (período que começa no dia 1: cada mês tocado vale a
+meta inteira), "84% da meta do mês" (mês em andamento) ou "da meta proporcional (91 em 7 dias)" (período que não começa no dia 1: a
+meta é rateada pelos dias de cada mês). O selo e o marco "Meta batida" só valem em comparação justa (meses ou semanas inteiros, mês em
+andamento, período, total); em comparação proporcional o percentual aparece sem o selo. Meta de custo (CPA, CPL) não escala com o
+período. **Compatibilidade:** config sem `periodo` (painel já publicado) continua comparando com o período filtrado, como sempre; o
+assistente reaberto num painel assim mostra "Como estava" e só muda quando a pessoa escolhe. O servidor recusa `periodo` inválido (400).
 
 Presença (o que faz o painel não parecer modelo pronto; CSS em `public/assets/css/presenca.css`):
 - FUNDO VIVO na cor da marca (`config.accent` e `accent2`): manchas e curvas de gráfico derivando devagar

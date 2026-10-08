@@ -168,6 +168,10 @@ Repo layout: `SKILL.md` (the agent playbook), `references/` (infra commands, sec
 extension guides, loaded on demand), `scripts/preflight.py` (environment + wrangler.toml checks before
 deploy), and `starter-kit/` (the deployable code library).
 
+## What changed in 3.7.1
+
+Fixes from an end-to-end run: build and prove a dash locally before having a Cloudflare account (`"modo": "local"` on step 4); a goal now has a period (`goal.periodo`: monthly by default); the assistant preview loads the effects stylesheet; Portuguese synonyms for column auto-mapping (weak matches ask for confirmation); every shown number can be hidden; sortable tables everywhere (the total row stays last); phone layout (cards plus "Ordenar por", 44 px targets, scrolling controls with a fading edge); a second official video script (`--roteiro efeitos`); and a measured taste pass (`scripts/passe-de-gosto.js`) that the step 6 gate reads. Details in `CHANGELOG.md`.
+
 ## Quick start
 
 See "Quickstart: from clone to your first dashboard" near the top of this file for the full numbered
@@ -355,6 +359,9 @@ node <skill-dir>/scripts/test-resolver-playwright.cjs
 node <skill-dir>/scripts/test-roteiro-de-video.cjs
 node <skill-dir>/scripts/test-gravar-video-integracao.cjs
 node <skill-dir>/scripts/test-efeitos-no-navegador.cjs
+node <skill-dir>/scripts/test-celular-no-navegador.cjs
+node <skill-dir>/scripts/test-passe-de-gosto-no-navegador.cjs
+node <skill-dir>/scripts/py.mjs test-lancador.py
 node <skill-dir>/scripts/py.mjs test-skill-md.py
 node <skill-dir>/scripts/py.mjs test-biblioteca-independe-do-layout.py
 node <skill-dir>/scripts/py.mjs test-preflight.py

@@ -95,7 +95,8 @@ disso mascara layout ruim.
 **O pré-voo anti-slop é esta lista**, e ela roda duas vezes: sobre o plano da `frontend-design`
 (antes de montar) e sobre o painel publicado, nos dois temas (antes de entregar). Conte os tells
 encontrados antes e depois; a contagem final precisa ser zero e vai no `passe_de_gosto` da etapa 6.
-Os tells de painel:
+Os tells de painel (dez deles o `scripts/passe-de-gosto.js` mede no navegador e o gate da etapa 6 confere; a cor como
+enfeite e o olho sobre a tela inteira ficam para quem olha, com o print registrado):
 
 - card com fundo tingido de accent, ou barrinha colorida no topo de cada widget
 - gradiente decorativo atrás de número

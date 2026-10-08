@@ -96,6 +96,72 @@ def modo_local(doc):
     return isinstance(doc, dict) and doc.get("modo") == "local"
 
 
+SINAIS_MEDIDOS = ("tinta_de_accent", "barrinha_no_topo", "gradiente_atras_de_numero", "icone_por_metrica", "sombra_sem_hairline",
+                  "sem_dados_sem_motivo", "caixa_alta_espacada", "numero_em_mono_esticado", "card_com_metade_vazia", "data_formato_americano")
+ITENS_DE_GOSTO = ("cor_como_enfeite", "olhado_claro", "olhado_escuro")
+
+
+def _sem_query(url):
+    return re.sub(r"[?#].*$", "", str(url)).rstrip("/")
+
+
+def conferir_passe_de_gosto(projeto, doc):
+    """D13: o passe de gosto da etapa 6 deixou de ser autodeclarado.
+
+    1. O que dá para MEDIR (10 sinais da lista de tells) vem do arquivo que `scripts/passe-de-gosto.js` grava, rodado contra
+       o painel PUBLICADO, nos dois temas e nos dois perfis. O gate lê o arquivo: sinal medido na tela com `depois: 0`
+       declarado é recusado, e a mensagem diz qual sinal e quantos.
+    2. O que é gosto (cor como enfeite, o painel inteiro olhado em cada tema) não se mede: o registro traz cada item com o
+       print que foi olhado e o que se viu. O gate confere que o print existe, está nas evidências e que o claro e o
+       escuro são imagens diferentes. Não prova que o olho olhou; prova que não dá para declarar zero sem os itens."""
+    passe = doc.get("passe_de_gosto")
+    arquivos = [str(a) for a in doc.get("arquivos", [])] if isinstance(doc.get("arquivos"), list) else []
+    norm = lambda a: str(Path(a))  # noqa: E731
+    medido_rel = passe.get("medido") if isinstance(passe, dict) else None
+    if not medido_rel or norm(medido_rel) not in [norm(a) for a in arquivos]:
+        raise ValueError("Etapa 6: o passe de gosto precisa do arquivo medido (`medido`, também em arquivos). Rode: "
+                         f"{lancador.comando('passe-de-gosto.js', chr(34) + '<URL-DO-DASHBOARD>' + chr(34), '--out', 'evidencias')}")
+    try:
+        medido = json.loads((projeto / medido_rel).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise ValueError(f"Etapa 6: não consegui ler {medido_rel} como JSON ({e}).")
+    if not isinstance(medido, dict) or medido.get("versao") != 1 or not isinstance(medido.get("sinais"), dict):
+        raise ValueError(f"Etapa 6: {medido_rel} não é a saída do passe-de-gosto.js (versão 1, com os sinais).")
+    faltam = [k for k in SINAIS_MEDIDOS if not isinstance(medido["sinais"].get(k), dict) or type(medido["sinais"][k].get("achados")) is not int]
+    if faltam:
+        raise ValueError(f"Etapa 6: a medição do passe de gosto não cobre estes sinais da lista: {', '.join(faltam)}. Rode o passe-de-gosto.js de novo.")
+    soma = sum(medido["sinais"][k]["achados"] for k in SINAIS_MEDIDOS)
+    if medido.get("total") != soma:
+        raise ValueError(f"Etapa 6: o total de {medido_rel} ({medido.get('total')}) não bate com a soma dos sinais ({soma}). O arquivo foi editado; rode o passe-de-gosto.js de novo.")
+    prova = re.search(r"https?://\S+", str(doc.get("prova_publicada", "")))
+    if prova and _sem_query(medido.get("url", "")) != _sem_query(prova.group(0)):
+        raise ValueError(f"Etapa 6: a medição é de outro painel ({medido.get('url')}), não do publicado ({_sem_query(prova.group(0))}).")
+    passes = medido.get("passes") if isinstance(medido.get("passes"), list) else []
+    temas = {x.get("tema") for x in passes if isinstance(x, dict)}
+    perfis = {x.get("perfil") for x in passes if isinstance(x, dict)}
+    for obrigatorio, achados in (("claro", temas), ("escuro", temas), ("desktop", perfis), ("mobile", perfis)):
+        if obrigatorio not in achados:
+            raise ValueError(f"Etapa 6: a medição do passe de gosto não cobre o tema/perfil {obrigatorio}. Rode o passe-de-gosto.js completo.")
+    achou = [(k, medido["sinais"][k]["achados"]) for k in SINAIS_MEDIDOS if medido["sinais"][k]["achados"] > 0]
+    if achou:
+        lista = "; ".join(f"{k} ({n})" for k, n in achou)
+        raise ValueError(f"Etapa 6: o passe de gosto MEDIU {soma} sinal(is) da lista de tells na tela: {lista}. "
+                         "Corrija o painel e rode o passe-de-gosto.js de novo; `depois: 0` não se declara com isso na tela.")
+    itens = passe.get("itens") if isinstance(passe.get("itens"), dict) else {}
+    vistos = {}
+    for chave in ITENS_DE_GOSTO:
+        item = itens.get(chave)
+        if not isinstance(item, dict) or not str(item.get("visto", "")).strip() or not str(item.get("print", "")).strip():
+            raise ValueError(f"Etapa 6: passe_de_gosto.itens.{chave} precisa de `print` (a imagem olhada) e `visto` (o que se viu). "
+                             "Item de gosto não se mede: declarar zero sem olhar não passa.")
+        alvo = (projeto / item["print"]).resolve()
+        if not alvo.is_file() or alvo.stat().st_size == 0 or not alvo.is_relative_to(projeto) or norm(item["print"]) not in [norm(a) for a in arquivos]:
+            raise ValueError(f"Etapa 6: o print de passe_de_gosto.itens.{chave} ({item['print']}) não existe ou não está em arquivos.")
+        vistos[chave] = hashlib.sha256(alvo.read_bytes()).hexdigest()
+    if vistos["olhado_claro"] == vistos["olhado_escuro"]:
+        raise ValueError("Etapa 6: o print do tema claro e o do escuro são a mesma imagem. Olhe os dois temas (o passe-de-gosto.js grava passe-claro-desktop.png e passe-escuro-desktop.png).")
+
+
 def validar_dash(etapa, doc, local=False, projeto=None):
     """T12 (teste com aluno, 02/10/2026): "Não" passava como prova porque o gate só via campo
     preenchido. Conta não confirmada não fecha a etapa 4; painel não publicado não fecha a 6.
@@ -127,7 +193,8 @@ def validar_dash(etapa, doc, local=False, projeto=None):
             raise ValueError("Etapa 6: prova_publicada precisa ter a URL https:// do dashboard publicado. "
                              "\"Não publicada\" ou endereço local não fecham a entrega.")
         arquivos = doc.get("arquivos") if isinstance(doc.get("arquivos"), list) else []
-        if not any(str(a).lower().endswith(".png") for a in arquivos):
+        # Os PNG do passe de gosto (passe-<tema>-<perfil>.png) não substituem o print da prova de tela.
+        if not any(str(a).lower().endswith(".png") and not Path(str(a)).name.lower().startswith("passe-") for a in arquivos):
             raise ValueError("Etapa 6: liste em arquivos o PNG do prova-dash.js rodado contra a URL publicada "
                              "(ex: prova/dash-desktop.png).")
         # 3.6.0: o movimento não se julga em imagem parada. A entrega traz o vídeo de prova do desktop e do
@@ -138,6 +205,8 @@ def validar_dash(etapa, doc, local=False, projeto=None):
                 raise ValueError(f"Etapa 6: falta o vídeo de prova do {perfil}. Grave com: "
                                  f"{lancador.comando('gravar-video.js', chr(34) + '<URL-DO-DASHBOARD>' + chr(34), '--saida', 'prova')} "
                                  f"(gera prova/video-desktop.webm e prova/video-mobile.webm), e liste os dois em arquivos.")
+        if projeto is not None:
+            conferir_passe_de_gosto(projeto, doc)
 
 
 def validar(projeto, arquivo, etapa, campos, perfil, local=False):

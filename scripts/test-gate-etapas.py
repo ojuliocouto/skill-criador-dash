@@ -48,6 +48,31 @@ WHOAMI = (' ⛅️ wrangler 4.1.0\n\nGetting User settings...\n👋 You are logg
           '├──────────────────┼──────────────────────────────────┤\n│ Conta da Ana     │ 0123456789abcdef0123456789abcdef │\n└──────────────────┴──────────────────────────────────┘\n')
 TOML = 'name = "clinica-lume"\npages_build_output_dir = "public"\n[[kv_namespaces]]\nbinding = "DASHBOARDS_KV"\nid = "0123456789abcdef0123456789abcdef"\n'
 
+SINAIS_MEDIDOS = ['tinta_de_accent', 'barrinha_no_topo', 'gradiente_atras_de_numero', 'icone_por_metrica', 'sombra_sem_hairline',
+                  'sem_dados_sem_motivo', 'caixa_alta_espacada', 'numero_em_mono_esticado', 'card_com_metade_vazia', 'data_formato_americano']
+URL_PUBLICADA = 'https://meu-dash.pages.dev/dashboard.html?id=x'
+
+
+def medido_json(achados=None, url='https://meu-dash.pages.dev/dashboard.html'):
+    achados = achados or {}
+    sinais = {k: {'achados': int(achados.get(k, 0)), 'onde': []} for k in SINAIS_MEDIDOS}
+    passes = [{'perfil': p, 'tema': tm, 'aba': 'Visão geral', 'achados': {}} for p in ('desktop', 'mobile') for tm in ('claro', 'escuro')]
+    return {'versao': 1, 'url': url, 'medidoEm': '2026-10-08T12:00:00Z', 'sinais': sinais, 'nao_medidos': ['cor_como_enfeite', 'olhado_claro', 'olhado_escuro'],
+            'passes': passes, 'total': sum(s['achados'] for s in sinais.values())}
+
+
+def gravar_passe(pasta, achados=None, url='https://meu-dash.pages.dev/dashboard.html'):
+    """Escreve os arquivos que o passe de gosto medido deixa e devolve (passe_de_gosto, arquivos)."""
+    (pasta / 'passe-de-gosto-medido.json').write_text(json.dumps(medido_json(achados, url)), encoding='utf-8')
+    (pasta / 'passe-claro-desktop.png').write_bytes(b'\x89PNG claro desktop')
+    (pasta / 'passe-escuro-desktop.png').write_bytes(b'\x89PNG escuro desktop')
+    passe = {'antes': 3, 'depois': 0, 'inspecao': 'tells da Fase 3, medidos e olhados', 'medido': 'passe-de-gosto-medido.json',
+             'itens': {'cor_como_enfeite': {'print': 'passe-claro-desktop.png', 'visto': 'cor só em estado bom, ruim e marca'},
+                       'olhado_claro': {'print': 'passe-claro-desktop.png', 'visto': 'painel inteiro no tema claro'},
+                       'olhado_escuro': {'print': 'passe-escuro-desktop.png', 'visto': 'painel inteiro no tema escuro'}}}
+    arquivos = ['dash-desktop.png', 'video-desktop.webm', 'video-mobile.webm', 'passe-de-gosto-medido.json', 'passe-claro-desktop.png', 'passe-escuro-desktop.png']
+    return passe, arquivos
+
 
 class EtapasDash(unittest.TestCase):
     """T12 (teste com aluno, 02/10/2026): "Não" passava como prova nas etapas 4 e 6."""
@@ -92,18 +117,23 @@ class EtapasDash(unittest.TestCase):
             with self.subTest(valor=valor):
                 self.assertEqual(self.registrar('4', {**self.DOCS['4'], 'conta_confirmada': valor}), 1)
 
-    def etapa6(self, prova, arquivos):
+    def etapa6(self, prova, arquivos, passe=None, achados=None):
         self.ate('6')
         self.assertEqual(self.registrar('5', self.DOCS['5']), 0)
+        if passe is None:  # com `passe` dado, os arquivos já foram gravados (e possivelmente adulterados) por quem chamou
+            passe, extras = gravar_passe(self.pasta, achados)
+        else:
+            extras = ['passe-de-gosto-medido.json', 'passe-claro-desktop.png', 'passe-escuro-desktop.png']
+        arquivos = list(arquivos) + [e for e in extras if e.startswith('passe-')]
         doc = {'prova_publicada': prova, 'pendencias': 'Nenhuma', 'arquivos': arquivos,
-               'passe_de_gosto': {'antes': 3, 'depois': 0, 'inspecao': 'tells da Fase 3'}}
+               'passe_de_gosto': passe}
         arq = self.pasta / 'etapa-6.json'
         arq.write_text(json.dumps(doc), encoding='utf-8')
         r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta),
                             'registrar', '6', '--arquivo', arq.name], capture_output=True, text=True, encoding='utf-8', errors='replace')
         return r.returncode
 
-    URL = 'https://meu-dash.pages.dev/dashboard.html?id=x'
+    URL = URL_PUBLICADA
     VIDEOS = ['video-desktop.webm', 'video-mobile.webm']
 
     def test_etapa_6_nao_aceita_nao_publicada(self):
@@ -142,6 +172,111 @@ class EtapasDash(unittest.TestCase):
         r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta),
                             'registrar', '6', '--arquivo', 'etapa-6.json'], capture_output=True, text=True, encoding='utf-8', errors='replace')
         self.assertIn('gravar-video.js', r.stdout)
+
+
+class PasseDeGostoMedido(unittest.TestCase):
+    """D13 (teste de ponta a ponta, 02/10/2026): o passe de gosto era autodeclarado. Agora o que dá para medir é medido
+    (scripts/passe-de-gosto.js) e o gate confere o arquivo; o que é gosto exige o print olhado, item por item."""
+
+    BASE = ['dash-desktop.png', 'video-desktop.webm', 'video-mobile.webm']
+    DOCS = EtapasDash.DOCS
+    URL = URL_PUBLICADA
+    setUp = EtapasDash.setUp
+    registrar = EtapasDash.registrar
+    ate = EtapasDash.ate
+    etapa6 = EtapasDash.etapa6
+
+    def com(self, mexe):
+        passe, _ = gravar_passe(self.pasta)
+        mexe(passe)
+        return self.etapa6(self.URL, self.BASE, passe=passe)
+
+    def test_positivo_com_medicao_zerada_e_itens_com_print(self):
+        self.assertEqual(self.etapa6(self.URL, self.BASE), 0)
+
+    def test_mutante_depois_zero_declarado_com_sinal_medido_na_tela_barra(self):
+        # O caso real: {"antes":0,"depois":0} com um card meio vazio na tela.
+        self.assertEqual(self.etapa6(self.URL, self.BASE, achados={'card_com_metade_vazia': 2}), 1)
+
+    def test_a_mensagem_diz_o_sinal_e_a_quantidade(self):
+        self.ate('6'); self.registrar('5', self.DOCS['5'])
+        passe, extras = gravar_passe(self.pasta, {'caixa_alta_espacada': 3})
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + [e for e in extras if e.startswith('passe-')]}
+        (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('caixa_alta_espacada', r.stdout)
+        self.assertIn('3', r.stdout)
+
+    def test_contagem_zerada_sem_o_arquivo_medido_barra(self):
+        self.assertEqual(self.com(lambda p: p.pop('medido')), 1)
+
+    def test_contagem_zerada_sem_os_itens_de_gosto_barra(self):
+        self.assertEqual(self.com(lambda p: p.pop('itens')), 1)
+        for item in ('cor_como_enfeite', 'olhado_claro', 'olhado_escuro'):
+            with self.subTest(item=item):
+                self.assertEqual(self.com(lambda p: p['itens'].pop(item)), 1)
+
+    def test_item_sem_o_que_foi_visto_barra(self):
+        self.assertEqual(self.com(lambda p: p['itens']['cor_como_enfeite'].update(visto='')), 1)
+
+    def test_item_com_print_que_nao_existe_barra(self):
+        self.assertEqual(self.com(lambda p: p['itens']['olhado_escuro'].update(print='nao-existe.png')), 1)
+
+    def test_claro_e_escuro_com_o_mesmo_print_barra(self):
+        # Não dá para ter olhado os dois temas com uma imagem só.
+        self.assertEqual(self.com(lambda p: p['itens']['olhado_escuro'].update(print='passe-claro-desktop.png')), 1)
+
+    def test_medicao_de_outro_painel_barra(self):
+        self.ate('6'); self.registrar('5', self.DOCS['5'])
+        passe, extras = gravar_passe(self.pasta, url='https://outro-painel.pages.dev/dashboard.html')
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + [e for e in extras if e.startswith('passe-')]}
+        (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('outro painel', r.stdout)
+
+    def test_medicao_que_nao_cobre_os_dois_temas_e_os_dois_perfis_barra(self):
+        self.ate('6'); self.registrar('5', self.DOCS['5'])
+        passe, extras = gravar_passe(self.pasta)
+        m = json.loads((self.pasta / 'passe-de-gosto-medido.json').read_text(encoding='utf-8'))
+        m['passes'] = [x for x in m['passes'] if x['tema'] == 'claro']
+        (self.pasta / 'passe-de-gosto-medido.json').write_text(json.dumps(m), encoding='utf-8')
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe, 'arquivos': self.BASE + [e for e in extras if e.startswith('passe-')]}
+        (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('escuro', r.stdout)
+
+    def test_medicao_com_total_que_nao_bate_com_os_sinais_barra(self):
+        def forja(p):
+            m = json.loads((self.pasta / 'passe-de-gosto-medido.json').read_text(encoding='utf-8'))
+            m['sinais']['card_com_metade_vazia']['achados'] = 4  # total continua 0
+            (self.pasta / 'passe-de-gosto-medido.json').write_text(json.dumps(m), encoding='utf-8')
+        self.assertEqual(self.com(forja), 1)
+
+    def test_medicao_sem_um_dos_sinais_da_lista_barra(self):
+        def tira(p):
+            m = json.loads((self.pasta / 'passe-de-gosto-medido.json').read_text(encoding='utf-8'))
+            del m['sinais']['icone_por_metrica']
+            (self.pasta / 'passe-de-gosto-medido.json').write_text(json.dumps(m), encoding='utf-8')
+        self.assertEqual(self.com(tira), 1)
+
+    def test_depois_diferente_de_zero_continua_barrando(self):
+        self.assertEqual(self.com(lambda p: p.update(depois=1)), 1)
+
+    def test_o_arquivo_medido_precisa_estar_em_arquivos(self):
+        passe, _ = gravar_passe(self.pasta)
+        self.ate('6'); self.registrar('5', self.DOCS['5'])
+        doc = {'prova_publicada': self.URL, 'pendencias': 'Nenhuma', 'passe_de_gosto': passe,
+               'arquivos': self.BASE + ['passe-claro-desktop.png', 'passe-escuro-desktop.png']}  # falta o json
+        (self.pasta / 'etapa-6.json').write_text(json.dumps(doc), encoding='utf-8')
+        r = subprocess.run([sys.executable, str(SCRIPT), '--perfil', 'dash', '--projeto', str(self.pasta), 'registrar', '6', '--arquivo', 'etapa-6.json'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+        self.assertEqual(r.returncode, 1)
 
 
 class Etapa4ConfereDeVerdade(unittest.TestCase):

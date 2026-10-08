@@ -68,6 +68,8 @@ def comandos_do_roteiro(projeto="~/meu-dash"):
         ("Passo 5: prova parcial (local ou publicado)", comando("prova-dash.js", '"<URL>"', "--out", "prova-parcial")),
         ("Passo 6: prova de tela publicada", comando("prova-dash.js", '"<URL>"')),
         ("Passo 6: vídeo de prova", comando("gravar-video.js", '"<URL>"', "--saida", "prova")),
+        ("Passo 6: vídeo dos efeitos (meta batida, Personalizado)", comando("gravar-video.js", '"<URL>"', "--saida", "prova-efeitos", "--roteiro", "efeitos")),
+        ("Passo 6: passe de gosto medido", comando("passe-de-gosto.js", '"<URL>"', "--out", "evidencias")),
         ("Passo 6.1: gate de uso", comando("uso-ferramentas.py", "--projeto", proj, "checar")),
     ]
 

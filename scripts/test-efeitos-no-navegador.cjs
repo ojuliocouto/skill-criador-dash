@@ -147,7 +147,7 @@ async function main() {
     ];
     const FILTRADAS = [LINHAS[3], LINHAS[0], LINHAS[1], LINHAS[4]]; // outro período: outra seleção, outra ordem
     const colunaLeads = (pagina) => pagina.evaluate(() => [...document.querySelectorAll('.table__el tbody tr')].map((tr) => tr.cells[1].textContent));
-    const pintar = (pagina, linhas) => pagina.evaluate((linhas) => { document.getElementById('grade').innerHTML = window.__efeitos.renderTabela({ title: 'Canais' }, { columns: ['Canal', 'Leads', 'Receita'], rows: linhas }); }, linhas);
+    const pintar = (pagina, linhas) => pagina.evaluate((linhas) => { document.getElementById('grade').innerHTML = '<div style="grid-column:1/-1">' + window.__efeitos.renderTabela({ title: 'Canais' }, { columns: ['Canal', 'Leads', 'Receita'], rows: linhas }) + '</div>'; }, linhas); // largura de computador: a tabela só vira cartão em cartão estreito (D12)
     const montarTabela = async (pagina) => {
       await pagina.evaluate(() => { window.__aba = 'canais'; window.__efeitos.ligarTabelaOrdena(document.getElementById('grade'), { aba: () => window.__aba }); });
       await pintar(pagina, LINHAS);

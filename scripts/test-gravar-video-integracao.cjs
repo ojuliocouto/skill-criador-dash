@@ -98,7 +98,7 @@ const roteiro = {
   const ruim = path.join(raiz, 'ruim.json');
   fs.writeFileSync(ruim, JSON.stringify({ passos: [{ acao: 'clicar', seletor: 'a' }] }), 'utf8');
   const r2 = await rodar([GRAVADOR, url, '--saida', path.join(raiz, 'saida2'), '--roteiro', ruim], 30000);
-  checa('roteiro inválido é recusado com código 2', r2.status === 2 && /Roteiro inválido/.test(r2.stderr), `código ${r2.status}`);
+  checa('roteiro inválido é recusado com código 2', r2.status === 2 && /Roteiro inválido/.test(r2.stdout), `código ${r2.status}`);
 
   servidor.close();
   console.log(`\nPasta de saída do teste: ${saida}`);
