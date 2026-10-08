@@ -11,12 +11,32 @@ import { listDashboards, saveDashboard, setAdminToken } from './lib/api-client.j
 
 /**
  * Dashboards que PODEM entrar num grupo: exclui outros grupos (nao se aninha) e
- * protegidos por senha (nao embutem e a listagem nem expoe o nome deles).
+ * protegidos por senha (a listagem publica nao mostra o nome deles, so o id; para colocar um
+ * protegido numa aba, use a API com o id que o POST devolveu: references/recursos.md).
  * @param {Array<{id:string, kind?:string, protected?:boolean}>} dashboards
  * @returns {Array}
  */
 export function eligibleForGroup(dashboards) {
   return (dashboards || []).filter((d) => d && d.id && d.kind !== 'group' && !d.protected);
+}
+
+/**
+ * Rotulo padrao de cada aba: o dominio (Marketing, Vendas, Suporte) descreve a AREA melhor que o nome
+ * completo, mas so serve quando e unico entre os dashboards. Dois paineis do mesmo dominio (o caso comum:
+ * o Marketing da loja e o Marketing da clinica) dariam duas abas com o mesmo nome; ai vale o nome do painel.
+ * @param {Array<{id:string, name?:string, domain?:string}>} dashboards
+ * @returns {Record<string,string>} id -> rotulo
+ */
+export function rotulosPadrao(dashboards) {
+  const lista = (dashboards || []).filter((d) => d && d.id);
+  const quantos = {};
+  for (const d of lista) if (d.domain) quantos[d.domain] = (quantos[d.domain] || 0) + 1;
+  const rotulos = {};
+  for (const d of lista) {
+    if (d.domain && quantos[d.domain] === 1) rotulos[d.id] = d.domain.charAt(0).toUpperCase() + d.domain.slice(1);
+    else rotulos[d.id] = d.name || d.id;
+  }
+  return rotulos;
 }
 
 /**
@@ -67,12 +87,6 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-// Rotulo default de uma aba: prefere o dominio capitalizado (Marketing/Vendas/
-// Suporte), que descreve a AREA melhor que o nome completo do dashboard.
-function defaultLabel(d) {
-  if (d && d.domain) return d.domain.charAt(0).toUpperCase() + d.domain.slice(1);
-  return (d && d.name) || (d && d.id) || '';
-}
 
 // Prompt de admin token (mesmo contrato do config-wizard): mostra um campo, guarda
 // o token e re-tenta a MESMA operacao.
@@ -108,9 +122,10 @@ function renderForm(app, cands) {
 
   // Uma linha por dashboard candidato: checkbox + nome + badge de dominio + input
   // de rotulo da aba (habilita quando marcado).
+  const rotulos = rotulosPadrao(cands);
   const rows = cands.map((d) => {
     const check = el('input', { type: 'checkbox', 'data-id': d.id });
-    const label = el('input', { class: 'input', type: 'text', value: defaultLabel(d), 'data-label-for': d.id, disabled: 'disabled' });
+    const label = el('input', { class: 'input', type: 'text', value: rotulos[d.id], 'data-label-for': d.id, disabled: 'disabled' });
     label.style.maxWidth = '200px';
     check.addEventListener('change', () => { label.disabled = !check.checked; });
     return el('div', { class: 'list-item', style: 'padding:12px 0;border-bottom:1px solid var(--border);gap:12px' }, [
@@ -137,7 +152,7 @@ function renderForm(app, cands) {
       const check = app.querySelector(`input[type=checkbox][data-id="${CSS.escape(d.id)}"]`);
       if (check && check.checked) {
         const lbl = app.querySelector(`input[data-label-for="${CSS.escape(d.id)}"]`);
-        tabs.push({ id: d.id, label: (lbl && lbl.value) || defaultLabel(d) });
+        tabs.push({ id: d.id, label: (lbl && lbl.value) || rotulos[d.id] });
       }
     }
     return tabs;
