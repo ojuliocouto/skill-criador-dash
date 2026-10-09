@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.7.2
+version: 3.7.3
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -472,11 +472,13 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
 - Modo histórico: deploy do Worker cron e força uma primeira captura (`references/infra.md`).
 - **PASSE DE GOSTO (antes de dizer pronto), medido.** Rode, contra o painel PUBLICADO:
 ```
-node <dir-da-skill>/scripts/passe-de-gosto.js "<URL-DO-DASHBOARD>" --out evidencias [--senha <SENHA>]
+node <dir-da-skill>/scripts/passe-de-gosto.js "<URL-DO-DASHBOARD>" --out evidencias [--senha <SENHA>] [--espera-ms 45000]
 ```
   Ele mede no navegador os 10 sinais da lista abaixo que dá para medir (cada aba, claro e escuro, desktop e celular), grava
   `evidencias/passe-de-gosto-medido.json` e os prints `passe-<tema>-<perfil>.png`, e sai com 1 se mediu algum. O gate da
-  etapa 6 lê o arquivo: declarar `depois: 0` com sinal medido na tela é recusado. O que é gosto (cor como enfeite, o painel
+  etapa 6 lê o arquivo: declarar `depois: 0` com sinal medido na tela é recusado. Ele só começa a medir depois que um número de
+  verdade (um dígito visível, fora do esqueleto de carregamento) aparece; sem número em 45 s (`--espera-ms`) reprova com a causa
+  em vez de medir o esqueleto e dar verde (3.7.3). O que é gosto (cor como enfeite, o painel
   inteiro olhado em cada tema) o script não finge medir: olhe os prints e registre cada item com o print e o que viu
   (`references/gate-etapas.md`). Depois rode o pré-voo anti-slop de novo sobre o painel
   publicado, nos DOIS temas: a lista de tells de painel em `references/direcao-de-arte.md`, Fase 3
@@ -671,7 +673,7 @@ Os 7 efeitos de movimento (3.7.0; CSS em `public/assets/css/efeitos.css`, um mó
 `public/assets/js/lib/`). Todos desligam com `prefers-reduced-motion` e o valor final do número está sempre
 no DOM:
 1. **Cartão que vira a tela** (`cartao-vira-tela.js`, `cobertura-boot.js`): na lista, a linha do painel cresce na cor dele até cobrir a tela, o nome aparece, a página troca e a capa da mesma cor sobe quando o painel desenha.
-2. **Gráfico que responde** (`grafico-responde.js`): régua, ponto e etiqueta (dia, data, valor) deslizam de um dia ao outro sob o mouse ou o toque.
+2. **Gráfico que responde** (`grafico-responde.js`): régua, ponto e etiqueta (dia, data, valor) deslizam de um dia ao outro sob o mouse ou o toque. Só com teclado (3.7.3): Tab leva ao gráfico, as setas esquerda e direita andam pelos dias (Home e End vão às pontas, Esc esconde) e o valor do dia é anunciado numa região `aria-live` ao lado do gráfico.
 3. **Período em um clique** (`periodo-atalhos.js`): Hoje, 7 dias, 30 dias, Este mês, Tudo e Personalizado, com a pílula deslizando ao escolhido.
 4. **Números de roleta** (`numero-roleta.js`): só o dígito que mudou rola, numa janela de uma linha por casa; separadores ficam parados.
 5. **Gráfico que se transforma** (`grafico-transforma.js`): a linha vai do desenho antigo ao novo e as barras de meta, ranking e funil crescem ou encolhem.
@@ -681,6 +683,13 @@ Faixa de duração deles: nenhum passa de 2,4 s e a troca de período inteira te
 (`test/efeitos-duracao.test.js`). Os tetos de 120 a 700 ms seguem valendo para o resto do painel.
 A medida no navegador (pixels do cartão na meta batida, dígitos por casa na roleta, ordem da tabela)
 está em `node <dir-da-skill>/scripts/test-efeitos-no-navegador.cjs`.
+
+**Navegadores, celular e acessibilidade (3.7.3).** A matriz em Chromium, Firefox, WebKit (o motor do Safari), iPhone 14 e Pixel 7 está em
+`node <dir-da-skill>/scripts/test-navegadores.cjs` e a acessibilidade (axe-core fixo, só teclado, nomes) em `scripts/test-acessibilidade.cjs`
+(precisam de `npx playwright install chromium firefox webkit` e `npm i -g axe-core@4.13.0`). O grupo com abas no celular, a altura do
+minigráfico dos cartões e a espera do passe de gosto têm teste próprio (`test-grupo-no-navegador.cjs`,
+`test-minigrafico-altura-no-navegador.cjs`, `test-passe-de-gosto-no-navegador.cjs`). Antes de entregar um painel a quem usa Safari ou
+celular, rode os dois primeiros. Não substituem aparelho físico, o aplicativo Safari nem VoiceOver, TalkBack ou NVDA.
 
 **A meta tem período (3.7.1).** `config.goal = { metricKey, value, periodo }`, com `periodo` em `mensal` (padrão no assistente),
 `semanal`, `periodo` (vale para o período escolhido, qualquer tamanho) ou `total`. Com meta mensal, o painel compara com a meta de
