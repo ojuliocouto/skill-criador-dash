@@ -6,8 +6,11 @@
   .atalho { min-height: 44px; padding: 0 14px; }
   .abas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .abas::-webkit-scrollbar { display: none; }
+  /* Abas do grupo (3.7.3): alvo de 44 px e preenchimento menor, para três abas de rótulo comum caberem inteiras em 390 px;
+     com mais abas a barra rola por dentro e a borda esmaecida avisa. */
+  .tabs .tab { padding: 10px 11px; min-height: 44px; }
   .aba { flex: 1 0 auto; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 14px; }
 }
-.atalhos.rola-dir:not(.rola-esq), .abas.rola-dir:not(.rola-esq) { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); }
-.atalhos.rola-esq:not(.rola-dir), .abas.rola-esq:not(.rola-dir) { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); }
-.atalhos.rola-esq.rola-dir, .abas.rola-esq.rola-dir { -webkit-mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); }
+.atalhos.rola-dir:not(.rola-esq), .abas.rola-dir:not(.rola-esq), .tabs.rola-dir:not(.rola-esq) { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); }
+.atalhos.rola-esq:not(.rola-dir), .abas.rola-esq:not(.rola-dir), .tabs.rola-esq:not(.rola-dir) { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); }
+.atalhos.rola-esq.rola-dir, .abas.rola-esq.rola-dir, .tabs.rola-esq.rola-dir { -webkit-mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); }

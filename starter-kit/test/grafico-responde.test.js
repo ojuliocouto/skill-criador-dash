@@ -83,3 +83,46 @@ test('travas do CSS: a régua e a etiqueta só animam transform e opacity, sem g
     for (const parte of m[1].split(',')) assert.match(parte.trim().split(/\s+/)[0], /^(transform|opacity|none)$/);
   }
 });
+
+// ---------------------------------------------------------------- 3.7.3: o gráfico também responde ao teclado
+import { proximoDia, textoDoDia } from '../public/assets/js/lib/grafico-responde.js';
+
+test('proximoDia: setas andam um dia, Home e End vão às pontas, nunca sai da lista', () => {
+  assert.equal(proximoDia({ atual: 5, tecla: 'ArrowRight', total: 10 }), 6);
+  assert.equal(proximoDia({ atual: 5, tecla: 'ArrowLeft', total: 10 }), 4);
+  assert.equal(proximoDia({ atual: 9, tecla: 'ArrowRight', total: 10 }), 9, 'no último dia a seta da direita fica');
+  assert.equal(proximoDia({ atual: 0, tecla: 'ArrowLeft', total: 10 }), 0, 'no primeiro dia a seta da esquerda fica');
+  assert.equal(proximoDia({ atual: 5, tecla: 'Home', total: 10 }), 0);
+  assert.equal(proximoDia({ atual: 5, tecla: 'End', total: 10 }), 9);
+  assert.equal(proximoDia({ atual: -1, tecla: 'ArrowLeft', total: 10 }), 9, 'sem dia em foco, a seta da esquerda parte do último');
+  assert.equal(proximoDia({ atual: -1, tecla: 'ArrowRight', total: 10 }), 9);
+});
+
+test('proximoDia: tecla que não é do gráfico devolve null (o navegador segue o caminho dele), e lista vazia também', () => {
+  assert.equal(proximoDia({ atual: 3, tecla: 'a', total: 10 }), null);
+  assert.equal(proximoDia({ atual: 3, tecla: 'Tab', total: 10 }), null);
+  assert.equal(proximoDia({ atual: 3, tecla: 'ArrowUp', total: 10 }), null);
+  assert.equal(proximoDia({ atual: 0, tecla: 'ArrowRight', total: 0 }), null);
+});
+
+test('textoDoDia: o que o leitor de tela fala: dia da semana, data, valor e a posição na série', () => {
+  const t = textoDoDia({ data: '2026-10-03', valor: 1234.5, formato: 'currency', posicao: 2, total: 60 });
+  assert.match(t, /sáb, 03\/10/);
+  assert.match(t, /R\$\s?1\.234,50/);
+  assert.match(t, /dia 3 de 60/);
+});
+
+test('timeseries: o gráfico pode receber foco, avisa que as setas leem os dias e tem região que anuncia o dia', () => {
+  const lista = Array.from({ length: 8 }, (_, i) => ({ date: `2026-10-0${i + 1}`, value: 10 + i }));
+  const html = renderSerie({ title: 'Leads por dia', format: 'integer' }, lista);
+  const svg = html.match(/<svg[^>]*class="chart__svg"[^>]*>/)[0];
+  assert.match(svg, /tabindex="0"/, 'o gráfico entra na ordem do Tab');
+  assert.match(svg, /role="img"/, 'segue sendo imagem com nome (o teste de nomes depende disso)');
+  const desc = svg.match(/aria-describedby="([^"]+)"/);
+  assert.ok(desc, 'aria-describedby aponta a dica de uso');
+  const dica = html.match(new RegExp(`id="${desc[1]}"[^>]*>([^<]+)<`));
+  assert.ok(dica, 'o elemento da dica existe');
+  assert.match(dica[1], /setas/i);
+  assert.match(html, /<[a-z]+[^>]*class="[^"]*chart__anuncio[^"]*"[^>]*aria-live="polite"|<[a-z]+[^>]*aria-live="polite"[^>]*class="[^"]*chart__anuncio/, 'região aria-live polite fora do svg');
+  assert.ok(html.indexOf('chart__anuncio') > html.indexOf('</svg>'), 'a região que anuncia fica fora do svg (role=img esconde os filhos)');
+});

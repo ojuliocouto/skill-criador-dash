@@ -1,0 +1,67 @@
+// Senha pedida DENTRO da aba de um grupo. Um painel com senha pode ser aba de um grupo: a aba mostra o campo,
+// a pessoa digita, e o painel abre ali mesmo (antes era um beco sem saída, "não pode ser embutida no grupo").
+// A parte pura (o HTML) é testada em node; a ligação com o DOM é pequena e provada no navegador
+// (scripts/test-grupo-no-navegador.cjs). A senha vira SHA-256 antes de sair do navegador e fica só na sessão.
+
+import { sha256Hex } from './auth.js';
+import { setDashboardAuth } from './api-client.js';
+
+/**
+ * HTML do pedido de senha da aba.
+ * @param {{ jaTentou?: boolean }} [o] jaTentou: já havia uma senha guardada (errada) nesta sessão
+ * @returns {string}
+ */
+export function pedidoDeSenhaDaAbaHtml({ jaTentou = false } = {}) {
+  return `<div class="empty-state aba-senha">` +
+    `<h2>Esta aba tem senha</h2>` +
+    `<p class="subtitle">Digite a senha deste painel para abrir a aba.</p>` +
+    `<div style="max-width:320px;margin:18px auto 0;display:flex;flex-direction:column;gap:10px">` +
+      `<label class="lbl-senha" for="abaSenha">Senha do painel desta aba</label>` +
+      `<input id="abaSenha" class="input" type="password" autocomplete="current-password" />` +
+      `<button id="abaSenhaBtn" class="btn" type="button">Abrir a aba</button>` +
+      `<p class="error" id="abaSenhaErro" role="alert">${jaTentou ? 'Senha incorreta. Tente de novo.' : ''}</p>` +
+    `</div>` +
+  `</div>`;
+}
+
+/**
+ * HTML da tela de senha da página inteira (painel protegido aberto pelo link). O campo tem rótulo visível ligado
+ * por `for`/`id` (3.7.3: antes só tinha o placeholder, que some ao digitar e o leitor de tela anuncia mal).
+ * @param {{ jaTentou?: boolean }} [o]
+ * @returns {string}
+ */
+export function pedidoDeSenhaDaPaginaHtml({ jaTentou = false } = {}) {
+  return `<div class="empty-state">` +
+    `<h1 class="titulo-estado">Dashboard protegido</h1>` +
+    `<p class="subtitle">Digite a senha para acessar este dashboard.</p>` +
+    `<div style="max-width:320px;margin:18px auto 0;display:flex;flex-direction:column;gap:10px">` +
+      `<label class="lbl-senha" for="pwInput">Senha</label>` +
+      `<input id="pwInput" class="input" type="password" autocomplete="current-password" />` +
+      `<button id="pwBtn" class="btn" type="button">Acessar</button>` +
+      `<p class="error" id="pwErr" role="alert">${jaTentou ? 'Senha incorreta. Tente de novo.' : ''}</p>` +
+    `</div>` +
+  `</div>`;
+}
+
+/**
+ * Desenha o pedido de senha dentro de `painel` e, ao enviar, guarda o hash na sessão e chama `tentarDeNovo`.
+ * @param {HTMLElement} painel
+ * @param {string} id id do painel protegido (a aba)
+ * @param {() => void} tentarDeNovo recarrega a aba
+ */
+export function pedirSenhaNaAba(painel, id, tentarDeNovo) {
+  let jaTentou = false;
+  try { jaTentou = !!sessionStorage.getItem(`dashauth:${id}`); } catch { /* sem sessionStorage */ }
+  painel.innerHTML = pedidoDeSenhaDaAbaHtml({ jaTentou });
+  const campo = painel.querySelector('#abaSenha');
+  const botao = painel.querySelector('#abaSenhaBtn');
+  const enviar = async () => {
+    if (!campo.value) { campo.focus(); return; }
+    botao.disabled = true;
+    setDashboardAuth(id, await sha256Hex(campo.value));
+    tentarDeNovo();
+  };
+  botao.addEventListener('click', enviar);
+  campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') enviar(); });
+  campo.focus();
+}

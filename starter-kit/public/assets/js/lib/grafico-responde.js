@@ -1,5 +1,6 @@
 // Efeito 1, "gráfico que responde": passar o mouse (ou tocar) no gráfico de linha mostra uma
-// régua vertical, o ponto do dia e uma etiqueta com data e valor. A régua e a etiqueta DESLIZAM
+// régua vertical, o ponto do dia e uma etiqueta com data e valor. Só com teclado (3.7.3): Tab no gráfico e as setas
+// esquerda e direita andam pelos dias; o valor é anunciado numa região aria-live. A régua e a etiqueta DESLIZAM
 // de um dia pro outro (só transform), não pulam. ESM.
 //
 // A parte com conta é pura e fica no topo (testada em test/grafico-responde.test.js). O DOM vem
@@ -38,6 +39,22 @@ export function posicaoDaDica({ ponto, dica, caixa, topo = 0, folga = 12, respir
   return { x, y: ponto.y + folga, abaixo: true };
 }
 
+/**
+ * Para onde vai o dia em foco quando uma tecla é apertada no gráfico (3.7.3, uso só com teclado). Setas andam um dia,
+ * Home e End vão às pontas. Sem dia em foco (`atual` -1) as duas setas partem do último dia. Tecla que não é do
+ * gráfico: null (o navegador segue o caminho dele).
+ */
+export function proximoDia({ atual, tecla, total }) {
+  if (!(total > 0)) return null;
+  const ultimo = total - 1;
+  if (tecla === 'Home') return 0;
+  if (tecla === 'End') return ultimo;
+  if (tecla !== 'ArrowLeft' && tecla !== 'ArrowRight') return null;
+  if (!(atual >= 0)) return ultimo;
+  const passo = tecla === 'ArrowRight' ? 1 : -1;
+  return Math.min(ultimo, Math.max(0, atual + passo));
+}
+
 const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
 /** 'sáb' pra '2026-10-03'; texto que não é data: ''. */
@@ -56,6 +73,13 @@ export function rotuloDaDica(data, valor, formato) {
     data: `${diaDaSemanaCurto(iso)}, ${iso.slice(8, 10)}/${iso.slice(5, 7)}`,
     valor: fmtBy(formato || 'number', Number(valor) || 0),
   };
+}
+
+/** O que o leitor de tela fala ao mudar de dia: "sáb, 03/10: R$ 1.234,50, dia 3 de 60". */
+export function textoDoDia({ data, valor, formato, posicao, total }) {
+  const r = rotuloDaDica(data, valor, formato);
+  const quando = r.data || String(data || '').trim();
+  return `${quando ? `${quando}: ` : ''}${r.valor}, dia ${posicao + 1} de ${total}`;
 }
 
 // ---------------------------------------------------------------- DOM (só no navegador)
@@ -105,6 +129,11 @@ function mostrar(svg, ev) {
   const user = p.matrixTransform(ctm.inverse());
   const i = indiceMaisProximo(pontos.map((q) => q.x), user.x);
   if (i < 0) return;
+  focarDia(svg, pontos, i, ctm);
+}
+
+// Põe a régua, o ponto e a etiqueta no dia `i`. Vale para o mouse, o toque e o teclado.
+function focarDia(svg, pontos, i, ctm) {
   const alvo = pontos[i];
   const pecas = pecasDoGrafico(svg);
   if (pecas.cartao.dataset.diaEmFoco === String(i) && pecas.dica.classList.contains('is-ativa')) return;
@@ -151,6 +180,48 @@ function esconder(svg) {
   if (dica) dica.classList.remove('is-ativa');
 }
 
+// Teclado: o gráfico recebe foco (Tab), as setas andam pelos dias e o valor do dia vai para a região aria-live
+// que fica ao lado do gráfico (dentro do svg role=img nada é lido). O dia em foco segue a mesma régua do mouse.
+function diaEmFocoDoTeclado(svg) {
+  const cartao = svg.closest('.chart');
+  const v = cartao && cartao.dataset.diaEmFoco;
+  return v === undefined ? -1 : Number(v);
+}
+
+function aoApertarTecla(ev) {
+  const svg = ev.target && ev.target.closest ? ev.target.closest('.chart--timeseries .chart__svg') : null;
+  if (!svg || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if (ev.key === 'Escape') { esconder(svg); return; }
+  const pontos = pontosDoSvg(svg);
+  const i = proximoDia({ atual: diaEmFocoDoTeclado(svg), tecla: ev.key, total: pontos.length });
+  if (i === null || pontos.length < 2) return;
+  ev.preventDefault(); // as setas não rolam a página enquanto leem o gráfico
+  mostrarDiaDoTeclado(svg, pontos, i);
+}
+
+function mostrarDiaDoTeclado(svg, pontos, i) {
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return;
+  focarDia(svg, pontos, i, ctm);
+  const cartao = svg.closest('.chart');
+  const anuncio = cartao && cartao.querySelector('.chart__anuncio');
+  if (anuncio) anuncio.textContent = textoDoDia({ data: pontos[i].data, valor: pontos[i].valor, formato: svg.getAttribute('data-formato'), posicao: i, total: pontos.length });
+}
+
+function aoFocar(ev) {
+  const svg = ev.target && ev.target.closest ? ev.target.closest('.chart--timeseries .chart__svg') : null;
+  if (!svg || ev.target !== svg) return;
+  // Foco que veio do mouse já tem o dia do ponteiro; o do teclado começa no último dia (o mais recente).
+  if (diaEmFocoDoTeclado(svg) >= 0) return;
+  const pontos = pontosDoSvg(svg);
+  if (pontos.length >= 2) mostrarDiaDoTeclado(svg, pontos, pontos.length - 1);
+}
+
+function aoPerderFoco(ev) {
+  const svg = ev.target && ev.target.closest ? ev.target.closest('.chart--timeseries .chart__svg') : null;
+  if (svg && ev.target === svg) { esconder(svg); const a = svg.closest('.chart').querySelector('.chart__anuncio'); if (a) a.textContent = ''; }
+}
+
 /**
  * Liga a resposta ao ponteiro em `raiz` (o #dashbody). Uma vez só: quem repinta o corpo não
  * precisa ligar de novo. Mouse: segue o ponteiro e some ao sair. Toque: segue o dedo e fica até
@@ -172,8 +243,14 @@ export function ligarGraficoResponde(raiz) {
   raiz.addEventListener('pointermove', aoMover);
   raiz.addEventListener('pointerdown', aoMover);
   raiz.addEventListener('pointerout', aoSair);
+  raiz.addEventListener('keydown', aoApertarTecla);
+  raiz.addEventListener('focusin', aoFocar);
+  raiz.addEventListener('focusout', aoPerderFoco);
   document.addEventListener('pointerdown', aoTocarFora);
   return () => {
+    raiz.removeEventListener('keydown', aoApertarTecla);
+    raiz.removeEventListener('focusin', aoFocar);
+    raiz.removeEventListener('focusout', aoPerderFoco);
     raiz.removeEventListener('pointermove', aoMover);
     raiz.removeEventListener('pointerdown', aoMover);
     raiz.removeEventListener('pointerout', aoSair);

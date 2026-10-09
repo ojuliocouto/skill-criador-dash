@@ -134,6 +134,15 @@ export function stripSecrets(config) {
   return clone;
 }
 
+// So conta pro limite de tentativas a requisicao que TRAZ uma senha (um palpite). Abrir o link sem senha nenhuma
+// e a abertura normal: e assim que o painel descobre que precisa pedir a senha. Se ela gastasse o limite, 8
+// aberturas em 5 minutos (uma equipe no mesmo roteador, os scripts de prova) trocariam o campo de senha por
+// "Muitas tentativas", ate pra quem tem a senha certa. A abertura sem senha nao adivinha nada: nao precisa de freio.
+async function contaTentativaErrada(env, request, id, providedHash) {
+  if (!providedHash) return { ok: true };
+  return authRateLimit(env, request, id);
+}
+
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
 function json(body, status = 200) {
@@ -289,7 +298,7 @@ async function getOne(kv, id, providedHash, env, request) {
   if (!(await authOk(config, providedHash))) {
     // RATE LIMIT anti brute force online da senha: so conta a tentativa ERRADA
     // (a senha certa nao passa por aqui). Estourou -> 429 Retry-After.
-    const rl = await authRateLimit(env, request, id);
+    const rl = await contaTentativaErrada(env, request, id, providedHash);
     if (!rl.ok) return tooMany(rl.retryAfter);
     return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
   }
@@ -475,7 +484,7 @@ async function create(kv, request, providedHash, env) {
   const existente = rotacionando ? null : await loadConfig(kv, config.id);
   if (existente && needsAuth(existente) && !(await authOk(existente, providedHash))) {
     // RATE LIMIT: sobrescrever dashboard protegido tambem e superficie de brute force.
-    const rl = await authRateLimit(env, request, config.id);
+    const rl = await contaTentativaErrada(env, request, config.id, providedHash);
     if (!rl.ok) return tooMany(rl.retryAfter);
     return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para sobrescrever.', needsPassword: true }, 401);
   }
@@ -520,7 +529,7 @@ async function remove(kv, id, providedHash, env, request) {
   const existente = await loadConfig(kv, id);
   if (existente && needsAuth(existente) && !(await authOk(existente, providedHash))) {
     // RATE LIMIT: excluir dashboard protegido tambem e superficie de brute force.
-    const rl = await authRateLimit(env, request, id);
+    const rl = await contaTentativaErrada(env, request, id, providedHash);
     if (!rl.ok) return tooMany(rl.retryAfter);
     return json({ error: 'Dashboard protegido por senha. Informe a senha (header x-dash-auth) para excluir.', needsPassword: true }, 401);
   }

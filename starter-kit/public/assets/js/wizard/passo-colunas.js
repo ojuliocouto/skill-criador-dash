@@ -87,7 +87,7 @@ export function renderColunas(corpo, ctx) {
         nomeArea.appendChild(el('span', { class: 'coluna__nome-atual', text: nomePadrao }));
         nomeArea.appendChild(el('button', {
           class: 'link', type: 'button', 'data-renomear': chave, text: 'Trocar nome',
-          'aria-label': `Trocar o nome de ${nomePadrao} no painel`, onclick: () => { desenharNome(true); nomeArea.querySelector('input').focus(); },
+          'aria-label': `Trocar nome de ${nomePadrao}`, // 3.7.3: começa pelo texto visível (WCAG 2.5.3) e diz de qual campo é onclick: () => { desenharNome(true); nomeArea.querySelector('input').focus(); },
         }));
         return;
       }

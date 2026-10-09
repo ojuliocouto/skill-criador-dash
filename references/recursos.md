@@ -57,10 +57,23 @@ curl -X POST "$BASE/api/dashboards" -H "content-type: application/json" -H "x-ad
 ```
 O id do grupo sai do slug do name. A landing (`index-page.js`) lista o grupo com o badge "Grupo" e o
 link único. Código: `initGroup`/`loadDashboardInto`/`resolveActiveTab` (puro, testado) em `dashboard.js`;
-`group-wizard.js` (`eligibleForGroup`/`buildGroupConfig`/`validateGroup` puros, testados); validação em
+`group-wizard.js` (`eligibleForGroup`/`rotulosPadrao`/`buildGroupConfig`/`validateGroup` puros, testados); validação em
 `functions/api/dashboards.js`; testes em `test/handlers.test.js`, `test/render.test.js`,
-`test/group-wizard.test.js`. Aba que aponta pra um dashboard protegido por senha não embute (mostra
-"abrir direto"); as demais abrem.
+`test/group-wizard.test.js`, `test/group-wizard-rotulos.test.js` e, no navegador, `scripts/test-grupo-no-navegador.cjs`.
+
+Comportamentos que valem saber (provados no ar em 08/10/2026):
+- **Rótulo padrão da aba (assistente):** o domínio ("Marketing") quando é único entre os painéis; se dois painéis são do
+  mesmo domínio, vale o nome de cada um (antes saíam duas abas "Marketing").
+- **A última aba clicada vale.** Clicar noutra aba com a anterior ainda carregando não deixa a resposta atrasada
+  desenhar por cima (`lib/ultima-vale.js`); antes, no celular, a aba nova ficava marcada com os números da anterior.
+- **Aba que aponta para um painel com senha:** a aba mostra "Esta aba tem senha", pede a senha ali mesmo
+  (`lib/senha-na-aba.js`) e abre o painel na aba; a senha fica só na sessão do navegador, então ir a outra aba e voltar
+  não pede de novo. Senha errada diz "Senha incorreta" na própria aba.
+- **Colocar um painel com senha no grupo:** o assistente não o lista (a listagem pública só mostra o id dele, nunca o
+  nome). Use a API com o id que o POST do painel devolveu: `{"id":"dash-<32 caracteres>","label":"Com senha"}` na lista
+  `tabs`. O id do painel protegido fica visível na lista de abas do grupo, que é pública: quem abre o grupo vê o rótulo
+  da aba, e só vê os números com a senha.
+- O grupo em si não tem senha (o POST de grupo com `auth` não é um caso testado): proteja cada painel-filho.
 
 ## Tema claro/escuro
 

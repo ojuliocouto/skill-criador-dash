@@ -22,6 +22,8 @@ function larguraPara(col) {
   return W;
 }
 const M = { top: 12, right: 14, bottom: 26, left: 48 };
+// Contador para ligar cada gráfico à sua dica de uso (aria-describedby precisa de id único na página).
+let sequenciaDeGraficos = 0;
 
 /**
  * Largura do quadro do desenho (viewBox). Em tela larga vale o `col` da célula. Em tela
@@ -137,6 +139,7 @@ export function render(props = {}, points) {
   const series = `<polygon class="chart__area" points="${areaPts}" />` +
     `<polyline class="chart__line" fill="none" points="${pts}" />${dots}`;
 
+  const dicaId = `chart-dica-${++sequenciaDeGraficos}`;
   // aria-label descritivo para leitores de tela (o SVG e role=img).
   // Inclui titulo, numero de pontos e a faixa de valores pra dar contexto sem depender do visual.
   const pointsLabel = `${n} pontos`;
@@ -150,11 +153,14 @@ export function render(props = {}, points) {
   return (
     `<div class="chart chart--timeseries">` +
       titleHtml +
-      `<svg class="chart__svg" viewBox="0 0 ${Wc} ${H}" data-formato="${esc(format)}" role="img" aria-label="${esc(label)}">` +
+      `<svg class="chart__svg" viewBox="0 0 ${Wc} ${H}" data-formato="${esc(format)}" role="img" aria-label="${esc(label)}" tabindex="0" aria-describedby="${dicaId}">` +
         gridHtml +
         series +
         xLabelsHtml +
       `</svg>` +
+      // Só com teclado (3.7.3): a dica de uso e a região que anuncia o dia ficam FORA do svg (role=img esconde os filhos).
+      `<span class="so-leitor" id="${dicaId}">Use as setas esquerda e direita para ler o valor de cada dia; Home e End vão ao primeiro e ao último dia.</span>` +
+      `<span class="so-leitor chart__anuncio" role="status" aria-live="polite"></span>` +
     `</div>`
   );
 }

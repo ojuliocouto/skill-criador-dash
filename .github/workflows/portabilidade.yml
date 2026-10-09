@@ -3,7 +3,9 @@ name: portabilidade
 # Prova a skill em Windows, macOS e Linux DE VERDADE (máquinas reais do GitHub), não por simulação.
 # A suíte inteira roda por um comando só (scripts/rodar-testes.mjs): npm test do starter-kit, todos os
 # scripts/test-*.py (pelo py.mjs) e todos os scripts/test-*.cjs, sem curinga de shell. No CI a variável CI
-# está ligada: teste que pula por falta de Playwright conta como falha, porque aqui ele existe de propósito.
+# está ligada: teste que pula por falta de Playwright, de um motor (Chromium, Firefox, WebKit) ou do axe-core conta como falha,
+# porque aqui eles existem de propósito. A matriz de navegadores (scripts/test-navegadores.cjs) e a acessibilidade
+# (scripts/test-acessibilidade.cjs) rodam nos três sistemas junto com o resto.
 
 on:
   push:
@@ -35,16 +37,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar o Playwright (pacote global, como a skill ensina)
-        run: npm install -g playwright
+      # A versão do axe é fixa: as contagens de acessibilidade não mudam sozinhas.
+      - name: Instalar o Playwright e o axe-core (pacotes globais)
+        run: npm install -g playwright axe-core@4.13.0
 
-      - name: Baixar o Chromium (Linux, com as bibliotecas do sistema)
+      - name: Baixar Chromium, Firefox e WebKit (Linux, com as bibliotecas do sistema)
         if: runner.os == 'Linux'
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Baixar o Chromium (Windows e macOS)
+      - name: Baixar Chromium, Firefox e WebKit (Windows e macOS)
         if: runner.os != 'Linux'
-        run: npx playwright install chromium
+        run: npx playwright install chromium firefox webkit
 
       - name: ffmpeg (Linux)
         if: runner.os == 'Linux'

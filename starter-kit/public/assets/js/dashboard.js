@@ -29,6 +29,8 @@ import { comecarProgresso, terminarProgresso } from './lib/carregamento.js';
 import { sincronizarModoDoPainel } from './lib/theme.js';
 import { TEMPOS } from './lib/saudacao.js';
 import { esc } from './lib/html.js';
+import { criarUltimaVale } from './lib/ultima-vale.js';
+import { pedirSenhaNaAba, pedidoDeSenhaDaPaginaHtml } from './lib/senha-na-aba.js';
 import { brandInnerHtml } from './lib/brand.js';
 import { areaDoPainel, trilhaHtml, acoesHtml, ligarCopiarLink, ligarBarraSolida } from './lib/barra-topo.js';
 import { aplicarPersonalizacao } from './lib/personalizacao.js';
@@ -222,16 +224,7 @@ function cardWith(title, innerHtml, extraClass = '') {
 function renderPasswordPrompt(app, id) {
   let jaTentou = false;
   try { jaTentou = !!sessionStorage.getItem(`dashauth:${id}`); } catch { /* ignora */ }
-  app.innerHTML =
-    `<div class="empty-state">` +
-      `<h2>Dashboard protegido</h2>` +
-      `<p class="subtitle">Digite a senha para acessar este dashboard.</p>` +
-      `<div style="max-width:320px;margin:18px auto 0;display:flex;flex-direction:column;gap:10px">` +
-        `<input id="pwInput" class="input" type="password" placeholder="Senha" autocomplete="current-password" />` +
-        `<button id="pwBtn" class="btn" type="button">Acessar</button>` +
-        `<p class="error" id="pwErr">${jaTentou ? 'Senha incorreta. Tente de novo.' : ''}</p>` +
-      `</div>` +
-    `</div>`;
+  app.innerHTML = pedidoDeSenhaDaPaginaHtml({ jaTentou });
   const input = document.getElementById('pwInput');
   const btn = document.getElementById('pwBtn');
   const submit = async () => {
@@ -1182,10 +1175,14 @@ async function loadDashboardInto(container, config, id, opts = {}) {
   // Modo historico: le o snapshot mais recente do D1. Ao vivo: busca a fonte na hora.
   const buscar = () => (config.storage === 'd1' ? fetchD1(id) : fetchDataForSource(config.source, id));
   let dataset;
+  // Num grupo, `aindaVale` diz se esta ainda é a aba que a pessoa escolheu por último. Resposta de aba antiga
+  // não desenha (nem erro, nem painel) por cima da aba nova.
+  const aindaVale = typeof opts.aindaVale === 'function' ? opts.aindaVale : () => true;
   try {
     dataset = await buscar();
     if (!dataset || !Array.isArray(dataset.rows)) throw new Error('A fonte não devolveu dados válidos.');
   } catch (err) {
+    if (!aindaVale()) return false;
     mostrarFalha(container, {
       err,
       contexto: 'dados',
@@ -1195,12 +1192,13 @@ async function loadDashboardInto(container, config, id, opts = {}) {
     return false;
   }
 
+  if (!aindaVale()) return false;
   const colMap = config.colMap || {};
   const baseCtx = { config, template, dataset, colMap };
   // Com saudação na tela, o painel é desenhado no instante em que a cortina começa a descer e
   // as peças dele entram em sequência com ela. Sem saudação, entra agora.
   const desenhar = (comCortina) => {
-    if (!container.isConnected) return;
+    if (!container.isConnected || !aindaVale()) return;
     // Com a capa da lista acesa, as peças do painel entram quando ela começa a subir.
     const comCapa = document.documentElement.hasAttribute('data-cobertura');
     renderDashboard(container, baseCtx, {
@@ -1211,6 +1209,18 @@ async function loadDashboardInto(container, config, id, opts = {}) {
   };
   if (abertura) abertura.quandoRevelar(desenhar); else desenhar(false);
   return true;
+}
+
+let soltarBordasDoGrupo = () => {};
+// Mantém a aba ativa do grupo inteira dentro da barra que rola por dentro (celular). Só mexe na rolagem da
+// própria barra, nunca na da página; o mínimo necessário, para a borda esmaecida seguir contando a verdade.
+function manterAbaVisivel(barra) {
+  const ativa = barra && barra.querySelector('.tab.active');
+  if (!ativa || barra.scrollWidth <= barra.clientWidth) return;
+  const esquerda = ativa.offsetLeft - 12;
+  const direita = ativa.offsetLeft + ativa.offsetWidth + 12 - barra.clientWidth;
+  if (esquerda < barra.scrollLeft) barra.scrollLeft = Math.max(0, esquerda);
+  else if (direita > barra.scrollLeft) barra.scrollLeft = direita;
 }
 
 // Renderiza um GRUPO: titulo do grupo + barra de abas + painel. Cada aba carrega
@@ -1241,8 +1251,19 @@ async function initGroup(app, group, groupId) {
   const panel = document.getElementById('tabpanel');
   const cache = {};
 
+  // A barra de abas rola por dentro em tela estreita (celular): borda esmaecida avisa que há mais para o lado,
+  // igual às abas internas do painel, e a aba ativa nunca fica cortada (3.7.3).
+  // Os ouvintes do painel-filho são soltos a cada carga de aba (soltarOuvintesDaJanela); os desta barra vivem
+  // enquanto o grupo está na tela, por isso ficam à parte.
+  const barraDeAbas = app.querySelector('.tabs');
+  soltarBordasDoGrupo();
+  soltarBordasDoGrupo = ligarBordas(barraDeAbas);
+
+  const novaAtivacao = criarUltimaVale();
   const activate = async (childId) => {
+    const aindaVale = novaAtivacao();
     app.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === childId));
+    manterAbaVisivel(barraDeAbas);
     // Reflete a aba na URL (compartilhavel) sem empilhar historico.
     try {
       const url = new URL(location.href);
@@ -1256,18 +1277,22 @@ async function initGroup(app, group, groupId) {
     if (!cfg) {
       try {
         cfg = await getDashboard(childId);
+        if (!aindaVale()) return;
         cache[childId] = cfg;
       } catch (err) {
+        if (!aindaVale()) return;
         const abrirDireto = { href: `/dashboard.html?id=${encodeURIComponent(childId)}`, label: 'Abrir direto' };
         if (err && err.needsPassword) {
-          showError(panel, 'Esta aba é um dashboard protegido por senha e não pode ser embutida no grupo.', abrirDireto);
+          // Aba com senha: pede a senha aqui mesmo e recarrega a aba (lib/senha-na-aba.js).
+          terminarProgresso();
+          pedirSenhaNaAba(panel, childId, () => activate(childId));
           return;
         }
         mostrarFalha(panel, { err, contexto: 'painel', acao: abrirDireto, tentar: () => activate(childId) });
         return;
       }
     }
-    await loadDashboardInto(panel, cfg, childId, { showHeader: false });
+    await loadDashboardInto(panel, cfg, childId, { showHeader: false, aindaVale });
   };
 
   app.querySelectorAll('.tab').forEach((b) => {
