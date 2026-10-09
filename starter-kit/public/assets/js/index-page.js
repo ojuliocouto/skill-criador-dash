@@ -87,7 +87,13 @@ lista.addEventListener('click', (ev) => {
   if (ev.target.closest('[data-excluir], .excluir-senha, input, select, textarea')) return;
   const cartao = ev.target.closest('.list-item');
   const link = cartao ? cartao.querySelector('a[href^="/dashboard"]') : null;
-  if (!link || menosMovimento() || !principal) return;
+  if (!link || !principal) return;
+  // Movimento reduzido: sem a capa que cresce, mas o cartão inteiro continua abrindo o painel (ele tem cursor de
+  // clique). Clicar no próprio link "Abrir" segue o caminho de sempre. (3.7.3: antes o clique no cartão não fazia nada.)
+  if (menosMovimento()) {
+    if (!ev.target.closest('a')) { ev.preventDefault(); window.location.href = link.href; }
+    return;
+  }
   ev.preventDefault();
   comecarProgresso();
   const usou = cartaoViraTela(cartao, { cor: cartao.dataset.accent, nome: cartao.dataset.nome, destino: link.href, idDoPainel: cartao.dataset.id });

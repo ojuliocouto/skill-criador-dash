@@ -410,7 +410,7 @@ tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--bg-elev-2); }
 
 /* Buttons + inputs */
-.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--accent-fg, #fff); border: 0; border-radius: 10px; padding: 11px 18px; font-size: 14.5px; font-weight: 600; cursor: pointer; transition: filter 0.15s, transform 0.05s; font-family: var(--font); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--accent); color: var(--accent-fg, #fff); border: 0; border-radius: 10px; padding: 11px 18px; font-size: 14.5px; font-weight: 600; cursor: pointer; transition: filter 0.15s, transform 0.05s; font-family: var(--font); }
 .btn:hover { filter: brightness(1.08); text-decoration: none; }
 .btn:active { transform: translateY(1px); }
 .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
@@ -424,6 +424,10 @@ tbody tr:hover { background: var(--bg-elev-2); }
    --bg-elev-2, que e justamente o fundo do proprio input) pra o indicador de
    foco nao sumir com accent muito claro no tema claro. Nao conflita com o anel
    de :focus-visible (--focus-ring), que e outro indicador. */
+/* O Safari desenha o select com o aspecto do sistema e ignora o preenchimento vertical (saía com 23 px de altura, ao lado de
+   campos de 38) e ignora min-height nele: só `height` vale. A mesma altura em todos os motores; no celular, 44 px de alvo de toque. */
+select.input { height: 38px; }
+@media (max-width: 620px) { select.input { height: 44px; } .filterbar .fb-reset { min-height: 44px; } }
 .input:focus { outline: none; border-color: var(--accent-fill-calc, var(--accent)); box-shadow: 0 0 0 3px var(--accent-soft); }
 label.field { display: block; margin-bottom: 16px; }
 
@@ -463,6 +467,22 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 .row-actions { display: flex; gap: 10px; margin-top: 26px; }
 .empty-state { text-align: center; color: var(--text-dim); padding: 60px 20px; }
 .list-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+/* Celular: o nome e os botões não cabem lado a lado; os botões descem para a linha de baixo, dentro do cartão. */
+@media (max-width: 620px) { .list-item { flex-wrap: wrap; } .list-item > .row-actions { flex: 1 1 100%; } .list-item > .row-actions > * { flex: 1 1 0; justify-content: center; } }
+/* Lista de painéis, celular: a marca nunca é espremida pelos botões; eles descem para uma segunda linha da barra. */
+/* Celular: o botão da barra do assistente vira "Dashboards" (o "Meus" sai) para a marca caber inteira ao lado dele. */
+@media (min-width: 621px) { .topbar .rot-curto { display: none; } }
+@media (max-width: 620px) { .topbar .rot-longo { display: none; } .topbar > .btn { padding-left: 14px; padding-right: 14px; } }
+/* Lista de painéis: os dois botões e o de tema ficam soltos na barra (sem a moldura de grupo, em que as bordas dos botões
+   se sobrepunham às dela). */
+.topbar--lista .actions { height: auto; border: 0; border-radius: 0; background: none; overflow: visible; gap: 8px; align-items: center; }
+.topbar--lista .actions > * { border-left: 0; }
+.topbar--lista .actions > .btn { border: 1px solid transparent; }
+.topbar--lista .actions > .btn.ghost { border-color: var(--border); }
+.topbar--lista .actions .theme-toggle { height: 38px; border: 1px solid var(--border); border-radius: 10px; }
+/* O botão da barra ("Meus dashboards") não quebra de linha nem encolhe: quem cede é o nome da marca. */
+.topbar > .btn { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 620px) { .topbar--lista { flex-wrap: wrap; } .topbar--lista .brand { flex: 1 1 auto; } .topbar--lista .brand .name { overflow: visible; white-space: nowrap; } .topbar--lista .actions { flex: 1 1 100%; justify-content: flex-end; } }
 .list-item .meta { color: var(--text-dim); font-size: 13px; }
 /* Badge: texto sobre o --accent-soft COMPOSTO (accent 13% sobre o card). Usa
    --badge-fg (tom da marca recalibrado pra >=4.5:1 contra esse fundo composto);
