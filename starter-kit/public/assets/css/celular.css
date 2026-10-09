@@ -8,6 +8,6 @@
   .abas::-webkit-scrollbar { display: none; }
   .aba { flex: 1 0 auto; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 14px; }
 }
-.atalhos.rola-dir:not(.rola-esq), .abas.rola-dir:not(.rola-esq) { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); }
-.atalhos.rola-esq:not(.rola-dir), .abas.rola-esq:not(.rola-dir) { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); }
-.atalhos.rola-esq.rola-dir, .abas.rola-esq.rola-dir { -webkit-mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); }
+.atalhos.rola-dir:not(.rola-esq), .abas.rola-dir:not(.rola-esq), .tabs.rola-dir:not(.rola-esq) { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent); }
+.atalhos.rola-esq:not(.rola-dir), .abas.rola-esq:not(.rola-dir), .tabs.rola-esq:not(.rola-dir) { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 34px), transparent); }
+.atalhos.rola-esq.rola-dir, .abas.rola-esq.rola-dir, .tabs.rola-esq.rola-dir { -webkit-mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to right, transparent, #000 34px, #000 calc(100% - 34px), transparent); }

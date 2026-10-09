@@ -29,13 +29,16 @@ const igual = (real, esperado, o) => { if (real !== esperado) throw new Error(`$
   const C = painel('dash-cccccccccccccccccccccccccccccccc', 'Painel C (com senha)', 4500);
   const G = { id: 'grupo', name: 'Grupo de teste', kind: 'group', accent: '#3F6B5C', saudacaoLigada: false, createdAt: '2026-10-02T00:00:00.000Z',
     tabs: [{ id: A.id, label: 'Lento' }, { id: B.id, label: 'Rápido' }, { id: C.id, label: 'Com senha' }] };
-  const bancada = await subir({ paineis: [A, B, C, G], senhas: { [C.id]: SENHA }, atrasoPorLeads: { 1200: 2500 } });
+  // Grupo com rótulos longos (os do print do celular): as abas não cabem em 390 px e a barra precisa rolar por dentro.
+  const GL = { ...G, id: 'grupo-longo', name: 'Grupo de rótulos longos',
+    tabs: [{ id: A.id, label: 'Planilha ao vivo' }, { id: B.id, label: 'Meta mensal' }, { id: C.id, label: 'Com senha' }] };
+  const bancada = await subir({ paineis: [A, B, C, G, GL], senhas: { [C.id]: SENHA }, atrasoPorLeads: { 1200: 2500 } });
   const browser = await pw.chromium.launch();
-  const abrir = async (query, perfil = {}) => {
+  const abrir = async (query, perfil = {}, grupo = 'grupo', esperar = '.tabs .tab') => {
     const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, ...perfil });
     const page = await ctx.newPage();
-    await page.goto(`${bancada.url}/dashboard.html?id=grupo${query}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.tabs .tab', { timeout: 20000 });
+    await page.goto(`${bancada.url}/dashboard.html?id=${grupo}${query}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector(esperar, { timeout: 20000 });
     return { ctx, page };
   };
   const leadsNaTela = (page) => page.evaluate(() => {
@@ -105,6 +108,107 @@ const igual = (real, esperado, o) => { if (real !== esperado) throw new Error(`$
       await page.locator('.tabs .tab', { hasText: 'Com senha' }).click();
       await esperarLeads(page, '4.500', 12000);
       if (await page.locator('#tabpanel input[type="password"]').count()) throw new Error('pediu a senha de novo na mesma sessão');
+      await ctx.close();
+    });
+
+    // ---- 3.7.3: a barra de abas do grupo no celular ----
+    const CELULAR = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
+    /** Onde cada aba está em relação à barra (todas as abas, em px de tela). */
+    const geometriaDasAbas = (page) => page.evaluate(() => {
+      const barra = document.querySelector('.tabs');
+      const b = barra.getBoundingClientRect();
+      const cs = getComputedStyle(barra);
+      return {
+        scrollLeft: barra.scrollLeft, rolaEsq: barra.classList.contains('rola-esq'), rolaDir: barra.classList.contains('rola-dir'),
+        mascara: cs.maskImage || cs.webkitMaskImage || 'none', transborda: barra.scrollWidth > barra.clientWidth + 2,
+        abas: [...barra.querySelectorAll('.tab')].map((t) => { const r = t.getBoundingClientRect(); return { texto: t.textContent.trim(), ativa: t.classList.contains('active'), esq: r.left - b.left, dir: r.right - b.right }; }),
+      };
+    });
+    const inteira = (a) => a.esq >= -0.5 && a.dir <= 0.5;
+    const nomeDe = (g) => g.abas.map((a) => `${a.texto}[${a.esq.toFixed(0)},${a.dir.toFixed(0)}]`).join(' ');
+
+    await teste('senha (página e aba): o campo tem rótulo visível e o leitor de tela acha o campo pelo nome "Senha"', async () => {
+      const { ctx, page } = await abrir('', {}, C.id, '#pwInput');
+      await page.waitForSelector('#pwInput', { timeout: 10000 });
+      igual(await page.getByLabel('Senha', { exact: true }).count(), 1, 'campos achados pelo rótulo "Senha" na página');
+      const visivel = await page.evaluate(() => { const l = document.querySelector('label[for="pwInput"]'); const r = l && l.getBoundingClientRect(); return !!r && r.width > 20 && r.height > 8; });
+      if (!visivel) throw new Error('o rótulo da tela de senha não está visível');
+      await ctx.close();
+      const { ctx: c2, page: p2 } = await abrir(`&tab=${C.id}`);
+      await p2.waitForSelector('#abaSenha', { timeout: 10000 });
+      igual(await p2.getByLabel('Senha do painel desta aba').count(), 1, 'campos achados pelo rótulo na aba');
+      await c2.close();
+    });
+
+    await teste('barra de abas do grupo no celular: ao abrir, a primeira aba aparece inteira (nada cortado pela esquerda)', async () => {
+      const { ctx, page } = await abrir('', CELULAR, GL.id);
+      await page.waitForTimeout(600);
+      const g = await geometriaDasAbas(page);
+      if (!g.transborda) throw new Error('o cenário não transborda: o teste não prova nada (' + nomeDe(g) + ')');
+      igual(g.scrollLeft, 0, 'rolagem ao abrir');
+      if (!inteira(g.abas[0])) throw new Error('primeira aba cortada: ' + nomeDe(g));
+      if (!g.abas[0].ativa) throw new Error('a aba ativa ao abrir devia ser a primeira');
+      await ctx.close();
+    });
+
+    await teste('barra de abas do grupo no celular: tem a mesma borda esmaecida das abas internas (só do lado que tem mais)', async () => {
+      const { ctx, page } = await abrir('', CELULAR, GL.id);
+      await page.waitForTimeout(600);
+      const g = await geometriaDasAbas(page);
+      if (!g.rolaDir || g.rolaEsq) throw new Error(`classes de borda erradas ao abrir: rolaDir=${g.rolaDir} rolaEsq=${g.rolaEsq}`);
+      if (!g.mascara || g.mascara === 'none') throw new Error('sem a máscara de borda esmaecida (mask-image) na barra');
+      await ctx.close();
+    });
+
+    await teste('barra de abas do grupo no celular: abrir direto na última aba deixa a ativa inteira e avisa que há mais à esquerda', async () => {
+      const { ctx, page } = await abrir(`&tab=${C.id}`, CELULAR, GL.id);
+      await page.waitForSelector('#tabpanel input[type="password"]', { timeout: 10000 });
+      await page.waitForTimeout(600);
+      const g = await geometriaDasAbas(page);
+      const ativa = g.abas.find((a) => a.ativa);
+      if (!ativa || !inteira(ativa)) throw new Error('aba ativa cortada ao abrir: ' + nomeDe(g));
+      if (!g.rolaEsq) throw new Error('rolou para a direita sem a borda esmaecida da esquerda: ' + nomeDe(g));
+      await ctx.close();
+    });
+
+    await teste('barra de abas do grupo no celular: tocar nas abas mantém a ativa inteira, e voltar à primeira desfaz a rolagem', async () => {
+      const { ctx, page } = await abrir('', CELULAR, GL.id);
+      await esperarLeads(page, '1.200', 15000);
+      for (const rotulo of ['Meta mensal', 'Com senha', 'Meta mensal', 'Planilha ao vivo']) {
+        await page.locator('.tabs .tab', { hasText: rotulo }).tap();
+        await page.waitForTimeout(500);
+        const g = await geometriaDasAbas(page);
+        const ativa = g.abas.find((a) => a.ativa);
+        if (!ativa || ativa.texto !== rotulo || !inteira(ativa)) throw new Error(`depois de tocar em "${rotulo}" a ativa não está inteira: ` + nomeDe(g));
+      }
+      const g = await geometriaDasAbas(page);
+      igual(g.scrollLeft, 0, 'rolagem depois de voltar à primeira');
+      if (!inteira(g.abas[0])) throw new Error('primeira aba cortada depois de voltar: ' + nomeDe(g));
+      await ctx.close();
+    });
+
+    await teste('barra de abas do grupo no celular: a borda esmaecida segue a rolagem do dedo DEPOIS que o painel da aba carregou', async () => {
+      const { ctx, page } = await abrir('', CELULAR, GL.id);
+      await esperarLeads(page, '1.200', 15000);
+      await page.waitForTimeout(500);
+      await page.evaluate(() => { const b = document.querySelector('.tabs'); b.scrollLeft = b.scrollWidth; });
+      await page.waitForTimeout(400);
+      let g = await geometriaDasAbas(page);
+      if (!g.rolaEsq || g.rolaDir) throw new Error(`rolou até o fim e a borda não acompanhou: rolaEsq=${g.rolaEsq} rolaDir=${g.rolaDir}`);
+      await page.evaluate(() => { document.querySelector('.tabs').scrollLeft = 0; });
+      await page.waitForTimeout(400);
+      g = await geometriaDasAbas(page);
+      if (g.rolaEsq || !g.rolaDir) throw new Error(`voltou ao início e a borda não acompanhou: rolaEsq=${g.rolaEsq} rolaDir=${g.rolaDir}`);
+      await ctx.close();
+    });
+
+    await teste('barra de abas do grupo no computador: cabe inteira, sem borda esmaecida', async () => {
+      const { ctx, page } = await abrir('', {}, GL.id);
+      await page.waitForTimeout(600);
+      const g = await geometriaDasAbas(page);
+      if (g.transborda) throw new Error('a barra transborda no computador: ' + nomeDe(g));
+      if (g.rolaEsq || g.rolaDir) throw new Error('borda esmaecida onde não há mais nada');
+      if (g.mascara && g.mascara !== 'none') throw new Error('máscara aplicada à toa: ' + g.mascara);
       await ctx.close();
     });
   } finally {

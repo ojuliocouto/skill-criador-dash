@@ -30,7 +30,7 @@ import { sincronizarModoDoPainel } from './lib/theme.js';
 import { TEMPOS } from './lib/saudacao.js';
 import { esc } from './lib/html.js';
 import { criarUltimaVale } from './lib/ultima-vale.js';
-import { pedirSenhaNaAba } from './lib/senha-na-aba.js';
+import { pedirSenhaNaAba, pedidoDeSenhaDaPaginaHtml } from './lib/senha-na-aba.js';
 import { brandInnerHtml } from './lib/brand.js';
 import { areaDoPainel, trilhaHtml, acoesHtml, ligarCopiarLink, ligarBarraSolida } from './lib/barra-topo.js';
 import { aplicarPersonalizacao } from './lib/personalizacao.js';
@@ -224,16 +224,7 @@ function cardWith(title, innerHtml, extraClass = '') {
 function renderPasswordPrompt(app, id) {
   let jaTentou = false;
   try { jaTentou = !!sessionStorage.getItem(`dashauth:${id}`); } catch { /* ignora */ }
-  app.innerHTML =
-    `<div class="empty-state">` +
-      `<h2>Dashboard protegido</h2>` +
-      `<p class="subtitle">Digite a senha para acessar este dashboard.</p>` +
-      `<div style="max-width:320px;margin:18px auto 0;display:flex;flex-direction:column;gap:10px">` +
-        `<input id="pwInput" class="input" type="password" placeholder="Senha" autocomplete="current-password" />` +
-        `<button id="pwBtn" class="btn" type="button">Acessar</button>` +
-        `<p class="error" id="pwErr">${jaTentou ? 'Senha incorreta. Tente de novo.' : ''}</p>` +
-      `</div>` +
-    `</div>`;
+  app.innerHTML = pedidoDeSenhaDaPaginaHtml({ jaTentou });
   const input = document.getElementById('pwInput');
   const btn = document.getElementById('pwBtn');
   const submit = async () => {
@@ -1220,6 +1211,18 @@ async function loadDashboardInto(container, config, id, opts = {}) {
   return true;
 }
 
+let soltarBordasDoGrupo = () => {};
+// Mantém a aba ativa do grupo inteira dentro da barra que rola por dentro (celular). Só mexe na rolagem da
+// própria barra, nunca na da página; o mínimo necessário, para a borda esmaecida seguir contando a verdade.
+function manterAbaVisivel(barra) {
+  const ativa = barra && barra.querySelector('.tab.active');
+  if (!ativa || barra.scrollWidth <= barra.clientWidth) return;
+  const esquerda = ativa.offsetLeft - 12;
+  const direita = ativa.offsetLeft + ativa.offsetWidth + 12 - barra.clientWidth;
+  if (esquerda < barra.scrollLeft) barra.scrollLeft = Math.max(0, esquerda);
+  else if (direita > barra.scrollLeft) barra.scrollLeft = direita;
+}
+
 // Renderiza um GRUPO: titulo do grupo + barra de abas + painel. Cada aba carrega
 // um dashboard-filho (por id) no painel, sem recarregar a pagina. As configs dos
 // filhos sao buscadas sob demanda e cacheadas. A aba ativa reflete/atualiza ?tab=.
@@ -1248,10 +1251,19 @@ async function initGroup(app, group, groupId) {
   const panel = document.getElementById('tabpanel');
   const cache = {};
 
+  // A barra de abas rola por dentro em tela estreita (celular): borda esmaecida avisa que há mais para o lado,
+  // igual às abas internas do painel, e a aba ativa nunca fica cortada (3.7.3).
+  // Os ouvintes do painel-filho são soltos a cada carga de aba (soltarOuvintesDaJanela); os desta barra vivem
+  // enquanto o grupo está na tela, por isso ficam à parte.
+  const barraDeAbas = app.querySelector('.tabs');
+  soltarBordasDoGrupo();
+  soltarBordasDoGrupo = ligarBordas(barraDeAbas);
+
   const novaAtivacao = criarUltimaVale();
   const activate = async (childId) => {
     const aindaVale = novaAtivacao();
     app.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === childId));
+    manterAbaVisivel(barraDeAbas);
     // Reflete a aba na URL (compartilhavel) sem empilhar historico.
     try {
       const url = new URL(location.href);

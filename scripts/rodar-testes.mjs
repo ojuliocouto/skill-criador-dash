@@ -36,6 +36,7 @@ const PRECISAM = {
   'test-grupo-no-navegador.cjs': 'navegador (grupo com abas: corrida entre abas e aba com senha)',
   'test-gravar-video-integracao.cjs': 'navegador (grava vídeo de verdade)',
   'test-minigrafico-no-navegador.cjs': 'navegador (mede a faixa de indicadores)',
+  'test-minigrafico-altura-no-navegador.cjs': 'navegador (mede a altura do minigráfico do cartão no painel de verdade, computador e celular)',
   'test-navegadores.cjs': 'Chromium, Firefox e WebKit do Playwright (a matriz: Safari, iPhone, Pixel; npx playwright install chromium firefox webkit)',
   'test-passe-de-gosto-no-navegador.cjs': 'navegador (mutantes do passe de gosto)',
   'test-prova-dash.cjs': 'navegador (o gate de tela abre as páginas de teste)',

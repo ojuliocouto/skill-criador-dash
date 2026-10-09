@@ -307,12 +307,16 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 /* Cartão vizinho do destaque (3.7.1): minigráfico de tendência do período e a variação ao lado, ocupando o que sobra do
    cartão (nunca meio vazio). Mesmo traço fino do destaque, na cor de texto secundária, sem eixo. */
 .kpi--mini { display: flex; flex-direction: column; }
+/* 3.7.3: o cartão cresce junto com a linha do destaque (que tem a barra da meta), e o minigráfico que preenchia o
+   cartão esticava até ~110 px de altura enquanto os outros tinham ~40: o serrilhado ficava exagerado. Agora todos têm
+   a MESMA altura (44 px, teto de 56) e ficam no pé do cartão; a folga sobra entre o número e o traço. */
 .kpi--mini .kpi__linha { flex: 1 1 auto; min-height: 44px; display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
-.kpi--mini .kpi__spark { flex: 1 1 auto; min-width: 0; height: 100%; min-height: 44px; margin-top: 0; align-self: stretch; }
+.kpi--mini .kpi__spark { flex: 1 1 auto; min-width: 0; height: 44px; max-height: 56px; min-height: 0; margin-top: 0; align-self: flex-end; }
 .kpi--mini .kpi__spark polyline { stroke: var(--text-dim); }
 .kpi--mini .kpi__trend { flex: 0 0 auto; margin-top: 0; text-align: right; }
 @container (max-width: 230px) {
-  .kpi--mini .kpi__linha { flex-direction: column; align-items: stretch; gap: 6px; }
+  .kpi--mini .kpi__linha { flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 6px; }
+  .kpi--mini .kpi__spark { align-self: stretch; flex: 0 0 44px; }
   .kpi--mini .kpi__trend { text-align: left; }
 }
 @container (max-width: 120px) {
@@ -440,6 +444,8 @@ label.field { display: block; margin-bottom: 16px; }
 a:focus-visible,
 select.input:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: 2px; }
 .input:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: 2px; border-color: var(--focus-ring, var(--accent-text)); }
+/* Rótulo visível do campo de senha (tela de senha da página e da aba). */
+.lbl-senha { display: block; color: var(--text-dim); font-size: 13px; font-weight: 500; text-align: left; margin-bottom: -4px; }
 label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 6px; }
 
 /* Wizard */
@@ -465,6 +471,7 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 
 /* Misc */
 .row-actions { display: flex; gap: 10px; margin-top: 26px; }
+.empty-state h1.titulo-estado { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14px; } /* a tela de senha da página não tem outro título: h1 (3.7.3), com o tamanho do h2 dos outros estados */
 .empty-state { text-align: center; color: var(--text-dim); padding: 60px 20px; }
 .list-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 /* Celular: o nome e os botões não cabem lado a lado; os botões descem para a linha de baixo, dentro do cartão. */

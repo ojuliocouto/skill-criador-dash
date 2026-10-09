@@ -16,9 +16,29 @@ export function pedidoDeSenhaDaAbaHtml({ jaTentou = false } = {}) {
     `<h2>Esta aba tem senha</h2>` +
     `<p class="subtitle">Digite a senha deste painel para abrir a aba.</p>` +
     `<div style="max-width:320px;margin:18px auto 0;display:flex;flex-direction:column;gap:10px">` +
-      `<input id="abaSenha" class="input" type="password" placeholder="Senha" aria-label="Senha do painel desta aba" autocomplete="current-password" />` +
+      `<label class="lbl-senha" for="abaSenha">Senha do painel desta aba</label>` +
+      `<input id="abaSenha" class="input" type="password" autocomplete="current-password" />` +
       `<button id="abaSenhaBtn" class="btn" type="button">Abrir a aba</button>` +
       `<p class="error" id="abaSenhaErro" role="alert">${jaTentou ? 'Senha incorreta. Tente de novo.' : ''}</p>` +
+    `</div>` +
+  `</div>`;
+}
+
+/**
+ * HTML da tela de senha da página inteira (painel protegido aberto pelo link). O campo tem rótulo visível ligado
+ * por `for`/`id` (3.7.3: antes só tinha o placeholder, que some ao digitar e o leitor de tela anuncia mal).
+ * @param {{ jaTentou?: boolean }} [o]
+ * @returns {string}
+ */
+export function pedidoDeSenhaDaPaginaHtml({ jaTentou = false } = {}) {
+  return `<div class="empty-state">` +
+    `<h1 class="titulo-estado">Dashboard protegido</h1>` +
+    `<p class="subtitle">Digite a senha para acessar este dashboard.</p>` +
+    `<div style="max-width:320px;margin:18px auto 0;display:flex;flex-direction:column;gap:10px">` +
+      `<label class="lbl-senha" for="pwInput">Senha</label>` +
+      `<input id="pwInput" class="input" type="password" autocomplete="current-password" />` +
+      `<button id="pwBtn" class="btn" type="button">Acessar</button>` +
+      `<p class="error" id="pwErr" role="alert">${jaTentou ? 'Senha incorreta. Tente de novo.' : ''}</p>` +
     `</div>` +
   `</div>`;
 }
