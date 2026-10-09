@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.7.3
+version: 3.7.4
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
