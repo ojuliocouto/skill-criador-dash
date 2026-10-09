@@ -17,6 +17,7 @@
  *      NAVEGADORES_PRINTS=<pasta>  guarda um PNG por combinação (para LER)
  *      NAVEGADORES_SO=firefox      roda só os perfis cujo nome contém o texto
  *      NAVEGADORES_TESTE=filtros   roda só as verificações cujo nome contém o texto
+ *      NAVEGADORES_RAF_LENTO=450   simula máquina lenta: o requestAnimationFrame chega 450 ms depois (o ubuntu do CI)
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -27,6 +28,7 @@ const { subirPilha } = require('./stack-local.cjs');
 const CI = Boolean(process.env.CI);
 const PRINTS = process.env.NAVEGADORES_PRINTS || '';
 const SO = process.env.NAVEGADORES_SO || '';
+const RAF_LENTO = Number(process.env.NAVEGADORES_RAF_LENTO || 0);
 if (PRINTS) fs.mkdirSync(PRINTS, { recursive: true });
 
 // ------------------------------------------------------------------ o dado de verdade (lido do CSV de exemplo)
@@ -79,6 +81,8 @@ async function abrirContexto(browser, perfil, extra = {}) {
   pagina.on('requestfailed', (r) => problemas.push(`requisição falhou: ${r.url()} (${(r.failure() || {}).errorText})`));
   pagina.on('response', (r) => { if (r.status() >= 400) problemas.push(`HTTP ${r.status()}: ${r.url()}`); });
   await pagina.addInitScript(() => { document.addEventListener('securitypolicyviolation', (e) => console.error(`CSP bloqueou ${e.violatedDirective}: ${e.blockedURI}`)); });
+  // NAVEGADORES_RAF_LENTO=<ms>: simula máquina lenta (o requestAnimationFrame chega <ms> depois), como no ubuntu do CI.
+  if (RAF_LENTO) await pagina.addInitScript((ms) => { const orig = window.requestAnimationFrame.bind(window); window.requestAnimationFrame = (cb) => orig(() => setTimeout(() => orig(cb), ms)); }, RAF_LENTO);
   pagina.__problemas = problemas;
   return { ctx, pagina };
 }
@@ -91,13 +95,16 @@ async function abrirPainel(pagina, base, id) {
 }
 
 /** Espera todas as animações com fim terminarem (as infinitas, como o carregando, não contam). */
-const quieto = (pagina, limite = 6000) => pagina.waitForFunction(() => !document.getAnimations().some((a) => {
+// 3.7.4: quieto também espera o fim da contagem dos números, que anda por requestAnimationFrame e por isso a lista de
+// animações do navegador não mostra. Enquanto o visor (.kpi__conta), a roleta ou a marca .is-contando existem, não está quieto.
+const quieto = (pagina, limite = 6000) => pagina.waitForFunction(() => !document.querySelector('.kpi__conta, .kpi__roleta, .kpi__value.is-contando') && !document.getAnimations().some((a) => {
   const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
   return a.playState === 'running' && t && Number.isFinite(t.endTime);
 }), null, { timeout: limite, polling: 50 });
 
-// O texto do número SEM a camada da roleta (que, durante o giro, também mora dentro do .kpi__value).
-const lerValor = (k) => { const v = k.querySelector('.kpi__value').cloneNode(true); v.querySelectorAll('.kpi__roleta, .kpi__selo').forEach((e) => e.remove()); return v.textContent; };
+// O texto do número SEM as camadas de efeito (a roleta, no giro, e o visor da contagem, na abertura: as duas moram dentro do
+// .kpi__value, são aria-hidden e repetem o número). Lê só o texto real do cartão.
+const lerValor = (k) => { const v = k.querySelector('.kpi__value').cloneNode(true); v.querySelectorAll('.kpi__roleta, .kpi__conta, .kpi__selo').forEach((e) => e.remove()); return v.textContent; };
 const kpi = (pagina, rotulo) => pagina.evaluate(({ rotulo, fn }) => {
   const ler = new Function('k', `return (${fn})(k)`);
   const c = [...document.querySelectorAll('.kpi')].find((k) => (k.querySelector('.kpi__label') || {}).textContent.trim() === rotulo);
@@ -393,6 +400,36 @@ async function verificar(perfil, browser, base, ids, resultados, teste) {
     assert.equal(m.atributo, false);
     assert.ok(m.display === 'none' || m.opacidade === '0', 'a capa ficou cobrindo o painel: ' + JSON.stringify(m));
     assert.equal(limpar(await kpi(pagina, 'Leads')), inteiro(somar(LINHAS, 'Leads')));
+    assert.deepEqual(pagina.__problemas, []);
+    await fechar();
+  });
+
+  // 3.7.4: a mesma passagem lista -> painel numa máquina lenta (o requestAnimationFrame chega tarde, como no ubuntu do CI).
+  // A contagem da abertura é feita por requestAnimationFrame, não pela API de animações: o `quieto` não a enxerga, e o visor
+  // dela (.kpi__conta, aria-hidden) ainda está no DOM quando a capa já saiu. O contrato: durante a contagem o número lido
+  // (sem as camadas de efeito) e o texto que o leitor de tela lê (sem o que é aria-hidden) são SÓ o valor final, nunca dobrados.
+  await teste(P('efeito 1, máquina lenta: durante a contagem o número lido e o do leitor de tela são só o valor final'), async () => {
+    ({ ctx, pagina } = await abrirContexto(browser, perfil));
+    await pagina.addInitScript((ms) => { const orig = window.requestAnimationFrame.bind(window); window.requestAnimationFrame = (cb) => orig(() => setTimeout(() => orig(cb), ms)); }, 450);
+    await pagina.goto(`${base}/`);
+    await pagina.waitForSelector('.list-item[data-id="' + ids.meta + '"]', { timeout: 15000 });
+    await pagina.waitForTimeout(700);
+    await tocar(perfil, pagina.locator(`.list-item[data-id="${ids.meta}"]`));
+    await pagina.waitForURL(/dashboard/, { timeout: 15000 });
+    await pagina.waitForFunction(() => document.querySelectorAll('.kpi__value').length >= 7, null, { timeout: 30000 });
+    await pagina.waitForFunction(() => document.querySelector('.kpi__value .kpi__conta'), null, { timeout: 9000 });
+    const final = inteiro(somar(LINHAS, 'Leads'));
+    const meio = await pagina.evaluate(() => {
+      const k = [...document.querySelectorAll('.kpi')].find((x) => x.querySelector('.kpi__label').textContent.trim() === 'Leads');
+      const leitor = (no) => (no.nodeType === 3 ? no.textContent : no.nodeType === 1 && no.getAttribute('aria-hidden') !== 'true' ? [...no.childNodes].map(leitor).join('') : '');
+      return { visorVivo: !!k.querySelector('.kpi__conta'), leitor: leitor(k.querySelector('.kpi__value')) };
+    });
+    assert.equal(meio.visorVivo, true, 'o teste perdeu o instante da contagem: o visor já tinha fechado');
+    assert.equal(limpar(meio.leitor), final, 'o texto que o leitor de tela lê durante a contagem não é só o valor final');
+    assert.equal(limpar(await kpi(pagina, 'Leads')), final, 'o número lido durante a contagem não é só o valor final (camada de efeito entrou na leitura)');
+    await quieto(pagina, 9000);
+    assert.equal(await pagina.evaluate(() => document.querySelectorAll('.kpi__conta, .kpi__roleta, .is-contando').length), 0, 'sobrou camada da contagem depois de quieto');
+    assert.equal(limpar(await kpi(pagina, 'Leads')), final);
     assert.deepEqual(pagina.__problemas, []);
     await fechar();
   });
