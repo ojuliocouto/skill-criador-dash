@@ -9,7 +9,7 @@
  * item por item com o print olhado. Também grava um print por tema e perfil para esse olhar.
  *
  * Uso:
- *   node <dir-da-skill>/scripts/passe-de-gosto.js "<URL-DO-DASHBOARD>" [--out evidencias] [--senha X]
+ *   node <dir-da-skill>/scripts/passe-de-gosto.js "<URL-DO-DASHBOARD>" [--out evidencias] [--senha X] [--espera-ms 45000]
  * Grava <out>/passe-de-gosto-medido.json e <out>/passe-<tema>-<perfil>.png. Sai com 1 se mediu algum sinal.
  */
 const fs = require('node:fs');
@@ -29,6 +29,8 @@ async function main() {
   const saida = path.resolve(flag('--out', 'evidencias'));
   // --senha ou a variável CD_SENHA (esta não fica no histórico do terminal nem na lista de processos).
   const senha = flag('--senha') || process.env.CD_SENHA;
+  // Quanto esperar o número de verdade aparecer (padrão 45 s; --espera-ms para mudar, o teste usa 4000).
+  const esperaMs = Math.max(1000, Number(flag('--espera-ms', 45000)) || 45000);
   const pw = acharPlaywright();
   if (!pw) { console.log('Playwright não encontrado: npm i -g playwright && npx playwright install chromium'); return 1; }
   fs.mkdirSync(saida, { recursive: true });
@@ -42,7 +44,14 @@ async function main() {
       await pagina.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
       // A tela de senha só nasce depois da resposta 401 da API. Sem esperar por ela o script media a tela de senha e dava verde.
       if (senha) await entrarComSenha(pagina, String(senha));
-      await pagina.waitForSelector('.kpi__value, .table__el, .resumo__el', { timeout: 30000 });
+      // O esqueleto de carregamento também tem `.kpi__value` (só barras): a espera exige um DÍGITO visível, fora do esqueleto,
+      // como o prova-dash.js. Sem número no tempo, reprova em vez de medir o esqueleto e dar verde (3.7.3).
+      try {
+        await pagina.waitForFunction(() => [...document.querySelectorAll('.kpi__value, .table__el, .resumo__el')]
+          .some((el) => !el.closest('.esqueleto, .esq-kpi, .esq-cartao') && el.getClientRects().length > 0 && /\d/.test(el.innerText || '')), null, { timeout: esperaMs });
+      } catch (_) {
+        throw new Error(`nenhum número visível em ${Math.round(esperaMs / 1000)} s (só o esqueleto de carregamento, ou a página não abriu): o passe de gosto não mede o esqueleto. Confira a fonte de dados do painel.`);
+      }
       await pagina.waitForTimeout(4500); // a abertura (saudação) e a contagem dos números terminam
       const nAbas = await pagina.locator('.abas [role="tab"]').count();
       for (const tema of TEMAS) {

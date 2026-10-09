@@ -4,9 +4,28 @@
  * Uso: node <dir-da-skill>/scripts/test-passe-de-gosto-no-navegador.cjs
  */
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawn } = require('node:child_process');
 const { acharPlaywright } = require('./video/achar-playwright.cjs');
 const { subir, MUTANTES } = require('./efeitos-harness.cjs');
 const { SINAIS, NAO_MEDIDOS, medirNaPagina } = require('./video/sinais-de-gosto.cjs');
+
+const grupoHarness = require('./grupo-harness.cjs');
+
+/** Roda o passe-de-gosto.js de verdade contra uma URL e devolve { status, saida, ms }. */
+function rodarPasse(args, tempoMs) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const f = spawn(process.execPath, [path.join(__dirname, 'passe-de-gosto.js'), ...args], { windowsHide: true });
+    let saida = '';
+    f.stdout.on('data', (d) => { saida += d; });
+    f.stderr.on('data', (d) => { saida += d; });
+    const relogio = setTimeout(() => f.kill(), tempoMs);
+    f.on('close', (status) => { clearTimeout(relogio); resolve({ status, saida, ms: Date.now() - t0 }); });
+  });
+}
 
 let falhas = 0;
 async function teste(nome, fn) {
@@ -53,6 +72,30 @@ async function main() {
       const r = await medir('caixa_alta_espacada', 'dark');
       assert.ok(r.caixa_alta_espacada >= 1);
     });
+
+    // 3.7.3: o passe de gosto esperava `.kpi__value` ou tabela SEM exigir dígito, e o esqueleto de carregamento tem
+    // `.kpi__value` (só barras cinza): a espera se satisfazia com o esqueleto e o script media o esqueleto.
+    const lenta = grupoHarness.painel('painel-lento', 'Painel lento', 777);
+    const harnessLento = await grupoHarness.subir({ paineis: [lenta], atrasoPorLeads: { 777: 60000 } });
+    await teste('passe de gosto: painel que só mostra o esqueleto (sem número) NÃO dá verde, reprova dizendo que não apareceu número', async () => {
+      const saida = fs.mkdtempSync(path.join(os.tmpdir(), 'passe esqueleto '));
+      const r = await rodarPasse([`${harnessLento.url}/dashboard.html?id=${lenta.id}`, '--out', saida, '--espera-ms', '4000'], 90000);
+      assert.notEqual(r.status, 0, `saiu 0 medindo o esqueleto: ${r.saida.slice(0, 200)}`);
+      assert.match(r.saida, /número|dígito/i, `a mensagem não diz o motivo: ${r.saida.slice(0, 200)}`);
+      assert.ok(!fs.existsSync(path.join(saida, 'passe-de-gosto-medido.json')), 'gravou medição de uma tela sem número');
+    });
+    await harnessLento.fechar();
+    const tardia = grupoHarness.painel('painel-tardio', 'Painel tardio', 888);
+    const harnessTardio = await grupoHarness.subir({ paineis: [tardia], atrasoPorLeads: { 888: 5500 } });
+    await teste('passe de gosto: painel que demora 5,5 s para trazer o número é medido DEPOIS do número (abas reais, não o esqueleto)', async () => {
+      const saida = fs.mkdtempSync(path.join(os.tmpdir(), 'passe tardio '));
+      const r = await rodarPasse([`${harnessTardio.url}/dashboard.html?id=${tardia.id}`, '--out', saida], 240000);
+      assert.equal(r.status, 0, `saída ${r.status}: ${r.saida.slice(0, 300)}`);
+      const medido = JSON.parse(fs.readFileSync(path.join(saida, 'passe-de-gosto-medido.json'), 'utf8'));
+      const abas = [...new Set(medido.passes.map((p) => p.aba))];
+      assert.ok(abas.includes('Visão geral'), `mediu ${JSON.stringify(abas)}: o esqueleto, não o painel`);
+    });
+    await harnessTardio.fechar();
   } finally {
     await browser.close();
     await bancada.fechar();
