@@ -30,9 +30,13 @@ const igual = (real, esperado, o) => { if (real !== esperado) throw new Error(`$
   const G = { id: 'grupo', name: 'Grupo de teste', kind: 'group', accent: '#3F6B5C', saudacaoLigada: false, createdAt: '2026-10-02T00:00:00.000Z',
     tabs: [{ id: A.id, label: 'Lento' }, { id: B.id, label: 'Rápido' }, { id: C.id, label: 'Com senha' }] };
   // Grupo com rótulos longos (os do print do celular): as abas não cabem em 390 px e a barra precisa rolar por dentro.
+  const D = painel('painel-d', 'Painel D', 5000);
   const GL = { ...G, id: 'grupo-longo', name: 'Grupo de rótulos longos',
+    tabs: [{ id: A.id, label: 'Planilha ao vivo' }, { id: B.id, label: 'Meta mensal' }, { id: C.id, label: 'Com senha' }, { id: D.id, label: 'Resultado por canal' }] };
+  // Os três rótulos do print do celular (390 px): têm que caber inteiros, sem rolagem e sem corte.
+  const GC = { ...G, id: 'grupo-curto', name: 'Grupo de teste 373',
     tabs: [{ id: A.id, label: 'Planilha ao vivo' }, { id: B.id, label: 'Meta mensal' }, { id: C.id, label: 'Com senha' }] };
-  const bancada = await subir({ paineis: [A, B, C, G, GL], senhas: { [C.id]: SENHA }, atrasoPorLeads: { 1200: 2500 } });
+  const bancada = await subir({ paineis: [A, B, C, D, G, GL, GC], senhas: { [C.id]: SENHA }, atrasoPorLeads: { 1200: 2500 } });
   const browser = await pw.chromium.launch();
   const abrir = async (query, perfil = {}, grupo = 'grupo', esperar = '.tabs .tab') => {
     const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, ...perfil });
@@ -161,8 +165,8 @@ const igual = (real, esperado, o) => { if (real !== esperado) throw new Error(`$
     });
 
     await teste('barra de abas do grupo no celular: abrir direto na última aba deixa a ativa inteira e avisa que há mais à esquerda', async () => {
-      const { ctx, page } = await abrir(`&tab=${C.id}`, CELULAR, GL.id);
-      await page.waitForSelector('#tabpanel input[type="password"]', { timeout: 10000 });
+      const { ctx, page } = await abrir(`&tab=${D.id}`, CELULAR, GL.id);
+      await esperarLeads(page, '5.000', 15000);
       await page.waitForTimeout(600);
       const g = await geometriaDasAbas(page);
       const ativa = g.abas.find((a) => a.ativa);
@@ -171,10 +175,22 @@ const igual = (real, esperado, o) => { if (real !== esperado) throw new Error(`$
       await ctx.close();
     });
 
+    await teste('barra de abas do grupo no celular (390): os três rótulos do print cabem inteiros, sem corte e sem borda esmaecida à toa', async () => {
+      const { ctx, page } = await abrir(`&tab=${C.id}`, CELULAR, GC.id);
+      await page.waitForSelector('#tabpanel input[type="password"]', { timeout: 10000 });
+      await page.waitForTimeout(600);
+      const g = await geometriaDasAbas(page);
+      igual(g.abas.length, 3, 'abas');
+      for (const a of g.abas) if (!inteira(a)) throw new Error(`aba cortada: ${nomeDe(g)}`);
+      igual(g.scrollLeft, 0, 'rolagem');
+      if (g.rolaEsq || g.rolaDir) throw new Error(`borda esmaecida sem ter mais abas: ${nomeDe(g)}`);
+      await ctx.close();
+    });
+
     await teste('barra de abas do grupo no celular: tocar nas abas mantém a ativa inteira, e voltar à primeira desfaz a rolagem', async () => {
       const { ctx, page } = await abrir('', CELULAR, GL.id);
       await esperarLeads(page, '1.200', 15000);
-      for (const rotulo of ['Meta mensal', 'Com senha', 'Meta mensal', 'Planilha ao vivo']) {
+      for (const rotulo of ['Meta mensal', 'Resultado por canal', 'Meta mensal', 'Planilha ao vivo']) {
         await page.locator('.tabs .tab', { hasText: rotulo }).tap();
         await page.waitForTimeout(500);
         const g = await geometriaDasAbas(page);
