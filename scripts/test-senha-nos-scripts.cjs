@@ -52,9 +52,9 @@ iniciar();
 let falhas = 0;
 const checa = (nome, ok, det = '') => { console.log(`${ok ? 'ok   ' : 'FALHA'} ${nome}${det ? ' -> ' + det : ''}`); if (!ok) falhas++; };
 
-function rodar(args, tempoMs) {
+function rodar(args, tempoMs, env = {}) {
   return new Promise((resolve) => {
-    const f = spawn(process.execPath, args, { windowsHide: true });
+    const f = spawn(process.execPath, args, { windowsHide: true, env: { ...process.env, ...env } });
     let saida = '';
     f.stdout.on('data', (d) => { saida += d; });
     f.stderr.on('data', (d) => { saida += d; });
@@ -87,6 +87,10 @@ function rodar(args, tempoMs) {
   r = await rodar([path.join(__dirname, 'prova-dash.js'), url, '--senha', 'errada-de-proposito', '--out', path.join(raiz, 'prova errada')], 120000);
   checa('prova-dash --senha errada: reprova (saída diferente de 0)', r.status !== 0, `saída ${r.status}`);
   checa('prova-dash --senha errada: a mensagem diz que a SENHA foi recusada', /senha/i.test(r.saida.split('\n').filter((l) => /FALHA/.test(l)).join(' ')) && /recusad|incorret/i.test(r.saida), r.saida.split('\n').filter((l) => /FALHA/.test(l)).join(' | ').slice(0, 200));
+
+  // 1b. a senha pode vir da variável CD_SENHA (não fica no histórico do terminal nem na lista de processos).
+  r = await rodar([path.join(__dirname, 'prova-dash.js'), url, '--out', path.join(raiz, 'prova env')], 120000, { CD_SENHA: SENHA });
+  checa('prova-dash com a senha na variável CD_SENHA (sem --senha): aprova', r.status === 0, `saída ${r.status}; ${r.saida.split('\n').filter((l) => /FALHA/.test(l)).join(' | ')}`);
 
   // 2. passe-de-gosto.js: tem que medir o PAINEL (abas "Visão geral" e "Canais"), não a tela de senha.
   const saidaPasse = path.join(raiz, 'passe');

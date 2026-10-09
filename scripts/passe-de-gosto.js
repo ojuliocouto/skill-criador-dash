@@ -27,7 +27,8 @@ async function main() {
   const url = args.find((a) => /^https?:/.test(a));
   if (!url) { console.log('uso: node passe-de-gosto.js "<URL-DO-DASHBOARD>" [--out evidencias] [--senha X]'); return 2; }
   const saida = path.resolve(flag('--out', 'evidencias'));
-  const senha = flag('--senha');
+  // --senha ou a variável CD_SENHA (esta não fica no histórico do terminal nem na lista de processos).
+  const senha = flag('--senha') || process.env.CD_SENHA;
   const pw = acharPlaywright();
   if (!pw) { console.log('Playwright não encontrado: npm i -g playwright && npx playwright install chromium'); return 1; }
   fs.mkdirSync(saida, { recursive: true });

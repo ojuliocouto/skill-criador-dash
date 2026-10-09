@@ -75,7 +75,8 @@ if (!url) {
   console.error('uso: node prova-dash.js <url-do-dashboard> [--senha X] [--out dir]');
   process.exit(2);
 }
-const senha = flag('--senha');
+// A senha vem de --senha ou da variável CD_SENHA (esta não fica no histórico do terminal nem na lista de processos).
+const senha = flag('--senha') || process.env.CD_SENHA || null;
 const outDir = flag('--out', path.join(process.cwd(), 'prova'));
 
 // Um card de KPI so passa com numero de verdade. Traco, travessao, vazio, NaN, erro ou

@@ -53,7 +53,8 @@ async function main() {
   const saida = path.resolve(String(flag('--saida', path.join(process.cwd(), 'prova'))));
   const arquivoDoRoteiro = roteiro.resolverRoteiro(flag('--roteiro'), __dirname);
   const perfis = String(flag('--perfis', 'desktop,mobile')).split(',').map((s) => s.trim()).filter(Boolean);
-  const senha = flag('--senha');
+  // --senha ou a variável CD_SENHA (esta não fica no histórico do terminal nem na lista de processos).
+  const senha = flag('--senha') || process.env.CD_SENHA;
 
   let doc;
   try { doc = JSON.parse(fs.readFileSync(arquivoDoRoteiro, 'utf8')); } catch (e) { console.error(`Não consegui ler o roteiro ${arquivoDoRoteiro}: ${e.message}`); return 2; }
