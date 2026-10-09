@@ -23,8 +23,8 @@ const { acharPlaywright } = require('./video/achar-playwright.cjs');
 
 const SENHA = 'senha-da-bancada';
 const PAGINA = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Dashboard</title>
-<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:18px system-ui;margin:24px}.kpi__value{font-size:40px;min-height:48px}</style></head>
-<body><div id="app"><div class="kpi"><div class="kpi__value esq">&nbsp;</div></div></div>
+<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:18px system-ui;margin:24px}.kpi__value{font-size:40px;min-height:48px}#saudacao{display:none;position:fixed;inset:0;background:#ff0000;z-index:99}html[data-saudar] #saudacao{display:block}</style></head>
+<body><div id="saudacao"></div><div id="app"><div class="kpi"><div class="kpi__value esq">&nbsp;</div></div></div>
 <script>
 const app = document.getElementById('app');
 const guardada = () => { try { return sessionStorage.getItem('dashauth'); } catch (_) { return null; } };
@@ -36,6 +36,9 @@ function pedirSenha() {
   document.getElementById('pwInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
 }
 function painel() {
+  // A saudação de abertura roda DEPOIS da senha: tela cheia vermelha por 2,5 s e depois some (como a cortina do painel de verdade).
+  document.documentElement.setAttribute('data-saudar', '');
+  setTimeout(() => document.documentElement.removeAttribute('data-saudar'), 2500);
   app.innerHTML = '<div class="abas" role="tablist"><button role="tab">Visão geral</button><button role="tab">Canais</button></div>' +
     '<div class="kpi"><div class="kpi__label">Investimento</div><div class="kpi__value">R$ 1.234,00</div></div>' +
     '<div class="kpi"><div class="kpi__label">Leads</div><div class="kpi__value">2.647</div></div>';
@@ -84,6 +87,21 @@ function rodar(args, tempoMs, env = {}) {
   let r = await rodar([path.join(__dirname, 'prova-dash.js'), url, '--senha', SENHA, '--out', path.join(raiz, 'prova ok')], 120000);
   checa('prova-dash --senha certa: aprova o painel (saída 0)', r.status === 0, `saída ${r.status}; ${r.saida.split('\n').filter((l) => /FALHA/.test(l)).join(' | ')}`);
   checa('prova-dash --senha certa: o 401 esperado da tela de senha não vira "request falhou"', !/request falhou/.test(r.saida), (r.saida.match(/FALHA[^\n]*request[^\n]*/) || [''])[0]);
+  // O PNG que o aluno vai OLHAR não pode sair com a saudação de abertura por cima (ela roda depois da senha).
+  {
+    const png = path.join(raiz, 'prova ok', 'dash-desktop.png');
+    const browser = await pw.chromium.launch();
+    const pg = await browser.newPage();
+    await pg.goto('file://' + png);
+    const pixel = await pg.evaluate(async () => {
+      const img = document.querySelector('img'); await img.decode();
+      const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      return Array.from(g.getImageData(Math.floor(c.width / 2), 40, 1, 1).data);
+    });
+    await browser.close();
+    checa('prova-dash --senha certa: o PNG sai com o painel, não com a saudação de abertura por cima', !(pixel[0] > 240 && pixel[1] < 20 && pixel[2] < 20), `pixel do topo ${JSON.stringify(pixel)}`);
+  }
   r = await rodar([path.join(__dirname, 'prova-dash.js'), url, '--senha', 'errada-de-proposito', '--out', path.join(raiz, 'prova errada')], 120000);
   checa('prova-dash --senha errada: reprova (saída diferente de 0)', r.status !== 0, `saída ${r.status}`);
   checa('prova-dash --senha errada: a mensagem diz que a SENHA foi recusada', /senha/i.test(r.saida.split('\n').filter((l) => /FALHA/.test(l)).join(' ')) && /recusad|incorret/i.test(r.saida), r.saida.split('\n').filter((l) => /FALHA/.test(l)).join(' | ').slice(0, 200));

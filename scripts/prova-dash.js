@@ -181,6 +181,13 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
       if (respostasRuins.length) falhas.push(`[${perfil.nome}] request falhou: ${respostasRuins.slice(0, 3).join(' | ')}`);
       if (errosConsole.length) avisos.push(`[${perfil.nome}] erro no console: ${errosConsole.slice(0, 2).join(' | ')}`);
 
+      // A saudação de abertura roda uma vez por sessão e, em painel com senha, DEPOIS da senha: o número já está no
+      // DOM com a cortina ainda por cima. Sem esperar ela sair, o PNG que a pessoa vai olhar sai coberto. Depois
+      // dela, mais um tempo para a entrada das peças e a contagem dos números terminarem (SKILL.md: print só depois de 3 s).
+      await page.waitForFunction(() => !document.documentElement.hasAttribute('data-saudar'), null, { timeout: 12000 }).catch(() => {
+        avisos.push(`[${perfil.nome}] a saudação de abertura não terminou em 12 s: o PNG pode sair com ela por cima`);
+      });
+      await page.waitForTimeout(3000);
       const png = path.join(outDir, `dash-${perfil.nome}.png`);
       await page.screenshot({ path: png, fullPage: true });
       console.log(`  ${perfil.nome}: ${png}`);
