@@ -13,7 +13,7 @@
  *
  * Teste que não tem como rodar nesta máquina se declara pulado imprimindo "PULADO: <motivo>" e saindo com 0: o
  * resumo conta e mostra o motivo de cada um, pular nunca é passar calado. No CI (variável CI) pulo por falta de
- * Playwright conta como FALHA: lá o navegador existe de propósito.
+ * Playwright, de um dos motores (Firefox, WebKit) ou do axe-core conta como FALHA: lá eles existem de propósito.
  *
  * PORTÁTIL = roda só com Node e Python, sem instalar mais nada. Fica fora quem abre navegador (Playwright com
  * Chromium). A lista está em PRECISAM, com o motivo de cada arquivo; teste novo entra como portátil por padrão.
@@ -30,10 +30,12 @@ const TETO_POR_TESTE_MS = 20 * 60 * 1000;
 
 const PRECISAM = {
   'test-barra-topo-no-navegador.cjs': 'navegador (mede a barra do topo ao rolar)',
+  'test-acessibilidade.cjs': 'navegador + axe-core (axe nas telas, teclado, nomes; npm i -g axe-core@4.13.0)',
   'test-celular-no-navegador.cjs': 'navegador (mede o celular em 390 e 360)',
   'test-efeitos-no-navegador.cjs': 'navegador (mede os efeitos de movimento)',
   'test-gravar-video-integracao.cjs': 'navegador (grava vídeo de verdade)',
   'test-minigrafico-no-navegador.cjs': 'navegador (mede a faixa de indicadores)',
+  'test-navegadores.cjs': 'Chromium, Firefox e WebKit do Playwright (a matriz: Safari, iPhone, Pixel; npx playwright install chromium firefox webkit)',
   'test-passe-de-gosto-no-navegador.cjs': 'navegador (mutantes do passe de gosto)',
   'test-prova-dash.cjs': 'navegador (o gate de tela abre as páginas de teste)',
   'test-resolver-playwright.cjs': 'Playwright instalado (acha o pacote pelo npm root -g)',
@@ -91,9 +93,9 @@ function main() {
 
   const estrito = Boolean(process.env.CI) && !soPortateis;
   for (const r of resultados) {
-    if (estrito && r.status === 0 && r.pulado.some((l) => /playwright/i.test(l))) {
+    if (estrito && r.status === 0 && r.pulado.some((l) => /playwright|axe-core/i.test(l))) {
       r.status = 3;
-      console.log(`FALHA em modo CI: ${r.nome} pulou por falta de Playwright, e no CI ele tem que existir.`);
+      console.log(`FALHA em modo CI: ${r.nome} pulou por falta de Playwright (ou do axe-core ou de um motor), e no CI eles têm que existir.`);
     }
   }
   const falhas = resultados.filter((r) => r.status !== 0);
