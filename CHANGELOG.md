@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.7.4
+
+Corrige a falha do CI da 3.7.3 (run 37870517417, só no ubuntu-latest): `WebKit iPhone 14: efeito 1, cartão que vira a tela` lia o número do cartão como `4.4724.472` em vez de `4.472`.
+
+- Causa: era o TESTE, não o painel. Na abertura o painel conta os números por `requestAnimationFrame`, com um visor `.kpi__conta` (`aria-hidden`, `user-select: none`, em posição absoluta sobre o texto real, que fica transparente) dentro do `.kpi__value`. O teste lia o `textContent` do cartão descartando a roleta e o selo, mas não o visor, então somava o texto real ao do visor; e o `quieto` só esperava as animações da API de animações, que não enxerga a contagem por `requestAnimationFrame`. Numa máquina lenta a capa já tinha saído e o visor ainda estava no DOM no instante da leitura. No Mac o visor fecha antes e a falha não aparecia.
+- Não é defeito do painel: medido no WebKit iPhone 14 com o `requestAnimationFrame` atrasado em 450 ms, o texto que o leitor de tela lê durante a contagem (tudo menos o `aria-hidden`) é só o valor final, e no print o número aparece uma vez (o visor sobre o texto real transparente).
+- Correção no teste (`scripts/test-navegadores.cjs`): `lerValor` descarta também o visor `.kpi__conta`; `quieto` passa a esperar o fim da contagem (nenhum visor, roleta ou `.is-contando` no DOM), sem afrouxar nenhuma conferência de número.
+- Teste novo, "efeito 1, máquina lenta": mesma passagem lista -> painel com o `requestAnimationFrame` atrasado em 450 ms; no instante em que o visor está vivo confere que o número lido e o texto do leitor de tela são só o valor final, e que depois de quieto não sobra camada. Reprovava antes da correção (`4.4720` lido) e passa depois.
+- `NAVEGADORES_RAF_LENTO=<ms>` simula máquina lenta em toda a matriz. Com 450 ms, o teste original reprovava 5 de 5 vezes com a mesma mensagem do CI (`4.4724.423` e parecidos) e, com a correção, passa 5 de 5.
+- Nenhum arquivo do painel mudou: o painel que as pessoas recebem é o mesmo da 3.7.3.
+
 ## 3.7.3
 
 Provado nos navegadores que as pessoas usam, no celular, com axe-core e no ar (Cloudflare Pages de teste), em 08/10/2026. Três frentes: navegadores e acessibilidade, senha e grupo e planilha ao vivo, e o fechamento.
