@@ -10,6 +10,8 @@
 /* EFEITO 1: gráfico que responde. Régua, ponto do dia e etiqueta com data e valor. */
 .chart--timeseries { position: relative; }
 .chart--timeseries .chart__svg { touch-action: pan-y; cursor: crosshair; }
+/* Só com teclado (3.7.3): o gráfico recebe foco e as setas leem os dias; o anel de foco precisa aparecer. */
+.chart--timeseries .chart__svg:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: 3px; border-radius: 6px; }
 .chart__regua { stroke: var(--text-faint); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0; pointer-events: none;
   transform-origin: 0 0; transition: transform var(--dur-regua) var(--ease-saida), opacity var(--dur-regua) var(--ease-saida); }
 .chart__foco { fill: var(--accent-graph, var(--accent)); stroke: var(--bg-elev); stroke-width: 2.5; opacity: 0; pointer-events: none;

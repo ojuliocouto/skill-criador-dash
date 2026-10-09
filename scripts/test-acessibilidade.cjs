@@ -9,6 +9,8 @@
  *      trocam de aba e de atalho; Enter e Espaço ordenam; o foco sempre tem contorno visível com contraste mínimo de 3:1.
  *   3. Nomes acessíveis: todo gráfico é uma imagem com nome que diz o que mostra, os cartões de número têm rótulo e valor juntos,
  *      os minigráficos decorativos ficam fora da árvore de acessibilidade, as tabelas têm cabeçalhos de coluna.
+ *   3b. (3.7.3) O gráfico de linha só com teclado: Tab chega nele, as setas andam pelos dias, o valor vai para uma região aria-live.
+ *       A tela de senha tem rótulo visível e o axe dá 0 nela.
  *   4. O detector tem dentes: o mesmo axe, numa cópia da página com defeitos plantados (contraste, nome, rótulo), reprova.
  * Sem o axe-core instalado o teste PULA (e diz como instalar); no CI a variável CI transforma o pulo em falha.
  *
@@ -237,6 +239,105 @@ async function main() {
         await ctx.close();
       });
     }
+
+
+    // ---------------------------------------------------------------- gráfico de linha só com teclado (3.7.3)
+    if (desktop) {
+      await teste('teclado: o gráfico de linha recebe foco por Tab, as setas andam pelos dias e o valor é anunciado numa região aria-live', async () => {
+        const { ctx, pagina } = await novoContexto(desktop, 'light');
+        await pagina.goto(`${pilha.url}/dashboard.html?id=${id}`); await pagina.waitForFunction(() => document.querySelectorAll('.kpi__value').length >= 7); await pagina.waitForTimeout(1500);
+        await pagina.locator('.aba', { hasText: 'Evolução' }).click(); await pagina.waitForSelector('.chart--timeseries .chart__svg', { timeout: 8000 }); await pagina.waitForTimeout(1500);
+        // 1. Tab chega no gráfico (o foco parte da aba "Evolução" e anda no máximo 60 Tabs)
+        await pagina.locator('.aba', { hasText: 'Evolução' }).focus();
+        let chegou = false;
+        for (let k = 0; k < 60 && !chegou; k++) { await pagina.keyboard.press('Tab'); chegou = await pagina.evaluate(() => document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('chart__svg')); }
+        assert.ok(chegou, 'Tab não chegou ao gráfico de linha');
+        const foco = await pagina.evaluate(() => { const e = document.activeElement; const cs = getComputedStyle(e); const d = document.getElementById(e.getAttribute('aria-describedby')); return { largura: parseFloat(cs.outlineWidth), estilo: cs.outlineStyle, dica: d ? d.textContent : '', nome: e.getAttribute('aria-label'), role: e.getAttribute('role') }; });
+        assert.ok(foco.largura >= 2 && foco.estilo !== 'none', `o gráfico focado não mostra contorno: ${foco.largura}px ${foco.estilo}`);
+        assert.match(foco.dica, /setas/i, 'sem a dica de que as setas leem os dias');
+        assert.equal(foco.role, 'img');
+        // 2. o que a tela e o leitor de tela dizem: o dia do ponto, o valor da etiqueta
+        const estado = () => pagina.evaluate(() => {
+          const svg = document.activeElement; const cartao = svg.closest('.chart');
+          const pts = [...svg.querySelectorAll('.chart__point')].map((c) => ({ d: c.getAttribute('data-d'), v: Number(c.getAttribute('data-v')) }));
+          return { anuncio: (cartao.querySelector('.chart__anuncio') || {}).textContent, dicaData: (cartao.querySelector('.chart__dica-data') || {}).textContent, dicaValor: (cartao.querySelector('.chart__dica-valor') || {}).textContent, dicaAtiva: !!cartao.querySelector('.chart__dica.is-ativa'), reguaAtiva: !!svg.querySelector('.chart__regua.is-ativa'), dia: cartao.dataset.diaEmFoco, n: pts.length, pts, rolagem: window.scrollY, ariaLive: (cartao.querySelector('.chart__anuncio') || {}).getAttribute('aria-live') };
+        });
+        let e = await estado();
+        assert.ok(e.n >= 30, `série curta demais para provar (${e.n})`);
+        assert.equal(e.ariaLive, 'polite');
+        assert.equal(Number(e.dia), e.n - 1, 'ao focar, parte do último dia');
+        assert.ok(e.dicaAtiva && e.reguaAtiva, 'a etiqueta e a régua aparecem com o foco do teclado');
+        assert.ok(e.anuncio.includes(e.dicaValor) && e.anuncio.includes(e.dicaData), `o anúncio "${e.anuncio}" não traz data e valor da etiqueta ("${e.dicaData}" / "${e.dicaValor}")`);
+        assert.ok(e.anuncio.includes(`dia ${e.n} de ${e.n}`), `sem a posição: "${e.anuncio}"`);
+        const rolagem0 = e.rolagem;
+        // 3. setas
+        await pagina.keyboard.press('ArrowLeft'); e = await estado();
+        assert.equal(Number(e.dia), e.n - 2, 'ArrowLeft anda um dia para trás');
+        assert.ok(e.anuncio.includes(`dia ${e.n - 1} de ${e.n}`), `anúncio depois de ArrowLeft: "${e.anuncio}"`);
+        assert.equal(e.rolagem, rolagem0, 'as setas não rolam a página');
+        await pagina.keyboard.press('ArrowRight'); e = await estado();
+        assert.equal(Number(e.dia), e.n - 1);
+        await pagina.keyboard.press('ArrowRight'); e = await estado();
+        assert.equal(Number(e.dia), e.n - 1, 'no último dia a seta da direita fica no último');
+        await pagina.keyboard.press('Home'); e = await estado();
+        assert.equal(Number(e.dia), 0); assert.ok(e.anuncio.includes(`dia 1 de ${e.n}`), e.anuncio);
+        await pagina.keyboard.press('End'); e = await estado();
+        assert.equal(Number(e.dia), e.n - 1);
+        // 4. o valor anunciado é o do dado: o mesmo da série (data-v) formatado, de ponta a ponta
+        await pagina.keyboard.press('Home'); e = await estado();
+        const primeiro = e.pts[0];
+        assert.ok(e.dicaData && /\d{2}\/\d{2}/.test(e.dicaData), `etiqueta sem data: "${e.dicaData}"`);
+        assert.ok(String(primeiro.d).includes(e.dicaData.slice(-5).split('/').reverse().join('-')), `a data "${e.dicaData}" não é a do primeiro ponto (${primeiro.d})`);
+        const digitos = (t) => String(t).replace(/\D/g, '');
+        assert.ok(digitos(e.dicaValor).length >= 1 && Math.abs(Number(digitos(e.dicaValor)) - Math.round(primeiro.v * (/,\d\d$/.test(e.dicaValor) ? 100 : 1))) <= 1, `valor "${e.dicaValor}" não bate com o ponto (${primeiro.v})`);
+        // 5. Escape e sair do gráfico limpam a etiqueta e o anúncio
+        await pagina.keyboard.press('Escape'); e = await estado();
+        assert.equal(e.dicaAtiva, false, 'Escape esconde a etiqueta');
+        await pagina.keyboard.press('ArrowRight');
+        await pagina.evaluate(() => { document.activeElement.setAttribute('data-primeiro', '1'); });
+        await pagina.keyboard.press('Tab'); // pode cair no gráfico seguinte, que tem a sua própria etiqueta
+        const fora = await pagina.evaluate(() => { const c = document.querySelector('[data-primeiro]').closest('.chart'); return { ativa: !!c.querySelector('.chart__dica.is-ativa'), regua: !!c.querySelector('.chart__regua.is-ativa'), anuncio: c.querySelector('.chart__anuncio').textContent }; });
+        assert.equal(fora.ativa, false, 'ao sair do gráfico a etiqueta dele some');
+        assert.equal(fora.regua, false, 'ao sair do gráfico a régua dele some');
+        assert.equal(fora.anuncio, '', 'ao sair do gráfico o anúncio dele é limpo');
+        await ctx.close();
+      });
+    }
+
+    // ---------------------------------------------------------------- tela de senha: rótulo e axe (3.7.3)
+    await teste('senha: a tela de senha da página tem rótulo visível ligado ao campo e o axe dá 0', async () => {
+      const hash = require('node:crypto').createHash('sha256').update('senha-de-teste-a11y').digest('hex');
+      const idSenha = await pilha.criar({ name: 'Painel com senha', domain: 'marketing', accent: '#0F5C6E', source: { type: 'csv', data: CSV_TEXTO }, colMap: COLMAP, auth: { hash } });
+      for (const perfil of PERFIS(pw)) {
+        const { ctx, pagina } = await novoContexto(perfil, 'light');
+        await pagina.goto(`${pilha.url}/dashboard.html?id=${idSenha}`); await pagina.waitForSelector('#pwInput', { timeout: 15000 }); await pagina.waitForTimeout(600);
+        const rot = await pagina.evaluate(() => { const l = document.querySelector('label[for="pwInput"]'); const r = l && l.getBoundingClientRect(); return { texto: l && l.textContent.trim(), visivel: !!r && r.width > 20 && r.height > 8, placeholder: document.getElementById('pwInput').getAttribute('placeholder') }; });
+        assert.equal(rot.texto, 'Senha'); assert.ok(rot.visivel, `rótulo invisível (${perfil.nome})`);
+        const r = await rodarAxe(pagina, 'tela de senha', perfil.nome);
+        assert.deepEqual(formatar(r), [], `axe na tela de senha (${perfil.nome})`);
+        await ctx.close();
+      }
+    });
+
+
+    // ---------------------------------------------------------------- assistente, passo 3: botões "Trocar nome" (3.7.3)
+    await teste('nomes: no passo 3 do assistente cada botão "Trocar nome" diz de qual campo é (nome único, e o texto visível está dentro do nome acessível)', async () => {
+      const { ctx, pagina } = await novoContexto(PERFIS(pw)[0], 'light');
+      await pagina.goto(`${pilha.url}/config.html?id=${id}`); await pagina.waitForSelector('#steps'); await pagina.waitForTimeout(1200);
+      for (let passo = 1; passo < 3; passo++) { await pagina.locator('main button', { hasText: /^Continuar/ }).first().click(); await pagina.waitForTimeout(1300); }
+      await pagina.waitForSelector('[data-renomear]', { timeout: 8000 });
+      const botoes = await pagina.evaluate(() => [...document.querySelectorAll('[data-renomear]')].map((b) => ({
+        visivel: b.textContent.trim(), nome: b.getAttribute('aria-label') || b.textContent.trim(),
+        campo: (b.closest('.coluna').querySelector('.coluna__nome') || {}).textContent,
+      })));
+      assert.ok(botoes.length >= 6, `poucos botões para provar (${botoes.length})`);
+      assert.equal(new Set(botoes.map((b) => b.nome)).size, botoes.length, `nomes acessíveis repetidos: ${JSON.stringify(botoes.map((b) => b.nome))}`);
+      for (const b of botoes) {
+        assert.ok(b.nome.includes(b.campo), `o botão "${b.nome}" não diz de qual campo é (${b.campo})`);
+        assert.ok(b.nome.toLowerCase().includes(b.visivel.toLowerCase()), `o nome acessível "${b.nome}" não contém o texto visível "${b.visivel}" (quem fala "Trocar nome" para o aparelho não acha o botão)`);
+      }
+      await ctx.close();
+    });
 
     // ---------------------------------------------------------------- nomes acessíveis
     await teste('nomes: gráficos são imagens com nome, minigráficos são decorativos, cartões têm rótulo e valor, tabelas têm cabeçalhos', async () => {
