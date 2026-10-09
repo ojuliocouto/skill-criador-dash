@@ -29,6 +29,14 @@ tempo constante. O dashboard pede a senha; a API só devolve a config E OS DADOS
 o header correto. Tentativas erradas têm rate limit por KV. `stripSecrets` remove recursivamente
 qualquer credencial da fonte (token/secret/apikey/senha/authorization) das respostas.
 
+### Limite de tentativas erradas (o que conta e o que não conta)
+
+Cada IP tem 8 senhas ERRADAS por painel a cada 5 minutos; a 9ª recebe 429 "Muitas tentativas". Só conta a requisição
+que traz uma senha digitada. Abrir o link sem senha nenhuma (é assim que o painel descobre que precisa pedir a
+senha) NÃO conta, e a senha certa nunca é barrada. Até 3.7.2 a abertura sem senha também contava: com 8 aberturas
+em 5 minutos (uma equipe no mesmo roteador, ou os scripts de prova) o campo de senha dava lugar a "Muitas tentativas".
+Teste: `test/senha-abertura-nao-gasta-limite.test.js`.
+
 ## ID do dashboard protegido (por que ele fica opaco)
 
 Dashboard SEM senha tem id legível, derivado do nome: "Vendas Time Comercial" vira
@@ -76,7 +84,8 @@ Quem tem a senha tem o link direto, e o link opaco ainda ganha em privacidade: m
 onde essa URL passar (mensagem, histórico, log de proxy).
 
 Código em `functions/api/dashboards.js` (`resolverId`, `gerarIdOpaco`, `temSenha`), testes em
-`test/protected-id.test.js`.
+`test/protected-id.test.js`. Como o `id` pedido é ignorado, quem cria o painel pela API TEM que guardar o `id` da
+resposta do POST: é o único jeito de saber o link. Para o hash da senha no POST, `scripts/hash-senha.mjs` (ver SKILL.md).
 
 ## Detalhe do gate por fonte
 
