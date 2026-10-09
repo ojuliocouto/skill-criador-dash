@@ -33,12 +33,14 @@ const PRECISAM = {
   'test-acessibilidade.cjs': 'navegador + axe-core (axe nas telas, teclado, nomes; npm i -g axe-core@4.13.0)',
   'test-celular-no-navegador.cjs': 'navegador (mede o celular em 390 e 360)',
   'test-efeitos-no-navegador.cjs': 'navegador (mede os efeitos de movimento)',
+  'test-grupo-no-navegador.cjs': 'navegador (grupo com abas: corrida entre abas e aba com senha)',
   'test-gravar-video-integracao.cjs': 'navegador (grava vídeo de verdade)',
   'test-minigrafico-no-navegador.cjs': 'navegador (mede a faixa de indicadores)',
   'test-navegadores.cjs': 'Chromium, Firefox e WebKit do Playwright (a matriz: Safari, iPhone, Pixel; npx playwright install chromium firefox webkit)',
   'test-passe-de-gosto-no-navegador.cjs': 'navegador (mutantes do passe de gosto)',
   'test-prova-dash.cjs': 'navegador (o gate de tela abre as páginas de teste)',
   'test-resolver-playwright.cjs': 'Playwright instalado (acha o pacote pelo npm root -g)',
+  'test-senha-nos-scripts.cjs': 'navegador (prova-dash, passe de gosto e gravador entram num painel com senha)',
 };
 
 const achar = () => readdirSync(AQUI).filter((n) => /^test-.+\.(py|cjs)$/.test(n)).sort();

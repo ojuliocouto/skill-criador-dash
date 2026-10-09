@@ -18,6 +18,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { entrarComSenha } = require('./video/entrar-com-senha.cjs');
 
 // Pasta dos pacotes globais, do jeito que o PROPRIO npm informa. T10 (teste com aluno,
 // 02/10/2026): o caminho fixo da maquina do dono nao existe pra quem instalou o Node pelo
@@ -74,7 +75,8 @@ if (!url) {
   console.error('uso: node prova-dash.js <url-do-dashboard> [--senha X] [--out dir]');
   process.exit(2);
 }
-const senha = flag('--senha');
+// A senha vem de --senha ou da variável CD_SENHA (esta não fica no histórico do terminal nem na lista de processos).
+const senha = flag('--senha') || process.env.CD_SENHA || null;
 const outDir = flag('--out', path.join(process.cwd(), 'prova'));
 
 // Um card de KPI so passa com numero de verdade. Traco, travessao, vazio, NaN, erro ou
@@ -123,8 +125,12 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
     const page = await ctx.newPage();
     const errosConsole = [];
     const respostasRuins = [];
-    page.on('console', (m) => { if (m.type() === 'error') errosConsole.push(m.text().slice(0, 200)); });
+    // Painel com senha: a primeira leitura da config SEM senha volta 401 de propósito (é assim que ele sabe que
+    // precisa pedir a senha). Esse 401 é o comportamento certo, não "request falhou". Vale só até a senha entrar.
+    let entrando = !!senha;
+    page.on('console', (m) => { if (m.type() === 'error' && !(entrando && /status of 401/.test(m.text()))) errosConsole.push(m.text().slice(0, 200)); });
     page.on('response', (r) => {
+      if (entrando && r.status() === 401 && /\/api\/dashboards/.test(r.url())) return;
       if (r.status() >= 400) respostasRuins.push(`${r.status()} ${r.url().slice(0, 120)}`);
     });
 
@@ -132,13 +138,9 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
       const resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
       if (resp && resp.status() >= 400) falhas.push(`[${perfil.nome}] a própria página voltou ${resp.status()}`);
 
-      if (senha) {
-        const campo = page.locator('input[type="password"]').first();
-        if (await campo.count()) {
-          await campo.fill(String(senha));
-          await page.keyboard.press('Enter');
-        }
-      }
+      // A tela de senha só nasce depois da resposta 401 da API: espera ela aparecer (ver video/entrar-com-senha.cjs).
+      if (senha) await entrarComSenha(page, String(senha));
+      entrando = false;
 
       // Espera o dado chegar, nao o DOM montar: painel monta o esqueleto na hora e
       // preenche depois. Sem isso a prova fotografa o esqueleto e aprova vazio.
@@ -179,6 +181,13 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
       if (respostasRuins.length) falhas.push(`[${perfil.nome}] request falhou: ${respostasRuins.slice(0, 3).join(' | ')}`);
       if (errosConsole.length) avisos.push(`[${perfil.nome}] erro no console: ${errosConsole.slice(0, 2).join(' | ')}`);
 
+      // A saudação de abertura roda uma vez por sessão e, em painel com senha, DEPOIS da senha: o número já está no
+      // DOM com a cortina ainda por cima. Sem esperar ela sair, o PNG que a pessoa vai olhar sai coberto. Depois
+      // dela, mais um tempo para a entrada das peças e a contagem dos números terminarem (SKILL.md: print só depois de 3 s).
+      await page.waitForFunction(() => !document.documentElement.hasAttribute('data-saudar'), null, { timeout: 12000 }).catch(() => {
+        avisos.push(`[${perfil.nome}] a saudação de abertura não terminou em 12 s: o PNG pode sair com ela por cima`);
+      });
+      await page.waitForTimeout(3000);
       const png = path.join(outDir, `dash-${perfil.nome}.png`);
       await page.screenshot({ path: png, fullPage: true });
       console.log(`  ${perfil.nome}: ${png}`);
