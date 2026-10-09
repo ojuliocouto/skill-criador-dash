@@ -24,7 +24,7 @@ Senha, grupo e planilha do Google
 
 Fechamento (achados da prova no ar, cada um com teste que reprovava antes)
 
-- Grupo no celular: a barra de abas do grupo ganhou a mesma borda esmaecida das abas internas (só do lado em que há mais abas), a aba ativa fica sempre inteira ao abrir direto numa aba do fim e ao tocar nas abas, e a borda acompanha a rolagem mesmo depois que o painel da aba carrega.
+- Grupo no celular: a barra de abas do grupo ganhou a mesma borda esmaecida das abas internas (só do lado em que há mais abas), a aba ativa fica sempre inteira ao abrir direto numa aba do fim e ao tocar nas abas, e a borda acompanha a rolagem mesmo depois que o painel da aba carrega. No celular as abas têm alvo de 44 px e preenchimento menor: três abas de rótulo comum ("Planilha ao vivo", "Meta mensal", "Com senha") cabem inteiras em 390 px, sem rolar.
 - Tela de senha (da página e da aba): rótulo visível ligado ao campo (`label for`), em vez de só o placeholder; a mensagem de erro é anunciada (`role="alert"`) e o título da tela de senha da página passa a ser o `h1` (o axe, em melhor prática, acusava página sem título principal).
 - Minigráfico dos cartões: todos da mesma grade têm a mesma altura (44 px, diferença de até 2 px, teto de 56 px) no computador e no celular, no pé do cartão. Antes o cartão do Investimento esticava o traço até ~110 px porque o cartão crescia com a linha do destaque (que tem a barra da meta), e o serrilhado ficava exagerado.
 - Passe de gosto: só começa a medir depois de um dígito visível fora do esqueleto de carregamento (como o `prova-dash.js` já fazia); sem número em 45 s (`--espera-ms`) reprova com a causa. Antes o esqueleto satisfazia a espera.
