@@ -1,30 +1,27 @@
-// Efeito 5, "meta batida": o momento mais marcante do painel, UMA vez por cruzamento. No instante
-// em que a barra da meta cruza 100% (na troca de período ou no Atualizar): a barra fecha e um
-// clarão percorre ela; o cartão inteiro acende na cor da marca e uma faixa de luz atravessa o
-// cartão de ponta a ponta; o número dá um pulso de escala; o selo "Meta batida" entra com peso
-// (vem grande e assenta). Tudo em ~1,9 s, só transform e opacity, sem filtro nem gradiente.
-// Não repete a cada redesenho enquanto a meta continua batida. ESM.
+// Efeito 5, "meta batida": UMA vez por cruzamento, no instante em que a barra da meta cruza 100%
+// (na troca de período ou no Atualizar). 3.9: o sinal é discreto. A barra fecha na cor de "bom",
+// um clarão curto corre por ela e o selo "Meta batida" entra de leve. O cartão NÃO acende nem é
+// atravessado por faixa de luz (a auditoria de 25/10/2026 mediu 1,9 s de cartão tingido; a direção
+// de arte da skill chama cartão tingido de tell de IA), e o número não pulsa. Só transform e
+// opacity, sem filtro nem gradiente. Não repete a cada redesenho enquanto a meta continua batida.
+// ESM.
 //
 // O selo já está no HTML do indicador sempre que a meta está batida (estado final); aqui ele só
-// ganha a entrada. Camadas do efeito saem do DOM no fim, o cartão volta ao normal. Sem movimento:
-// nada acontece e o selo simplesmente está lá.
+// ganha a entrada. O clarão sai do DOM no fim. Sem movimento: nada acontece e o selo está lá.
 
 import { menosMovimento, CURVA } from './movimento.js';
 
 /**
  * Tempos do marco (ms, contados do instante em que o corpo novo entra no DOM; a barra leva ~640).
- * onda = a luz do cartão e a faixa que o atravessa; clarao = o brilho que corre pela barra;
- * pulso = a escala do número; selo = a entrada do selo.
+ * clarao = o brilho que corre pela barra quando ela fecha; selo = a entrada do selo.
  */
 export const TEMPOS_DO_MARCO = Object.freeze({
-  ondaAtraso: 520, onda: 1400,
-  claraoAtraso: 560, clarao: 760,
-  pulsoAtraso: 780, pulso: 640,
-  seloAtraso: 900, selo: 560,
+  claraoAtraso: 560, clarao: 560,
+  seloAtraso: 620, selo: 320,
 });
 
 /** Quando o último trecho do marco termina (ms). */
-export const DURACAO_TOTAL_DO_MARCO = Math.max(...[['ondaAtraso', 'onda'], ['claraoAtraso', 'clarao'], ['pulsoAtraso', 'pulso'], ['seloAtraso', 'selo']].map(([a, d]) => TEMPOS_DO_MARCO[a] + TEMPOS_DO_MARCO[d]));
+export const DURACAO_TOTAL_DO_MARCO = Math.max(TEMPOS_DO_MARCO.claraoAtraso + TEMPOS_DO_MARCO.clarao, TEMPOS_DO_MARCO.seloAtraso + TEMPOS_DO_MARCO.selo);
 
 /** true só quando a meta estava ABAIXO de 100% e passou a 100% ou mais. Sem partida, não. */
 export function cruzouMeta(antes, depois) {
@@ -33,13 +30,6 @@ export function cruzouMeta(antes, depois) {
   const d = Number(depois);
   if (!Number.isFinite(a) || !Number.isFinite(d)) return false;
   return a < 1 && d >= 1;
-}
-
-/** Raio do círculo que, saindo de `origem`, cobre um cartão `caixa` inteiro (até o canto mais longe). */
-export function raioDaOnda(caixa, origem) {
-  const dx = Math.max(origem.x, caixa.w - origem.x);
-  const dy = Math.max(origem.y, caixa.h - origem.y);
-  return Math.hypot(dx, dy);
 }
 
 const el = (classe, pai) => { const e = document.createElement('span'); e.className = classe; if (pai) pai.appendChild(e); return e; };
@@ -54,49 +44,23 @@ export function marcarMetaBatida(raiz) {
   const cartao = preenchimento && preenchimento.closest('.kpi');
   if (!cartao) return false;
   const T = TEMPOS_DO_MARCO;
-  const ambos = { fill: 'both' };
 
-  // Camada do cartão: a luz cobre tudo, a faixa (corpo mais fraco, ponta mais forte) atravessa.
-  const onda = el('kpi__onda');
-  onda.setAttribute('aria-hidden', 'true');
-  const luz = el('kpi__onda-luz', onda);
-  const passa = el('kpi__onda-passa', onda);
-  el('kpi__onda-faixa', passa);
-  el('kpi__onda-frente', passa);
-  cartao.prepend(onda);
-  luz.animate([{ opacity: 0 }, { opacity: 0.34, offset: 0.35 }, { opacity: 0 }], { duration: T.onda, delay: T.ondaAtraso, easing: 'linear', ...ambos });
-  passa.animate([
-    { transform: 'translateX(-100%)', opacity: 0 },
-    { transform: 'translateX(-30%)', opacity: 1, offset: 0.2 },
-    { transform: 'translateX(120%)', opacity: 1, offset: 0.8 },
-    { transform: 'translateX(180%)', opacity: 0 },
-  ], { duration: T.onda, delay: T.ondaAtraso, easing: 'cubic-bezier(0.45, 0, 0.25, 1)', ...ambos });
-
-  // Barra: um clarão corre por ela e ela engrossa um instante.
+  // Barra: um clarão curto corre por ela no instante em que fecha.
   const trilha = preenchimento.parentElement;
   const clarao = el('kpi__goal-clarao', trilha);
   clarao.setAttribute('aria-hidden', 'true');
-  clarao.animate([{ transform: 'translateX(-110%)', opacity: 0 }, { transform: 'translateX(40%)', opacity: 0.95, offset: 0.35 }, { transform: 'translateX(380%)', opacity: 0 }],
-    { duration: T.clarao, delay: T.claraoAtraso, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', ...ambos });
-  trilha.animate([{ transform: 'scaleY(1)' }, { transform: 'scaleY(1.9)', offset: 0.3 }, { transform: 'scaleY(1)' }],
-    { duration: T.clarao, delay: T.claraoAtraso, easing: CURVA.saida });
+  clarao.animate([{ transform: 'translateX(-110%)', opacity: 0 }, { transform: 'translateX(40%)', opacity: 0.7, offset: 0.4 }, { transform: 'translateX(380%)', opacity: 0 }],
+    { duration: T.clarao, delay: T.claraoAtraso, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'both' });
 
-  // Número: pulso de escala. Selo: entra grande, assenta com um repique.
-  const valor = cartao.querySelector('.kpi__value');
-  if (valor) valor.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.16)', offset: 0.35 }, { transform: 'scale(0.98)', offset: 0.7 }, { transform: 'scale(1)' }],
-    { duration: T.pulso, delay: T.pulsoAtraso, easing: CURVA.saida });
+  // Selo: aparece e assenta, sem repique.
   const selo = cartao.querySelector('.kpi__selo');
   if (selo) {
-    selo.animate([
-      { transform: 'scale(1.9)', opacity: 0 },
-      { transform: 'scale(0.9)', opacity: 1, offset: 0.55 },
-      { transform: 'scale(1.07)', opacity: 1, offset: 0.8 },
-      { transform: 'scale(1)', opacity: 1 },
-    ], { duration: T.selo, delay: T.seloAtraso, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)', fill: 'backwards' });
+    selo.animate([{ transform: 'scale(0.92)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }],
+      { duration: T.selo, delay: T.seloAtraso, easing: CURVA.saida, fill: 'backwards' });
   }
   const texto = cartao.querySelector('.kpi__goal-text');
-  if (texto) texto.animate([{ transform: 'translateY(4px)', opacity: 0.2 }, { transform: 'none', opacity: 1 }], { duration: 360, delay: T.seloAtraso - 80, easing: CURVA.saida, fill: 'backwards' });
+  if (texto) texto.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 240, delay: T.seloAtraso - 60, easing: CURVA.saida, fill: 'backwards' });
 
-  setTimeout(() => { onda.remove(); clarao.remove(); }, DURACAO_TOTAL_DO_MARCO + 200);
+  setTimeout(() => { clarao.remove(); }, DURACAO_TOTAL_DO_MARCO + 200);
   return true;
 }

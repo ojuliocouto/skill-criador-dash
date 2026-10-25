@@ -69,7 +69,7 @@ async function main() {
       { props: { label: 'Receita', format: 'currency' }, valor: 12000 }, { props: { label: 'Cliques', format: 'integer' }, valor: 900 }];
 
     for (const tema of ['dark', 'light']) {
-      await teste(`meta batida (${tema}): dura de 1,6 a 2,4 s e começa e termina por si`, async () => {
+      await teste(`meta batida (${tema}): sinal curto, de 0,8 a 1,3 s, que começa e termina por si`, async () => {
         const { ctx, pagina } = await abrir(browser, bancada.url, { tema });
         await montar(pagina, META);
         const fim = await pagina.evaluate(() => {
@@ -78,11 +78,11 @@ async function main() {
           as.forEach((a) => a.pause());
           return Math.max(0, ...as.map((a) => a.effect.getComputedTiming().endTime));
         });
-        assert.ok(fim >= 1600 && fim <= 2400, `duração total ${fim} ms, fora de 1600 a 2400`);
+        assert.ok(fim >= 800 && fim <= 1300, `duração total ${fim} ms, fora de 800 a 1300`);
         await ctx.close();
       });
 
-      await teste(`meta batida (${tema}): no meio do efeito pelo menos 25% dos pixels do cartão mudam; no fim volta ao normal com o selo`, async () => {
+      await teste(`meta batida (${tema}): o cartão não é tingido (no máximo 12% dos pixels mudam em qualquer instante); no fim volta ao normal com o selo`, async () => {
         const { ctx, pagina } = await abrir(browser, bancada.url, { tema });
         await montar(pagina, META);
         await pagina.evaluate(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))));
@@ -100,12 +100,13 @@ async function main() {
           if (QUADROS) fs.writeFileSync(path.join(QUADROS, `meta-${tema}-${t}ms.png`), quadro);
           medidas[t] = await fracaoMudada(pagina, dataUrl(antes), dataUrl(quadro));
         }
-        const meio = medidas[Math.round(fim * 0.5)];
+        const pico = Math.max(...Object.values(medidas));
         console.log(`        (${tema}) fração mudada por instante: ` + Object.entries(medidas).map(([t, f]) => `${t} ms ${(f * 100).toFixed(1)}%`).join(' | '));
-        assert.ok(meio >= 0.25, `no meio do efeito só ${(meio * 100).toFixed(1)}% do cartão mudou (mínimo 25%)`);
+        assert.ok(pico > 0, 'o sinal da meta batida nunca apareceu');
+        assert.ok(pico <= 0.12, `o efeito mudou ${(pico * 100).toFixed(1)}% do cartão (máximo 12%: sinal discreto, sem tingir o cartão)`);
         // fim: relógio no fim de tudo e a camada do efeito já saiu
         await pagina.evaluate((fim) => { document.getAnimations().forEach((a) => { a.currentTime = fim + 50; a.finish(); }); }, fim);
-        await pagina.waitForFunction(() => !document.querySelector('.kpi__onda'), null, { timeout: 5000 });
+        await pagina.waitForFunction(() => !document.querySelector('.kpi__goal-clarao'), null, { timeout: 5000 });
         await pagina.evaluate(() => document.getAnimations().forEach((a) => a.cancel()));
         const depois = await cartao.screenshot();
         const resto = await fracaoMudada(pagina, dataUrl(antes), dataUrl(depois), 4);
@@ -120,12 +121,12 @@ async function main() {
     await teste('meta batida: com movimento reduzido não toca nada', async () => {
       const { ctx, pagina } = await abrir(browser, bancada.url, { reduzido: true });
       await montar(pagina, META);
-      const r = await pagina.evaluate(() => ({ tocou: window.__efeitos.marcarMetaBatida(document.getElementById('grade')), camadas: document.querySelectorAll('.kpi__onda').length, anims: document.getAnimations().length }));
+      const r = await pagina.evaluate(() => ({ tocou: window.__efeitos.marcarMetaBatida(document.getElementById('grade')), camadas: document.querySelectorAll('.kpi__goal-clarao').length, anims: document.getAnimations().length }));
       assert.deepEqual(r, { tocou: false, camadas: 0, anims: 0 });
       await ctx.close();
     });
 
-    await teste('meta batida: o cartão sem meta batida não acende e a camada do efeito só usa transform e opacity', async () => {
+    await teste('meta batida: só o cartão com a meta batida ganha o sinal, e o efeito só usa transform e opacity', async () => {
       const { ctx, pagina } = await abrir(browser, bancada.url);
       await montar(pagina, META);
       await pagina.evaluate(() => { window.__efeitos.marcarMetaBatida(document.getElementById('grade')); document.getAnimations().forEach((a) => a.pause()); });
@@ -135,7 +136,7 @@ async function main() {
         return [...nomes].sort();
       });
       assert.deepEqual(props.filter((p) => !['transform', 'opacity'].includes(p)), [], 'anima propriedade proibida: ' + props.join());
-      const cartoesComCamada = await pagina.evaluate(() => [...document.querySelectorAll('.kpi')].map((k) => !!k.querySelector('.kpi__onda')));
+      const cartoesComCamada = await pagina.evaluate(() => [...document.querySelectorAll('.kpi')].map((k) => !!k.querySelector('.kpi__goal-clarao')));
       assert.deepEqual(cartoesComCamada, [true, false, false]);
       await ctx.close();
     });

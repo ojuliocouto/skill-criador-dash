@@ -57,15 +57,9 @@
   .filterbar .fb-datas { flex: 1 1 100%; }
 }
 
-/* EFEITO 5: meta batida. O cartão acende na cor da marca, uma faixa de luz o atravessa, um clarão
-   corre pela barra, o número pulsa e o selo entra com peso. As camadas nascem por JS e saem no fim;
-   o "de" de cada animação (opacidade 0) vem do primeiro quadro dela, nunca do CSS. */
-.kpi__onda { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
-.kpi__onda ~ * { position: relative; z-index: 1; }
-.kpi__onda-luz { position: absolute; inset: 0; background: var(--accent-solido, var(--accent)); }
-.kpi__onda-passa { position: absolute; top: 0; bottom: 0; left: 0; width: 55%; }
-.kpi__onda-faixa { position: absolute; inset: 0; background: var(--accent-solido, var(--accent)); opacity: 0.22; }
-.kpi__onda-frente { position: absolute; top: 0; bottom: 0; right: 0; width: 14%; background: var(--accent-solido, var(--accent)); opacity: 0.5; }
+/* EFEITO 5: meta batida (3.9: sinal discreto). A barra fecha na cor de "bom", um clarão curto corre
+   por ela e o selo entra de leve. O cartão não acende nem é atravessado por luz. O clarão nasce por JS
+   e sai no fim; o "de" da animação (opacidade 0) vem do primeiro quadro dela, nunca do CSS. */
 .kpi__goal-track { position: relative; }
 .kpi__goal-clarao { position: absolute; top: 0; bottom: 0; left: 0; width: 28%; background: #fff; pointer-events: none; }
 .kpi__value { transform-origin: 0 60%; }
