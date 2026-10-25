@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.9.2
+
+Correção urgente da 3.9.1, achada no teste de aluno da véspera da aula.
+
+- O `npm test` da cópia do aluno ficava vermelho (1433 de 1435) logo depois do `lancador.py iniciar`: `test/dados-exemplo.test.js` esperava as datas originais de julho no `estoque-exemplo.csv`, que o `iniciar` desloca. A janela do teste agora é relativa à maior data do arquivo, e `scripts/test-exemplos-ate-ontem.py` roda os testes dos exemplos dentro de uma cópia feita pelo `iniciar`.
+- Os exemplos terminam HOJE, não ontem: "Hoje" mostra número e "7 dias" compara 7 dias com os 7 anteriores.
+
 ## 3.9.1
 
 Rodada da aula (26/10), a partir do teste de aluno no clone limpo da 3.9.0.
