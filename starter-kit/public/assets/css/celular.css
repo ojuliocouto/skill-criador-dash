@@ -2,8 +2,10 @@
 /* D12 (3.7.1), celular: alvo de toque de 44 px nos atalhos de período e nas abas; as abas e os atalhos nunca
    quebram de linha, rolam por dentro, e a borda esmaecida avisa que há mais para o lado (rolagem-borda.js). */
 @media (max-width: 620px) {
-  .atalhos { height: auto; }
-  .atalho { min-height: 44px; padding: 0 14px; }
+  /* 3.9.1: na gaveta Filtros os atalhos quebram em 2 linhas, 3 por linha: o "Hoje" ficava escondido à
+     esquerda e o "Personalizado" cortado à direita. A pílula que desliza segue o atalho nas duas linhas. */
+  .atalhos { height: auto; flex-wrap: wrap; overflow: visible; }
+  .atalho { flex: 1 1 calc(33.33% - 2px); justify-content: center; min-height: 44px; padding: 0 8px; }
   .abas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .abas::-webkit-scrollbar { display: none; }
   /* Abas do grupo (3.7.3): alvo de 44 px e preenchimento menor, para três abas de rótulo comum caberem inteiras em 390 px;

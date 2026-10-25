@@ -182,6 +182,15 @@ export function ligarAtalhos(barra, limites, aoMudar) {
   const reposicionar = () => posicionar(false);
   window.addEventListener('resize', reposicionar);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(reposicionar).catch(() => {});
-  return { selecionar, ativo: () => grupo.dataset.ativo, soltar: () => window.removeEventListener('resize', reposicionar) };
+  // 3.9.1: no celular a barra nasce escondida atrás do botão Filtros (largura zero) e os atalhos quebram
+  // em 2 linhas. Quando a gaveta abre, o tamanho do controle muda e a pílula vai pro atalho marcado;
+  // sem isso ela ficava com tamanho zero e o "Tudo" marcado aparecia em branco sobre o fundo claro.
+  const observador = typeof ResizeObserver === 'function' ? new ResizeObserver(reposicionar) : null;
+  if (observador) observador.observe(grupo);
+  return {
+    selecionar,
+    ativo: () => grupo.dataset.ativo,
+    soltar: () => { window.removeEventListener('resize', reposicionar); if (observador) observador.disconnect(); },
+  };
 }
 

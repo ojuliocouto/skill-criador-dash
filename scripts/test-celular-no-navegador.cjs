@@ -104,19 +104,21 @@ async function main() {
         await ctx.close();
       });
 
-      await teste(`${largura}: os atalhos rolam por dentro, a borda avisa que há mais e "Personalizado" é alcançável`, async () => {
+      // 3.9.1: na gaveta Filtros os atalhos quebravam escondidos (Hoje fora à esquerda, Personalizado cortado). Agora 2 linhas.
+      await teste(`${largura}: os atalhos quebram em 2 linhas, todos inteiros à vista, sem rolar, e a pílula fica no marcado`, async () => {
         const { ctx, pagina } = await abrir();
-        await pagina.evaluate(() => { document.querySelector('.atalhos').scrollLeft = 0; });
-        await pagina.waitForTimeout(150);
-        const antes = await pagina.evaluate(() => { const g = document.querySelector('.atalhos'); return { rola: g.scrollWidth > g.clientWidth, dir: g.classList.contains('rola-dir'), esq: g.classList.contains('rola-esq'), mascara: getComputedStyle(g).maskImage || getComputedStyle(g).webkitMaskImage }; });
-        assert.ok(antes.rola, 'neste tamanho os 6 atalhos não cabem: o controle rola por dentro');
-        assert.ok(antes.dir && !antes.esq, 'no começo há mais só à direita');
-        assert.match(antes.mascara, /gradient/, 'a borda esmaecida está desenhada');
-        await pagina.evaluate(() => { const g = document.querySelector('.atalhos'); g.scrollLeft = g.scrollWidth; });
-        await pagina.waitForTimeout(150);
-        const depois = await pagina.evaluate(() => { const g = document.querySelector('.atalhos'); const p = document.querySelector('[data-atalho="personalizado"]').getBoundingClientRect(); const c = g.getBoundingClientRect(); return { esq: g.classList.contains('rola-esq'), dir: g.classList.contains('rola-dir'), dentro: p.left >= c.left - 1 && p.right <= c.right + 1 }; });
-        assert.ok(depois.dentro, '"Personalizado" cabe inteiro dentro do controle ao rolar até o fim');
-        assert.ok(depois.esq && !depois.dir, 'no fim há mais só à esquerda');
+        const botao = pagina.locator('.filtros-abrir[aria-expanded="false"]');
+        if (await botao.isVisible().catch(() => false)) { await botao.tap(); await pagina.waitForTimeout(250); }
+        const m = await pagina.evaluate(() => {
+          const g = document.querySelector('.atalhos'); const c = g.getBoundingClientRect();
+          const itens = [...g.querySelectorAll('[data-atalho]')].map((e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), dentro: r.left >= c.left - 1 && r.right <= c.right + 1 && r.width > 0 }; });
+          const p = document.querySelector('.atalhos__pilula').getBoundingClientRect(); const a = g.querySelector('[aria-checked="true"]').getBoundingClientRect();
+          return { rola: g.scrollWidth > g.clientWidth + 1, linhas: new Set(itens.map((i) => i.top)).size, todosDentro: itens.every((i) => i.dentro), pilula: Math.abs(p.left - a.left) + Math.abs(p.top - a.top) + Math.abs(p.width - a.width) };
+        });
+        assert.equal(m.rola, false, 'o controle não rola de lado');
+        assert.equal(m.linhas, 2, `atalhos em ${m.linhas} linhas`);
+        assert.ok(m.todosDentro, 'todo atalho aparece inteiro');
+        assert.ok(m.pilula <= 2, `a pílula está fora do atalho marcado (${m.pilula} px)`);
         await pagina.locator('[data-atalho="personalizado"]').tap();
         await pagina.waitForTimeout(300);
         assert.equal(await pagina.evaluate(() => document.querySelector('[data-atalho="personalizado"]').getAttribute('aria-checked')), 'true', 'um toque em Personalizado escolhe');
