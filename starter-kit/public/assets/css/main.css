@@ -287,6 +287,7 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 .kpi__trend.is-bad { color: var(--bad); }
 /* Variacao sem julgamento: a metrica nao declara o que e melhor. Cinza de proposito. */
 .kpi__trend.is-neutral { color: var(--text-dim); }
+.kpi__trend--dica { color: var(--text-faint); font-weight: 400; }
 .kpi__trend .kpi__trend-cap { font-family: var(--font); color: var(--text-faint); font-weight: 400; letter-spacing: 0; }
 /* KPI HEROI: a metrica principal do dominio (template.primaryMetric). Hierarquia vem de
    ESPACO e TAMANHO, nunca de fundo colorido nem borda de destaque: card tingido e o tell de

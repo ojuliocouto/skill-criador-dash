@@ -40,7 +40,7 @@ function sparkSvg(serie) {
 }
 
 export function render(props = {}, value) {
-  const { label = '', format = 'number', hint, trend: trendDado, goal: goalDado, unmapped = false, hero = false, spark: sparkDado, heroCompacto = false, mini = false, semDado, taxa } = props;
+  const { label = '', format = 'number', hint, trend: trendDado, goal: goalDado, unmapped = false, hero = false, spark: sparkDado, heroCompacto = false, mini = false, semDado, taxa, dica } = props;
   // semDado (3.9, achado 4): a taxa não existe neste período porque o denominador é zero (CPA sem
   // venda, CPL sem lead, ROAS sem investimento). Antes o cartão mostrava R$ 0,00 enquanto a tabela
   // logo abaixo dizia "sem dado" para o mesmo CPA. Agora o cartão diz "sem dado", igual à tabela, e o
@@ -73,7 +73,9 @@ export function render(props = {}, value) {
         `${esc(trend.text)}` +
         `<span class="kpi__trend-cap"> ${esc(trendCap)}</span>` +
       `</div>`
-    : '';
+    // 3.9.1: sem seta (em "Tudo" não há período anterior), o herói diz como ver a variação, discreto.
+    // Nunca junto com a seta: a dica só ocupa o lugar dela.
+    : (!unmapped && !vazio && dica ? `<div class="kpi__trend is-neutral kpi__trend--dica">${esc(dica)}</div>` : '');
   let goalHtml = '';
   if (!unmapped && goal && Number.isFinite(goal.pct)) {
     const w = Math.max(0, Math.min(100, goal.pct * 100));

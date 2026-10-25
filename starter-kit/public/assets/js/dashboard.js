@@ -304,7 +304,8 @@ function kpiSome(item, mapped) {
   return !!(p && p.seMapeada && mapped && mapped[p.metricKey] === false);
 }
 
-export function renderKpiBlock(itensDoLayout, template, computed, mapped = {}, trends = {}, goal = null, sparks = {}) {
+// opts.semComparacao (3.9.1): texto da dica que o herói mostra quando não há seta (em "Tudo").
+export function renderKpiBlock(itensDoLayout, template, computed, mapped = {}, trends = {}, goal = null, sparks = {}, opts = {}) {
   // Cartão com seMapeada (Resultados e Custo por resultado do Meta Ads) só entra quando a fonte tem
   // a coluna: num CSV sem ela, some em vez de virar mais um "Não mapeada".
   const items = (Array.isArray(itensDoLayout) ? itensDoLayout : []).filter((it) => !kpiSome(it, mapped));
@@ -360,6 +361,7 @@ export function renderKpiBlock(itensDoLayout, template, computed, mapped = {}, t
           heroCompacto: isHero && !heroLargo,
           semDado,
           taxa,
+          dica: isHero && isMapped && !(trends && trends[key]) ? (opts && opts.semComparacao) : undefined,
         },
         value,
       );
@@ -544,7 +546,8 @@ function buildBodyHtml(ctx) {
     if (block.type === 'kpis') {
       flush();
       parts.push(`<section class="section">${renderKpiBlock(block.items, template, ctx.computed, ctx.mapped, ctx.trends, ctx.goal,
-        sparksDaFaixa(template, ctx.dataset && ctx.dataset.rows, ctx.colMap, [template.primaryMetric, ...block.items.map((it) => it && it.props && it.props.metricKey)]))}</section>`);
+        sparksDaFaixa(template, ctx.dataset && ctx.dataset.rows, ctx.colMap, [template.primaryMetric, ...block.items.map((it) => it && it.props && it.props.metricKey)]),
+        { semComparacao: ctx.semComparacao })}</section>`);
       continue;
     }
     const html = renderSingle(block.item, ctx);
@@ -660,6 +663,10 @@ function montarCtx(baseCtx, state) {
   const { computed, mapped } = computeAllMapped(template.metrics, rows, colMap);
   const dateSlot = resolveDateSlot(template);
   const trends = tendenciasDoPeriodo(template, dataset.rows, colMap, state, rows);
+  // 3.9.1: em "Tudo" (sem De nem Até) não há período anterior, e a seta some de propósito. O herói
+  // ganha uma dica discreta pra quem acha que quebrou. Só com coluna de data (sem ela não há período).
+  const emTudo = !(state && (state.from || state.to)) && !!(colMap && colMap[dateSlot]);
+  const semComparacao = emTudo && rows.length ? 'Escolha um período para comparar' : undefined;
   // Período vazio não mexe na meta (o marco de "meta batida" não conta uma volta do vazio).
   const goal = rows.length ? buildGoal(config, computed, mapped, template, janelaDasLinhas(rows, colMap, dateSlot)) : null;
   const ds = { columns: dataset.columns, rows, meta: dataset.meta };
@@ -668,7 +675,7 @@ function montarCtx(baseCtx, state) {
   // pode morar no DOM dele.
   const ui = baseCtx.ui || { abas: [], abaAtiva: null, meta: {} };
   return {
-    config, template, dataset: ds, colMap, computed, mapped, trends, goal,
+    config, template, dataset: ds, colMap, computed, mapped, trends, goal, semComparacao,
     filtro: state, todas: dataset.rows,
     // Com abas em uso: o layout da aba ativa. Sem abas (template sem tabs, ou nenhuma aba com
     // conteúdo): o layout plano do template.
