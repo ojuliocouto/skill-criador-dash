@@ -214,3 +214,19 @@ test('celular: as cinco abas cabem em 390 px sem cortar "Dados" (menos respiro l
   assert.ok(pad <= 9, `respiro lateral de ${pad}px`);
   assert.match(ultima[2], /min-height:\s*44px/);
 });
+
+// ---------------------------------------------------------------- 7. pedidos das outras frentes
+
+test('vazio: funil e gráfico de linha dizem "Nenhum dado neste período." (nunca "Sem dados" solto)', () => {
+  assert.match(renderFunnel({}, []), /Nenhum dado neste período\./);
+  assert.match(renderTimeseries({}, []), /Nenhum dado neste período\./);
+  assert.ok(!/Sem dados/.test(renderFunnel({}, []) + renderTimeseries({}, [])));
+});
+
+test('resumo largo (Meta, 9 métricas) continua tabela a partir de 760 px de cartão; cartões só abaixo disso', () => {
+  const css = semComentario(ler('public/assets/css/main.css'));
+  const corte = Number((css.match(/@container resumo \(max-width: (\d+)px\)\s*\{\s*\.resumo--g/) || [])[1]);
+  assert.ok(corte > 0 && corte <= 760, `resumo--g vira cartão abaixo de ${corte} px`);
+  assert.match(css, /\.resumo--g \.resumo__el th, \.resumo--g \.resumo__el td\s*\{[^}]*padding:\s*\d+px \d+px/, 'tabela larga com respiro menor');
+  assert.match(css, /@container resumo \(max-width: 760px\) \{ \.resumo--g \.ordenar-por \{ display: flex; \} \}/, 'o seletor Ordenar por só aparece junto com os cartões');
+});

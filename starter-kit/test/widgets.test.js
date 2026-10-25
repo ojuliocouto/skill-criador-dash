@@ -82,9 +82,9 @@ test('timeseries: svg com polyline e pontos', () => {
   assert.ok(html.includes('01/01') && html.includes('03/01'), 'datas curtas do primeiro e ultimo ponto');
 });
 
-test('timeseries: lista vazia mostra Sem dados', () => {
+test('timeseries: lista vazia diz que não há dado no período', () => {
   const html = renderTimeseries({ title: 'Vazio' }, []);
-  assert.ok(html.includes('Sem dados'), 'mensagem sem dados');
+  assert.ok(html.includes('Nenhum dado neste período.'), 'mensagem de período sem dado');
   assert.ok(!html.includes('<polyline'), 'nao desenha polyline');
 });
 
@@ -142,8 +142,8 @@ test('funnel: value 0 nao gera NaN nem Infinity', () => {
   assert.ok(!html.includes('Infinity'));
 });
 
-test('funnel: vazio mostra Sem dados', () => {
-  assert.ok(renderFunnel({ title: 'V' }, []).includes('Sem dados'));
+test('funnel: vazio diz que não há dado no período', () => {
+  assert.ok(renderFunnel({ title: 'V' }, []).includes('Nenhum dado neste período.'));
 });
 
 // ---------- table ----------

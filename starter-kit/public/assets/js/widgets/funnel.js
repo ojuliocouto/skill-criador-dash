@@ -46,7 +46,7 @@ export function render(props = {}, steps) {
   const list = Array.isArray(steps) ? steps : [];
 
   if (list.length === 0) {
-    return `<div class="funnel">${titleHtml}<div class="funnel__empty">Sem dados</div></div>`;
+    return `<div class="funnel">${titleHtml}<div class="funnel__empty">Nenhum dado neste período.</div></div>`;
   }
 
   const { larguras, log } = larguraDasEtapas(list.map((s) => s.value));

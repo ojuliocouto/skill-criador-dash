@@ -74,7 +74,7 @@ export function render(props = {}, points) {
     return (
       `<div class="chart chart--timeseries">` +
         titleHtml +
-        `<div class="chart__empty">Sem dados</div>` +
+        `<div class="chart__empty">Nenhum dado neste período.</div>` +
       `</div>`
     );
   }

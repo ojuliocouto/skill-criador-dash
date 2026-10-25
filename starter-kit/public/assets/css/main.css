@@ -642,7 +642,12 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
   .resumo--m .resumo__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
   .resumo--m .resumo__el tfoot tr { border-bottom: 0; margin-top: 10px; padding: 14px; background: var(--bg-elev-2); border-radius: var(--radius-sm); }
 }
-@container resumo (max-width: 1120px) {
+/* 3.9: tabela larga (9 métricas, como o Meta com Resultados e Custo por resultado) com respiro menor;
+   ela só vira cartões abaixo de 760 px de cartão. Antes virava já em 1120 px e, a 1440, a tabela
+   "Resultado por canal" do Meta (cartão de 779 px) aparecia em cartões. */
+.resumo--g .resumo__el th, .resumo--g .resumo__el td { padding: 10px 7px; font-size: 12.5px; }
+.resumo--g .resumo__el tbody th, .resumo--g .resumo__el tfoot th { font-size: 12.5px; }
+@container resumo (max-width: 760px) {
   .resumo--g .resumo__el, .resumo--g .resumo__el tbody, .resumo--g .resumo__el tfoot { display: block; }
   .resumo--g .resumo__el thead { display: none; }
   .resumo--g .resumo__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
@@ -660,6 +665,8 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 .meta__title { font-size: 13.5px; font-weight: 560; color: var(--text-dim); letter-spacing: -0.01em; margin: 0; }
 .meta__rotulo { display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 6px; }
 .meta__input { max-width: 220px; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* 3.9: o campo abre vazio; a sugestão no placeholder é leve, pra não passar por meta digitada. */
+.meta__input::placeholder { font-size: 15px; font-weight: 400; color: var(--text-faint); opacity: 1; }
 .meta__lista { margin: 0; }
 .meta__item { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; padding: 11px 0; border-bottom: 1px solid var(--border); }
 .meta__item:first-child { border-top: 1px solid var(--border); }
@@ -876,4 +883,4 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 }
 @container resumo (max-width: 480px) { .resumo--p .ordenar-por { display: flex; } }
 @container resumo (max-width: 740px) { .resumo--m .ordenar-por { display: flex; } }
-@container resumo (max-width: 1120px) { .resumo--g .ordenar-por { display: flex; } }
+@container resumo (max-width: 760px) { .resumo--g .ordenar-por { display: flex; } }
