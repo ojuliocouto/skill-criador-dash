@@ -25,6 +25,6 @@ export function aplicarMarca(el, accent, isDark, accent2) {
   const texto = textoDeMarcaSobreFundo(cor, segunda, isDark);
   el.style.setProperty('--accent-text', texto);
   el.style.setProperty('--focus-ring', texto);
-  // "Olá," da saudação: a folha da saudação é escura nos dois modos.
+  // "Olá," da saudação no tema escuro (no claro, presenca.css usa --accent-text: a folha segue o tema desde a 3.9).
   el.style.setProperty('--saud-ola', accentText(cor, true));
 }

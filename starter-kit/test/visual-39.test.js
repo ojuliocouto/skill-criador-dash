@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 import { TEMPOS, duracaoDaAbertura, chaveDaContagem, deveContar } from '../public/assets/js/lib/saudacao.js';
 import { TEMPOS_DO_MARCO, DURACAO_TOTAL_DO_MARCO } from '../public/assets/js/lib/meta-batida.js';
-import { render as renderTimeseries, niceScale } from '../public/assets/js/widgets/timeseries.js';
+import { render as renderTimeseries, niceScale, rotuloDoEixo } from '../public/assets/js/widgets/timeseries.js';
 import { render as renderFunnel, larguraDasEtapas } from '../public/assets/js/widgets/funnel.js';
 import { cabecalhoHtml } from '../public/assets/js/lib/cabecalho.js';
 import { alternarFiltros, rotuloDoBotao } from '../public/assets/js/lib/filtros-celular.js';
@@ -175,4 +175,42 @@ test('celular: com filtro aplicado, o botão diz qual (o número na tela está f
   assert.equal(rotuloDoBotao({ aberto: false, aplicado: true }), 'Filtrado');
   assert.equal(textoDoPeriodoCurto({ de: '26/08/2026', ate: '25/10/2026' }), 'Dados de 26/08 a 25/10');
   assert.equal(textoDoPeriodoCurto({ de: '20/12/2025', ate: '05/01/2026' }), 'Dados de 20/12/2025 a 05/01/2026');
+});
+
+// ---------------------------------------------------------------- 6. achados extras (teste de aluno de 25/10)
+
+test('cabeçalho: sem bloco preto repetindo o topo; a faixa vira o título da página, no tema de cada um', () => {
+  const css = semComentario(ler('public/assets/css/main.css'));
+  const temas = [...css.matchAll(/--faixa-bg:\s*([^;]+);/g)].map((m) => m[1].trim());
+  assert.ok(temas.length >= 2, 'token nos dois temas');
+  for (const v of temas) assert.equal(v, 'transparent', `faixa com fundo ${v}`);
+  assert.match(css, /\.faixa__dominio\s*\{[^}]*display:\s*none/, 'a área já está no selo da barra do topo');
+  const presenca = semComentario(ler('public/assets/css/presenca.css'));
+  assert.ok(!/outline:\s*2px solid #fff/.test(presenca + ler('public/assets/css/celular.css')), 'foco branco sumiria no fundo claro');
+});
+
+test('fundo: as linhas onduladas ficam bem sutis atrás do conteúdo', () => {
+  const css = semComentario(ler('public/assets/css/presenca.css'));
+  const op = Number((css.match(/\.fundo__linhas\s*\{[^}]*opacity:\s*([\d.]+)/) || [])[1]);
+  assert.ok(op > 0 && op <= 0.35, `opacidade das linhas ${op}`);
+});
+
+test('eixo de valor diz a unidade: R$ em dinheiro, % em taxa, mil quando passa de 10 mil', () => {
+  assert.equal(rotuloDoEixo(2000, 'currency', 3000), 'R$ 2.000');
+  assert.equal(rotuloDoEixo(20000, 'currency', 30000), 'R$ 20 mil');
+  assert.equal(rotuloDoEixo(0.02, 'percent', 0.03), '2%');
+  assert.equal(rotuloDoEixo(150, 'number', 300), '150');
+  assert.equal(rotuloDoEixo(0, 'currency', 3000), 'R$ 0');
+  const html = renderTimeseries({ format: 'currency' }, serie(10, 1700, 500));
+  const ticks = [...html.matchAll(/class="chart__ytick"[^>]*>([^<]+)</g)].map((m) => m[1]);
+  assert.ok(ticks.every((t) => t.startsWith('R$ ')), ticks.join(' | '));
+});
+
+test('celular: as cinco abas cabem em 390 px sem cortar "Dados" (menos respiro lateral, alvo de 44 px mantido)', () => {
+  const css = semComentario(ler('public/assets/css/celular.css'));
+  const ultima = [...css.matchAll(/(^|\n)\s*\.aba\s*\{([^}]*)\}/g)].pop();
+  assert.ok(ultima, 'regra da aba no celular');
+  const pad = Number((ultima[2].match(/padding:\s*0 (\d+)px/) || [])[1]);
+  assert.ok(pad <= 9, `respiro lateral de ${pad}px`);
+  assert.match(ultima[2], /min-height:\s*44px/);
 });

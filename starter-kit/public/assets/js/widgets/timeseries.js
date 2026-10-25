@@ -4,6 +4,21 @@
 import { esc } from './_util.js';
 import { fmtNumber } from '../lib/format.js';
 
+/**
+ * Rótulo de uma marca do eixo de valor, com a unidade da série (3.9: o eixo saía sem R$ nem %).
+ * Dinheiro: 'R$ 2.000'; acima de 10 mil no topo do eixo, 'R$ 20 mil'. Taxa: '2%'. Número: '150'.
+ * @param {number} v       valor da marca
+ * @param {string} formato 'currency' | 'percent' | 'integer' | 'number'
+ * @param {number} topo    o maior valor do eixo (decide se vira "mil")
+ */
+export function rotuloDoEixo(v, formato, topo) {
+  const mil = Math.abs(Number(topo) || 0) >= 10000;
+  const num = (x) => (mil && x !== 0 ? `${fmtNumber(x / 1000)} mil` : fmtNumber(x));
+  if (formato === 'currency') return `R$ ${num(v)}`;
+  if (formato === 'percent') return `${fmtNumber(Math.round(v * 10000) / 100)}%`;
+  return num(v);
+}
+
 // viewBox com margem reservada: esquerda pros ticks do eixo Y, base pros rotulos de data.
 const W = 600;
 const H = 240;
@@ -99,11 +114,15 @@ export function render(props = {}, points) {
   // Serie com valor negativo mantem o negativo (o zero fica dentro do eixo).
   const { niceMin: min, niceMax: max, ticks: yTicksVals } = niceScale(Math.min(0, dataMin), Math.max(0, dataMax), 4);
 
+  // Rótulos do eixo com unidade: a margem da esquerda cresce pro maior deles (~6,2 unidades por caractere).
+  const rotulosY = yTicksVals.map((v) => rotuloDoEixo(v, format, max));
+  const esquerda = Math.max(M.left, Math.ceil(Math.max(...rotulosY.map((r) => r.length)) * 6.2) + 12);
+
   // area de plotagem (dentro das margens dos eixos).
-  const plotX = M.left;
+  const plotX = esquerda;
   const plotY = M.top;
   const Wc = larguraDoDesenho(props && props.col, props && props.screenWidth);
-  const plotW = Wc - M.left - M.right;
+  const plotW = Wc - esquerda - M.right;
   const plotH = H - M.top - M.bottom;
   const n = list.length;
 
@@ -118,11 +137,11 @@ export function render(props = {}, points) {
 
   // Eixo Y: ticks redondos (de niceScale) com gridlines horizontais discretas.
   const gridHtml = yTicksVals
-    .map((v) => {
+    .map((v, i) => {
       const y = round(yAt(v));
       return (
         `<line class="chart__grid" x1="${round(plotX)}" y1="${y}" x2="${round(plotX + plotW)}" y2="${y}" />` +
-        `<text class="chart__ytick" x="${round(plotX - 6)}" y="${round(y + 3)}" text-anchor="end">${esc(fmtNumber(v))}</text>`
+        `<text class="chart__ytick" x="${round(plotX - 6)}" y="${round(y + 3)}" text-anchor="end">${esc(rotulosY[i])}</text>`
       );
     })
     .join('');

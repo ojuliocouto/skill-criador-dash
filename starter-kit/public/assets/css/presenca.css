@@ -55,6 +55,8 @@
   animation: fundo-deriva-b 82s linear -30s infinite;
 }
 .fundo__linhas {
+  /* 3.9: as curvas passavam atrás dos filtros e entre os cartões e poluíam a leitura (teste de aluno de 25/10). */
+  opacity: 0.3;
   position: absolute; left: -10%; top: 0; width: 120%; height: 100%; overflow: visible; will-change: transform;
   animation: fundo-onda-a 46s linear -6s infinite;
 }
@@ -224,8 +226,6 @@ html[data-sem-contagem] .kpi__value.is-contando { color: var(--text); }
    um traço fino no meio. */
 .esq-barra--traco { display: block; width: 100%; height: 30px; margin: 11px 0 0; border-radius: 0; background: linear-gradient(var(--esq-cor), var(--esq-cor)) center / 100% 2px no-repeat; }
 .esq-barra--traco::after { content: none; }
-/* A faixa é escura nos dois modos: os blocos dela usam o claro da faixa. */
-.esq-faixa { --esq-cor: rgba(255, 255, 255, 0.11); --esq-brilho: rgba(255, 255, 255, 0.1); }
 .esq-faixa .faixa__nome { font-size: 24px; line-height: 1.2; }
 .esq-aba, .esq-aba:hover { cursor: default; background: transparent; }
 .esq-abas .esq-aba:first-child { background: var(--bg-elev-2); }
@@ -256,7 +256,7 @@ html[data-sem-contagem] .kpi__value.is-contando { color: var(--text); }
 /* Largura fixa: o texto muda ("Atualizado há 3 min", "Buscando os números...") sem empurrar o período ao lado. */
 .dados-estado { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; width: 212px; max-width: 100%; text-align: right; }
 .dados-estado__texto { color: var(--faixa-texto-dim); font-size: 12.5px; font-variant-numeric: tabular-nums; min-height: 19px; }
-.dados-estado__texto.is-erro { color: #ffb4ab; }
+.dados-estado__texto.is-erro { color: var(--bad); }
 .dados-estado__botao {
   appearance: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   font-family: var(--font); font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--faixa-texto);
@@ -266,7 +266,7 @@ html[data-sem-contagem] .kpi__value.is-contando { color: var(--text); }
 }
 .dados-estado__botao:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--faixa-texto) 55%, transparent); }
 .dados-estado__botao:active { transform: scale(0.97); }
-.dados-estado__botao:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.dados-estado__botao:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-text)); outline-offset: 2px; }
 .dados-estado__botao.is-loading { cursor: progress; opacity: 0.85; }
 /* Buscando: o ícone gira e o botão não muda de largura (o texto dele continua o mesmo). */
 .dados-estado__icone { display: block; flex-shrink: 0; }

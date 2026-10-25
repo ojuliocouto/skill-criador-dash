@@ -2,8 +2,8 @@
 // domínio e o período dos dados. ESM, puro: monta string HTML já escapada.
 //
 // O logo da config entra quando passa em safeLogoSrc (https ou data:image). Ele vai sobre uma
-// plaquinha clara porque a faixa é escura nos dois temas e a maioria dos logos é desenhada
-// pra fundo claro: sem a plaquinha, um logo escuro sumiria.
+// plaquinha clara porque a maioria dos logos é desenhada pra fundo claro: no tema escuro, sem a
+// plaquinha, um logo escuro sumiria. 3.9: a faixa não é mais um bloco preto; é o título da página.
 
 import { esc } from './html.js';
 import { safeLogoSrc } from './brand.js';
