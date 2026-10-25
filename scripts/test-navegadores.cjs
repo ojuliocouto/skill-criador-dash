@@ -74,6 +74,9 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g
 
 async function abrirContexto(browser, perfil, extra = {}) {
   const ctx = await browser.newContext({ ...perfil.ctx, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', ...extra });
+  // 3.9: "Hoje" e "7 dias" contam do dia do CALENDÁRIO (achado 5). O CSV de exemplo termina em ULTIMO: o relógio
+  // do navegador fica nesse dia, ao meio-dia de São Paulo, para "7 dias" ser a última semana do CSV.
+  await ctx.clock.setFixedTime(new Date(`${ULTIMO}T12:00:00-03:00`));
   const pagina = await ctx.newPage();
   const problemas = [];
   pagina.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') problemas.push(`console.${m.type()}: ${m.text()}`); });

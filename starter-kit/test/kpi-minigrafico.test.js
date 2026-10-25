@@ -14,10 +14,10 @@ const css = readFileSync(join(raiz, 'public/assets/css/main.css'), 'utf8');
 const SERIE = [3, 5, 4, 8, 6, 9];
 
 test('cartão vizinho com série: ganha kpi--mini, o minigráfico e a variação juntos na mesma linha', () => {
-  const h = renderKpi({ label: 'CPL', format: 'currency', mini: true, spark: SERIE, trend: { text: '▼ 7,38%', good: true } }, 26);
+  const h = renderKpi({ label: 'CPL', format: 'currency', mini: true, spark: SERIE, trend: { text: '▼ 7,38%', good: true, rotulo: 'vs. 7 dias anteriores' } }, 26);
   assert.match(h, /class="kpi kpi--mini/);
   assert.match(h, /<div class="kpi__linha">\s*<svg class="kpi__spark"/);
-  assert.match(h, /kpi__linha">.*kpi__trend.*vs\. início.*<\/div><\/div>/s);
+  assert.match(h, /kpi__linha">.*kpi__trend.*vs\. 7 dias anteriores.*<\/div><\/div>/s);
 });
 
 test('cartão vizinho sem série (ou com 1 ponto): sem minigráfico, sem linha, altura do conteúdo', () => {

@@ -85,3 +85,19 @@ test('reconciliarOrdem: tabela de outro formato na mesma aba não herda a ordem;
   assert.equal(reconciliarOrdem(null, 'canais', 'T').aplicar, null);
   assert.equal(reconciliarOrdem(undefined, 'canais', 'T').estado.aba, 'canais');
 });
+
+// 3.9 (achado 8): ordenar mexe no conjunto inteiro da tabela, e o corte de linhas à vista é refeito na
+// ordem nova (as N primeiras da ordem escolhida ficam à vista).
+import { linhasAVista, proximoCorte } from '../public/assets/js/lib/tabela-ordena.js';
+
+test('linhasAVista: as N primeiras ficam à vista; sem corte (tabela resumida), todas', () => {
+  assert.deepEqual(linhasAVista(5, 2), [true, true, false, false, false]);
+  assert.deepEqual(linhasAVista(3, null), [true, true, true]);
+  assert.deepEqual(linhasAVista(2, 10), [true, true]);
+});
+
+test('proximoCorte: Mostrar mais soma o passo sem passar do total', () => {
+  assert.equal(proximoCorte(50, 183, 50), 100);
+  assert.equal(proximoCorte(150, 183, 50), 183);
+  assert.equal(proximoCorte(183, 183, 50), 183);
+});

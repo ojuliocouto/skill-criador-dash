@@ -41,3 +41,28 @@ test('horaCurta: hora e minuto com dois dígitos', () => {
   assert.match(horaCurta(ha(0)), /^\d{2}:\d{2}$/);
   assert.equal(horaCurta('lixo'), '');
 });
+
+// 3.9 (achado 5 da auditoria de 25/10/2026): "Atualizado agora" media a LEITURA, não o dado. Um painel com
+// a planilha parada em 04/10 dizia "Atualizado agora" em 25/10. Quando o dado mais recente é de antes de
+// hoje, o texto diz qual é o último dia com dado.
+import { textoDoFrescor } from '../public/assets/js/lib/atualizado.js';
+
+test('textoDoFrescor: dado de hoje mantém a idade da leitura', () => {
+  const agora = Date.parse('2026-10-25T15:00:00Z');
+  assert.equal(textoDoFrescor({ lidoEm: agora - 5000, ultimoDia: '2026-10-25', hoje: '2026-10-25', agora }), 'Atualizado agora');
+  assert.equal(textoDoFrescor({ lidoEm: agora - 3 * 60000, ultimoDia: '2026-10-25', hoje: '2026-10-25', agora }), 'Atualizado há 3 min');
+});
+
+test('textoDoFrescor: dado mais antigo que hoje diz a data do último dado, e não "Atualizado agora"', () => {
+  const agora = Date.parse('2026-10-25T15:00:00Z');
+  assert.equal(textoDoFrescor({ lidoEm: agora, ultimoDia: '2026-10-04', hoje: '2026-10-25', agora }), 'Último dado: 04/10 (há 21 dias)');
+  assert.equal(textoDoFrescor({ lidoEm: agora, ultimoDia: '2026-10-24', hoje: '2026-10-25', agora }), 'Último dado: 24/10 (ontem)');
+  assert.equal(textoDoFrescor({ lidoEm: agora, ultimoDia: '2025-12-30', hoje: '2026-01-02', agora }), 'Último dado: 30/12/2025 (há 3 dias)');
+});
+
+test('textoDoFrescor: sem coluna de data (ou dado no futuro) fica a idade da leitura', () => {
+  const agora = Date.parse('2026-10-25T15:00:00Z');
+  assert.equal(textoDoFrescor({ lidoEm: agora, ultimoDia: null, hoje: '2026-10-25', agora }), 'Atualizado agora');
+  assert.equal(textoDoFrescor({ lidoEm: agora, ultimoDia: '2026-10-31', hoje: '2026-10-25', agora }), 'Atualizado agora');
+  assert.equal(textoDoFrescor({ lidoEm: null, ultimoDia: null, hoje: '2026-10-25', agora }), '');
+});

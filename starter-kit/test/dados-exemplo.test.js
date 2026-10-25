@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 
 import { parseCSV } from '../functions/lib/csv.mjs';
 import { timeSeries, groupBy } from '../public/assets/js/lib/metrics.js';
-import { splitByPeriod, buildTrends } from '../public/assets/js/dashboard.js';
+import { tendenciasDoPeriodo } from '../public/assets/js/dashboard.js';
 import { template as estoque } from '../public/assets/js/templates/estoque.js';
 import { template as financeiro } from '../public/assets/js/templates/financeiro.js';
 import { registry } from '../public/assets/js/widgets/index.js';
@@ -75,12 +75,12 @@ test('estoque-exemplo.csv: "Faturamento no tempo" rende varios pontos, nao um po
   assert.ok(valores.size >= 3, 'a curva varia ao longo dos dias');
 });
 
-test('estoque-exemplo.csv: KPIs ganham o badge "vs. inicio"', () => {
+test('estoque-exemplo.csv: KPIs ganham a seta contra o período anterior', () => {
   const rows = loadExample('estoque-exemplo.csv');
-  const { current, previous } = splitByPeriod(rows, COL_ESTOQUE, 'data');
-  assert.ok(previous && previous.length > 0, 'ha periodo anterior para comparar');
-  const trends = buildTrends(estoque.metrics, current, previous, COL_ESTOQUE);
+  // Os 3 últimos dias (09 a 11/07) contra os 3 anteriores (06 a 08/07): os dois têm dado.
+  const trends = tendenciasDoPeriodo(estoque, rows, COL_ESTOQUE, { from: '2026-07-09', to: '2026-07-11', dims: {} });
   assert.ok(Object.keys(trends).length > 0, 'pelo menos um KPI mostra tendencia');
+  for (const t of Object.values(trends)) assert.equal(t.rotulo, 'vs. 3 dias anteriores');
 });
 
 test('estoque-exemplo.csv: continua coerente (produtos, categorias e valores)', () => {

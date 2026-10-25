@@ -47,6 +47,44 @@ export function ordemDasLinhas(textos, direcao) {
   return itens.map((x) => x.i);
 }
 
+// ---------------------------------------------------------------- corte de linhas à vista (3.9)
+// A tabela de dados traz todas as linhas (widgets/table.js); só as N primeiras ficam à vista
+// (data-visiveis na <table>). Ordenar mexe no conjunto inteiro e o corte é refeito na ordem nova: as N
+// primeiras da ordem escolhida aparecem. "Mostrar mais" soma um passo ao N.
+
+/** Quais linhas ficam à vista: as `visiveis` primeiras. Sem corte (null), todas. */
+export function linhasAVista(total, visiveis) {
+  const n = Number.isFinite(Number(visiveis)) && visiveis != null ? Number(visiveis) : Infinity;
+  return Array.from({ length: Math.max(0, Number(total) || 0) }, (_, i) => i < n);
+}
+
+/** Novo corte depois de "Mostrar mais": soma o passo sem passar do total. */
+export function proximoCorte(visiveis, total, passo) {
+  return Math.min(Number(total) || 0, (Number(visiveis) || 0) + (Number(passo) || 0));
+}
+
+// Aplica o corte da tabela (só a de dados tem data-visiveis) e acerta o botão e o texto do rodapé.
+function aplicarCorte(tabela) {
+  if (!tabela || tabela.dataset.visiveis == null) return;
+  const corpo = tabela.tBodies[0];
+  if (!corpo) return;
+  const linhas = [...corpo.rows];
+  const vista = linhasAVista(linhas.length, Number(tabela.dataset.visiveis));
+  linhas.forEach((tr, i) => {
+    if (vista[i]) { tr.removeAttribute('data-corte'); tr.style.removeProperty('display'); } else { tr.setAttribute('data-corte', ''); tr.style.display = 'none'; }
+  });
+  const caixa = tabela.closest('.table');
+  const botao = caixa && caixa.querySelector('[data-mostrar-mais]');
+  const aVista = Math.min(linhas.length, Number(tabela.dataset.visiveis));
+  const faltam = linhas.length - aVista;
+  if (botao) {
+    if (faltam <= 0) botao.remove();
+    else botao.textContent = `Mostrar mais ${Math.min(Number(botao.dataset.mostrarMais) || 50, faltam).toLocaleString('pt-BR')}`;
+  }
+  const resumo = caixa && caixa.querySelector('.table__resumo');
+  if (resumo) resumo.textContent = resumo.textContent.replace(/^Mostrando [\d.]+ de /, `Mostrando ${aVista.toLocaleString('pt-BR')} de `);
+}
+
 // ---------------------------------------------------------------- "Ordenar por" (celular)
 // No celular a tabela vira cartões e o cabeçalho some: quem ordena é um seletor "Ordenar por" no topo da tabela
 // (3.7.1, D12). Valor da opção: "<coluna>:<asc|desc>"; vazio = ordem original.
@@ -125,11 +163,13 @@ function ordenar(tabela, indiceDaColuna, direcao, animar = true) {
     novas = [...linhas].sort((a, b) => Number(a.dataset.ordemOriginal) - Number(b.dataset.ordemOriginal));
   }
   novas.forEach((tr) => corpo.appendChild(tr));
+  aplicarCorte(tabela);
   if (!animar || menosMovimento() || typeof Element.prototype.animate !== 'function') return;
   // Linha que viaja longe (a lista embaralhou) sai de perto e aparece: senão a tabela fica em
   // branco enquanto as linhas atravessam a tela vindas de fora dela.
   const TETO = 120;
   novas.forEach((tr, i) => {
+    if (tr.hasAttribute('data-corte')) return; // fora do corte não aparece: não anima
     const dy = antes.get(tr) - tr.getBoundingClientRect().top;
     if (!dy) return;
     const longe = Math.abs(dy) > TETO;
@@ -210,7 +250,20 @@ export function ligarTabelaOrdena(raiz, opcoes = {}) {
     estado = registrarOrdem(estado, abaAtual(), assinaturaDaTabela(cabecalhosDe(tabela)), o ? o.coluna : 0, o ? o.direcao : null);
     ordenar(tabela, o ? o.coluna : 0, o ? o.direcao : null);
   };
-  const aoClicar = (e) => { const th = e.target.closest ? e.target.closest(CABECALHOS) : null; if (th) { preparar(); alternar(th); } };
+  // "Mostrar mais" (tabela de dados): mais um passo de linhas à vista, na ordem que está na tela.
+  const mostrarMais = (botao) => {
+    const caixa = botao.closest('.table');
+    const tabela = caixa && caixa.querySelector('.table__el');
+    if (!tabela) return;
+    const total = tabela.tBodies[0] ? tabela.tBodies[0].rows.length : 0;
+    tabela.dataset.visiveis = String(proximoCorte(Number(tabela.dataset.visiveis), total, Number(botao.dataset.mostrarMais) || 50));
+    aplicarCorte(tabela);
+  };
+  const aoClicar = (e) => {
+    const mais = e.target.closest ? e.target.closest('[data-mostrar-mais]') : null;
+    if (mais) { mostrarMais(mais); return; }
+    const th = e.target.closest ? e.target.closest(CABECALHOS) : null; if (th) { preparar(); alternar(th); }
+  };
   const aoTeclar = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches(CABECALHOS)) { e.preventDefault(); alternar(e.target); } };
   raiz.addEventListener('click', aoClicar);
   raiz.addEventListener('keydown', aoTeclar);

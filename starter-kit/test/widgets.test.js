@@ -177,12 +177,15 @@ test('table: escapa script na celula', () => {
 test('table: respeita pageSize', () => {
   const rows = Array.from({ length: 5 }, (_, i) => ({ N: String(i) }));
   const html = renderTable({ title: 'P', pageSize: 2 }, { columns: ['N'], rows });
-  const tdCount = (html.match(/<td/g) || []).length;
-  assert.equal(tdCount, 2, 'so 2 linhas renderizadas');
+  // 3.9: as 5 linhas entram na tabela (ordenar alcança todas), mas só 2 ficam à vista; o resto espera o "Mostrar mais".
+  const aVista = (html.match(/<tr><td/g) || []).length;
+  const escondidas = (html.match(/<tr data-corte/g) || []).length;
+  assert.equal(aVista, 2, 'so 2 linhas à vista');
+  assert.equal(escondidas, 3, 'as outras 3 escondidas, não fora da tabela');
 });
 
-test('table: vazio mostra Sem dados', () => {
-  assert.ok(renderTable({ title: 'V' }, { columns: [], rows: [] }).includes('Sem dados'));
+test('table: vazio mostra a frase de período sem dado', () => {
+  assert.ok(renderTable({ title: 'V' }, { columns: [], rows: [] }).includes('Nenhum dado neste período.'));
 });
 
 // ---------- ranking ----------
@@ -208,7 +211,7 @@ test('ranking: currency formata valores', () => {
 });
 
 test('ranking: escapa key e trata vazio', () => {
-  assert.ok(renderRanking({ title: 'V' }, []).includes('Sem dados'));
+  assert.ok(renderRanking({ title: 'V' }, []).includes('Nenhum dado neste período.'));
   const html = renderRanking({ title: 'X' }, [{ key: '<b>x</b>', value: 1 }]);
   assert.ok(!html.includes('<b>x</b>'), 'escapa key');
 });

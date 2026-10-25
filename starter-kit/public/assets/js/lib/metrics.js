@@ -135,6 +135,28 @@ export function computeAll(defs, rows, colMap) {
   return computed;
 }
 
+/**
+ * Chave da métrica cujo zero torna a TAXA inexistente: o 2o termo do ratio (CPA = investimento /
+ * conversões) ou o `denominator` declarado na derivada (ROAS: investimento). Métrica de volume: null.
+ * O computeMetric devolve 0 na divisão por zero (contrato antigo, várias contas dependem dele); quem
+ * MOSTRA o número usa esta regra para dizer "sem dado" em vez de R$ 0,00 (3.9, achado 4).
+ * @param {MetricDef|null|undefined} def
+ * @returns {string|null}
+ */
+export function denominadorDaTaxa(def) {
+  if (!def) return null;
+  if (def.agg === 'ratio' && Array.isArray(def.ratioOf) && def.ratioOf[1]) return def.ratioOf[1];
+  if (typeof def.denominator === 'string' && def.denominator) return def.denominator;
+  return null;
+}
+
+/** A taxa não existe neste conjunto de linhas: o denominador é zero (ou vazio). Volume nunca. */
+export function taxaSemDenominador(def, computed) {
+  const den = denominadorDaTaxa(def);
+  if (!den) return false;
+  return !(Number(computed && computed[den]) > 0);
+}
+
 // Indica se um SLOT semantico tem coluna resolvida (mapeada no colMap ou coluna
 // direta com esse nome no dataset). Reexpoe resolveColumn como um booleano, pra
 // quem so precisa saber "tem dado por tras ou nao" sem repetir a logica de

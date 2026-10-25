@@ -11,7 +11,7 @@
 
 import { getDashboard, fetchDataForSource, fetchD1, setDashboardAuth } from './lib/api-client.js';
 import { getTemplate } from './templates/index.js';
-import { computeAll, computeAllMapped, timeSeries } from './lib/metrics.js';
+import { computeAll, computeAllMapped, timeSeries, taxaSemDenominador, denominadorDaTaxa } from './lib/metrics.js';
 import { parseDateBR, fmtPercent } from './lib/format.js';
 import { alvoDaMeta } from './lib/meta-periodo.js';
 import { sha256Hex } from './lib/auth.js';
@@ -23,7 +23,7 @@ import { aplicarMarca } from './lib/marca.js';
 import { moverFundo } from './lib/fundo.js';
 import { esqueletoHtml } from './lib/esqueleto.js';
 import { erroHtml, explicarFalha } from './lib/estado-de-erro.js';
-import { textoAtualizado, proximaTroca, horaCurta } from './lib/atualizado.js';
+import { textoDoFrescor, proximaTroca, horaCurta } from './lib/atualizado.js';
 import { prepararAbertura } from './lib/abertura.js';
 import { comecarProgresso, terminarProgresso } from './lib/carregamento.js';
 import { sincronizarModoDoPainel } from './lib/theme.js';
@@ -50,7 +50,9 @@ import { ocupar } from './wizard/dom.js';
 import { ligarGraficoResponde } from './lib/grafico-responde.js';
 import { fotografarDados, transformarDados } from './lib/grafico-transforma.js';
 import { rolarIndicadores } from './lib/numero-roleta.js';
-import { atalhosHtml, ligarAtalhos } from './lib/periodo-atalhos.js';
+import { atalhosHtml, ligarAtalhos, hojeLocal } from './lib/periodo-atalhos.js';
+import { comparacaoDoPeriodo } from './lib/periodo-anterior.js';
+import { estadoVazio, estadoVazioHtml, SEM_DADOS_NO_PERIODO } from './lib/estado-vazio.js';
 import { cruzouMeta, marcarMetaBatida } from './lib/meta-batida.js';
 import { prepararCapa, levantarCapa } from './lib/cartao-vira-tela.js';
 import { ligarTabelaOrdena } from './lib/tabela-ordena.js';
@@ -82,50 +84,26 @@ export function planLayout(layout) {
 }
 
 /**
- * Divide as linhas em duas metades por data: a primeira metade das datas
- * distintas (previous) e a segunda (current). Serve para calcular tendencia
- * dentro do proprio periodo. Se houver menos de 2 datas validas, nao ha
- * comparacao possivel e previous volta null.
- * @returns {{current:Object[], previous:Object[]|null}}
+ * Monta o mapa de tendências por métrica: o período atual contra o período ANTERIOR do mesmo tamanho
+ * (3.9, achado 3 da auditoria de 25/10/2026; a regra das datas mora em lib/periodo-anterior.js).
+ * Antes a comparação era a 2a metade contra a 1a metade do próprio período ("vs. início"), e em 7 dias
+ * ela inverteu o sinal de Leads, Vendas e Receita. `comparacao` (de comparacaoDoPeriodo) leva o rótulo
+ * ("vs. 7 dias anteriores") e as datas (dica) para o cartão.
+ * Só gera tendência com base anterior diferente de zero, e nunca para taxa sem denominador em um dos
+ * dois períodos (CPA de um período sem venda não é "▼ 100%", é ausência de CPA).
+ * @returns {Object<string,{text:string, good?:boolean, neutral?:boolean, rotulo?:string, titulo?:string}>}
  */
-export function splitByPeriod(rows, colMap, dateSlot) {
-  const col = (colMap && colMap[dateSlot]) || dateSlot;
-  const dated = [];
-  for (const r of (rows || [])) {
-    const iso = parseDateBR(r[col]);
-    if (iso) dated.push({ iso, r });
-  }
-  const uniq = [...new Set(dated.map((d) => d.iso))].sort();
-  if (uniq.length < 2) return { current: rows || [], previous: null };
-  // Metades com o MESMO numero de datas, para que somas sejam comparaveis.
-  // Se o total de datas for impar, a data do meio fica de fora das duas metades.
-  const half = Math.floor(uniq.length / 2);
-  const prevDates = new Set(uniq.slice(0, half));
-  const curDates = new Set(uniq.slice(uniq.length - half));
-  const previous = [];
-  const current = [];
-  for (const d of dated) {
-    if (prevDates.has(d.iso)) previous.push(d.r);
-    else if (curDates.has(d.iso)) current.push(d.r);
-  }
-  if (!previous.length || !current.length) return { current: rows || [], previous: null };
-  return { current, previous };
-}
-
-/**
- * Monta o mapa de tendencias por metrica (2a metade vs 1a metade do periodo).
- * So gera tendencia para metricas com betterWhen definido e denominador nao-zero.
- * @returns {Object<string,{text:string, good:boolean}>}
- */
-export function buildTrends(metrics, curRows, prevRows, colMap) {
+export function buildTrends(metrics, curRows, prevRows, colMap, comparacao = null) {
   if (!prevRows || !prevRows.length) return {};
   const cur = computeAll(metrics, curRows, colMap);
   const prev = computeAll(metrics, prevRows, colMap);
+  const extra = comparacao ? { rotulo: comparacao.rotulo, titulo: comparacao.titulo } : {};
   const trends = {};
   for (const m of (metrics || [])) {
     const c = cur[m.key];
     const p = prev[m.key];
     if (!Number.isFinite(c) || !Number.isFinite(p) || p === 0) continue;
+    if (taxaSemDenominador(m, cur) || taxaSemDenominador(m, prev)) continue;
     const delta = (c - p) / Math.abs(p);
     if (Math.abs(delta) < 0.0005) continue; // praticamente estavel
     const up = c > p;
@@ -136,13 +114,46 @@ export function buildTrends(metrics, curRows, prevRows, colMap) {
     // informacao existe, o julgamento de valor e que nao. Pintar de verde seria inventar uma
     // opiniao que o template deliberadamente nao deu.
     if (!m.betterWhen) {
-      trends[m.key] = { text, neutral: true };
+      trends[m.key] = { text, neutral: true, ...extra };
       continue;
     }
     const good = m.betterWhen === 'higher' ? up : !up;
-    trends[m.key] = { text, good };
+    trends[m.key] = { text, good, ...extra };
   }
   return trends;
+}
+
+/**
+ * Tendências do período na tela contra o período anterior do mesmo tamanho, com os MESMOS filtros de
+ * agrupar (canal etc.). "Tudo", período anterior fora dos dados ou sem linha: {} (sem seta).
+ * @param {object} template
+ * @param {Object[]} todas    linhas da fonte inteira (sem filtro)
+ * @param {object} colMap
+ * @param {{from?:string|null, to?:string|null, dims?:object}} filtro  o filtro na tela (ISO)
+ * @param {Object[]} [linhasDoPeriodo]  linhas já filtradas (evita filtrar de novo)
+ */
+export function tendenciasDoPeriodo(template, todas, colMap, filtro, linhasDoPeriodo) {
+  const col = colMap && colMap[resolveDateSlot(template)];
+  if (!col || !Array.isArray(todas)) return {};
+  const comparacao = comparacaoDoPeriodo(filtro, dateBounds(todas, col));
+  if (!comparacao) return {};
+  const f = filtro || {};
+  const atuais = linhasDoPeriodo || applyFilters(todas, colMap, template, f);
+  const anteriores = applyFilters(todas, colMap, template, { ...f, from: comparacao.anterior.from, to: comparacao.anterior.to });
+  return buildTrends(template.metrics, atuais, anteriores, colMap, comparacao);
+}
+
+/**
+ * Período sem nenhuma linha: em vez de 7 cartões zerados, uma frase que diz por que está vazio e um
+ * botão para o que fazer (3.9, achado 7; texto em lib/estado-vazio.js). Com linha, devolve ''.
+ */
+export function vazioDoCorpo({ template, colMap, todas, linhas, filtro }) {
+  if (Array.isArray(linhas) && linhas.length) return '';
+  const lista = Array.isArray(todas) ? todas : [];
+  const col = colMap && colMap[resolveDateSlot(template)];
+  const limites = col ? dateBounds(lista, col) : { min: null, max: null };
+  const rotulos = Object.fromEntries(dimensionSlots(template).map((d) => [d.key, d.label]));
+  return estadoVazioHtml(estadoVazio({ total: lista.length, filtro: filtro || {}, limites, rotulos }));
 }
 
 /**
@@ -181,6 +192,9 @@ export function buildGoal(config, computed, mapped = {}, template = null, janela
   // escolhido pela config (T7) a meta passou a poder cair num CPA, e val/target dizia
   // "95% da meta" pra um CPA que ja estava melhor que o alvo.
   const def = template && findMetricDef(template, g.metricKey);
+  // Taxa sem denominador (ROAS sem investimento, CPA sem venda) não tem meta a comparar (3.9).
+  const denDaMeta = denominadorDaTaxa(def);
+  if (denDaMeta && computed && denDaMeta in computed && taxaSemDenominador(def, computed)) return null;
   const menorMelhor = def && def.betterWhen === 'lower';
   if (menorMelhor && val <= 0) return null;
   // Meta de custo (menor é melhor) não escala com o tamanho do período: o CPA do mês é o CPA do mês.
@@ -193,7 +207,15 @@ export function buildGoal(config, computed, mapped = {}, template = null, janela
   // Comparação proporcional que passou de 100%: o percentual sozinho parece meta batida. O texto diz que é ritmo;
   // o selo e o marco ficam para a meta de verdade batida (mês cheio, mês em curso já acima da meta inteira, período, total).
   const acima = justa === false && pct >= 1 ? ', acima do ritmo' : '';
-  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} ${rotulo}${acima}`, justa };
+  return { metricKey: g.metricKey, pct, text: `${textoDoAlcance(pct, rotulo)}${acima}`, justa };
+}
+
+// "499,73% da meta proporcional" não se lê (teste de aluno, 25/10/2026). Do dobro em diante, múltiplo com
+// até uma casa ("5x a meta", "2,5x a meta do período"); abaixo disso, o percentual de sempre.
+const MULTIPLO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+export function textoDoAlcance(pct, rotulo) {
+  if (Number.isFinite(pct) && pct >= 2) return `${MULTIPLO.format(Math.round(pct * 10) / 10)}x ${String(rotulo).replace(/^da /, 'a ')}`;
+  return `${fmtPercent(pct)} ${rotulo}`;
 }
 
 /**
@@ -316,6 +338,11 @@ export function renderKpiBlock(itensDoLayout, template, computed, mapped = {}, t
       const isMapped = mapped[key] !== false;
       const value = computed[key];
       const goalForKpi = isMapped && goal && goal.metricKey === key ? goal : undefined;
+      // Divisão por zero (3.9, achado 4): "sem dado", igual à tabela, com o motivo no nome da métrica
+      // que faltou ("Sem conversões no período"). taxa 'custo' marca CPA, CPL, CPC e custo por resultado.
+      const den = denominadorDaTaxa(def);
+      const semDado = isMapped && taxaSemDenominador(def, computed) ? `Sem ${rotuloMinusculo(template, den)} no período` : undefined;
+      const taxa = den && format === 'currency' ? 'custo' : undefined;
       const isHero = temHero && key === heroKey;
       // Destaque largo estica os vizinhos da mesma linha: cada um ganha o minigráfico da própria série (3.7.1).
       const miniOk = heroLargo && !isHero && isMapped && Array.isArray(sparks && sparks[key]) && sparks[key].length >= 2;
@@ -331,6 +358,8 @@ export function renderKpiBlock(itensDoLayout, template, computed, mapped = {}, t
           spark: isHero || miniOk ? sparks[key] : undefined,
           mini: miniOk,
           heroCompacto: isHero && !heroLargo,
+          semDado,
+          taxa,
         },
         value,
       );
@@ -342,6 +371,14 @@ export function renderKpiBlock(itensDoLayout, template, computed, mapped = {}, t
   // Agora a contagem vai explicita e o CSS monta a faixa com o numero certo de colunas.
   const unidades = items.length + (heroLargo ? 1 : 0);
   return `<div class="grid kpis" style="--kpi-cols:${faixaDeKpi(unidades)}">${cards}</div>`;
+}
+
+// Nome da métrica em minúscula para a frase do motivo ("Sem conversões no período"). Usa o nome que a
+// pessoa deu (config.labels já está no template); sigla (CPA) e nome próprio ficam como estão.
+function rotuloMinusculo(template, key) {
+  const def = findMetricDef(template, key);
+  const rotulo = (def && def.label) || key || '';
+  return /^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{2,}$/.test(rotulo) ? rotulo : rotulo.charAt(0).toLowerCase() + rotulo.slice(1);
 }
 
 // Quantas colunas a faixa de indicadores declara. Até 7 unidades cabem numa linha. De 8 em
@@ -476,7 +513,7 @@ function serieDaMetrica(template, rows, colMap, key) {
   for (const iso of [...porDia.keys()].sort()) {
     const { computed, mapped } = computeAllMapped(metrics, porDia.get(iso), colMap);
     if (mapped[key] === false) return null;
-    if (def.agg === 'ratio' && !Number(computed[def.ratioOf[1]])) continue;
+    if (taxaSemDenominador(def, computed)) continue;
     const v = computed[key];
     if (Number.isFinite(v)) serie.push(v);
   }
@@ -622,9 +659,9 @@ function montarCtx(baseCtx, state) {
   const rows = applyFilters(dataset.rows, colMap, template, state);
   const { computed, mapped } = computeAllMapped(template.metrics, rows, colMap);
   const dateSlot = resolveDateSlot(template);
-  const { current, previous } = splitByPeriod(rows, colMap, dateSlot);
-  const trends = buildTrends(template.metrics, current, previous, colMap);
-  const goal = buildGoal(config, computed, mapped, template, janelaDasLinhas(rows, colMap, dateSlot));
+  const trends = tendenciasDoPeriodo(template, dataset.rows, colMap, state, rows);
+  // Período vazio não mexe na meta (o marco de "meta batida" não conta uma volta do vazio).
+  const goal = rows.length ? buildGoal(config, computed, mapped, template, janelaDasLinhas(rows, colMap, dateSlot)) : null;
   const ds = { columns: dataset.columns, rows, meta: dataset.meta };
   // ui = o que sobrevive ao repaint: as abas em uso, a aba ativa e o que foi digitado na
   // calculadora de meta. O corpo é trocado inteiro a cada mudança de filtro, então nada disso
@@ -632,6 +669,7 @@ function montarCtx(baseCtx, state) {
   const ui = baseCtx.ui || { abas: [], abaAtiva: null, meta: {} };
   return {
     config, template, dataset: ds, colMap, computed, mapped, trends, goal,
+    filtro: state, todas: dataset.rows,
     // Com abas em uso: o layout da aba ativa. Sem abas (template sem tabs, ou nenhuma aba com
     // conteúdo): o layout plano do template.
     layout: layoutDaAba({ ...template, tabs: ui.abas }, ui.abaAtiva),
@@ -667,7 +705,8 @@ function renderBody(baseCtx, state, modo = 'quieto', extra = {}) {
   // A classe entra ANTES do conteúdo: os elementos novos já nascem com a animação de entrada.
   // Fora da entrada ela sai, então o conteúdo novo nasce parado.
   bodyEl.classList.toggle('anima-entrada', modo === 'entrada');
-  bodyEl.innerHTML = buildBodyHtml(ctx) || '<div class="empty-state"><p>Nenhum dado para os filtros selecionados.</p></div>';
+  bodyEl.innerHTML = vazioDoCorpo({ template: ctx.template, colMap: ctx.colMap, todas: ctx.todas, linhas: ctx.dataset.rows, filtro: ctx.filtro })
+    || buildBodyHtml(ctx) || estadoVazioHtml({ frase: SEM_DADOS_NO_PERIODO, acao: null });
   if (metaEl) metaEl.textContent = buildMetaText(ctx.dataset);
   if (modo === 'entrada') contarIndicadores(bodyEl, { atraso: extra.atraso || 0 });
   if (modo === 'filtro') {
@@ -929,7 +968,8 @@ function wireFilters(baseCtx) {
   if (!bar) return;
   // Atalhos de período (efeito 4): um clique põe a faixa nos campos e dispara a transição.
   const dateCol = baseCtx.colMap && baseCtx.colMap[resolveDateSlot(baseCtx.template)];
-  const limites = dateCol ? dateBounds(baseCtx.dataset.rows, dateCol) : { min: null, max: null };
+  // "Hoje" é o dia do calendário de quem vê (3.9, achado 5), não o último dia com dado.
+  const limites = { ...(dateCol ? dateBounds(baseCtx.dataset.rows, dateCol) : { min: null, max: null }), hoje: hojeLocal() };
   baseCtx.atalhos = ligarAtalhos(bar, limites, () => renderBody(baseCtx, readFilterState(), 'filtro'));
   if (baseCtx.atalhos) ouvintesDaJanela.push(baseCtx.atalhos.soltar);
   bar.addEventListener('change', () => renderBody(baseCtx, readFilterState(), 'filtro'));
@@ -975,7 +1015,7 @@ export function renderDashboard(app, baseCtx, opts = {}) {
   const periodo = periodoDosDados(dataset.rows, colMap, resolveDateSlot(template));
   const comFaixa = opts.showHeader !== false;
   const dados = typeof opts.aoAtualizar === 'function'
-    ? { texto: textoAtualizado(dataset.meta && dataset.meta.fetchedAt) }
+    ? { texto: frescorDosDados(baseCtx) }
     : null;
   const header = comFaixa
     ? cabecalhoHtml({ nome: config.name, dominio: template.label, periodo, logo: config.logo, logoFundo: config.logoFundo, dados })
@@ -1042,6 +1082,7 @@ export function renderDashboard(app, baseCtx, opts = {}) {
   ouvintesDaJanela.push(ligarGraficoResponde(document.getElementById('dashbody')));
   ouvintesDaJanela.push(ligarTabelaOrdena(document.getElementById('dashbody'), { aba: () => (baseCtx.ui ? baseCtx.ui.abaAtiva : '') }));
   wireAtualizar(app, baseCtx, opts);
+  wireVazio(baseCtx);
   return { abaAtiva: () => (baseCtx.ui ? baseCtx.ui.abaAtiva : null) };
 }
 let vezDaAbertura = 0;
@@ -1066,6 +1107,28 @@ function restaurarFiltros(estado) {
   return true;
 }
 
+// Frescor dos números na faixa (3.9, achado 5): com dado de hoje, a idade da leitura ("Atualizado há
+// 3 min"); com o dado mais recente de antes de hoje, a data dele ("Último dado: 04/10 (há 21 dias)").
+function frescorDosDados(baseCtx) {
+  const { dataset, colMap, template } = baseCtx;
+  const col = colMap && colMap[resolveDateSlot(template)];
+  const ultimoDia = col && dataset ? dateBounds(dataset.rows || [], col).max : null;
+  return textoDoFrescor({ lidoEm: dataset && dataset.meta && dataset.meta.fetchedAt, ultimoDia, hoje: hojeLocal() });
+}
+
+// O botão do estado vazio: "Ver todo o período" volta ao atalho Tudo; "Limpar filtros" usa o Limpar da barra.
+function wireVazio(baseCtx) {
+  const bodyEl = document.getElementById('dashbody');
+  if (!bodyEl) return;
+  bodyEl.addEventListener('click', (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('[data-vazio-acao]') : null;
+    if (!b) return;
+    if (b.dataset.vazioAcao === 'tudo' && baseCtx.atalhos) { baseCtx.atalhos.selecionar('tudo'); return; }
+    const limpar = document.getElementById('fb-reset');
+    if (limpar) limpar.click();
+  });
+}
+
 // Idade dos números ("Atualizado há 3 min", que se mantém sozinho) e o botão Atualizar: busca
 // os números de novo sem recarregar a página, mantendo a aba, os filtros e o que foi digitado.
 // Enquanto busca, o próprio botão mostra (ícone girando) e a barra do topo anda. Se a busca
@@ -1081,7 +1144,13 @@ function wireAtualizar(app, baseCtx, opts) {
   let relogio = 0;
   const escrever = () => {
     if (!texto.isConnected) return;
-    if (!texto.classList.contains('is-erro') && !btn.classList.contains('is-loading')) texto.textContent = textoAtualizado(lidoEm());
+    if (!texto.classList.contains('is-erro') && !btn.classList.contains('is-loading')) {
+      texto.textContent = frescorDosDados(baseCtx);
+      // Dado parado: a dica guarda a hora da leitura, que o texto deixou de dizer.
+      const hora = horaCurta(lidoEm());
+      if (/^Último dado/.test(texto.textContent)) texto.title = `${hora ? `Números lidos da fonte às ${hora}. ` : ''}A fonte não tem dado de hoje.`;
+      else texto.removeAttribute('title');
+    }
     const falta = proximaTroca(lidoEm());
     if (falta != null) relogio = setTimeout(escrever, falta + 40);
   };
