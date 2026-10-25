@@ -22,7 +22,8 @@ export function rotuloDoEixo(v, formato, topo) {
 
 // viewBox com margem reservada: esquerda pros ticks do eixo Y, base pros rotulos de data.
 const W = 600;
-const H = 240;
+// 3.9.1: 250 de altura e margem de baixo maior, pra caber a data com a fonte do eixo em 14.
+const H = 250;
 
 // Largura do viewBox por largura da celula. O SVG escala uniformemente (xMidYMid meet), entao
 // num card de 12 colunas o desenho de 600x240 ficava do tamanho de sempre, centralizado, com
@@ -37,7 +38,7 @@ function larguraPara(col) {
   if (n >= 8) return 900;
   return W;
 }
-const M = { top: 12, right: 14, bottom: 26, left: 48 };
+const M = { top: 12, right: 14, bottom: 32, left: 52 };
 // Contador para ligar cada gráfico à sua dica de uso (aria-describedby precisa de id único na página).
 let sequenciaDeGraficos = 0;
 
@@ -117,7 +118,7 @@ export function render(props = {}, points) {
 
   // Rótulos do eixo com unidade: a margem da esquerda cresce pro maior deles (~6,2 unidades por caractere).
   const rotulosY = yTicksVals.map((v) => rotuloDoEixo(v, format, max));
-  const esquerda = Math.max(M.left, Math.ceil(Math.max(...rotulosY.map((r) => r.length)) * 6.2) + 12);
+  const esquerda = Math.max(M.left, Math.ceil(Math.max(...rotulosY.map((r) => r.length)) * 8.2) + 12);
 
   // area de plotagem (dentro das margens dos eixos).
   const plotX = esquerda;
@@ -206,7 +207,7 @@ export function indicesDasDatas(n, largura = W) {
 }
 
 function renderXLabels(list, coords, baselineY, largura) {
-  const y = round(baselineY + 16);
+  const y = round(baselineY + 20);
   const idxs = indicesDasDatas(list.length, largura);
   const ultimo = list.length - 1;
   return idxs

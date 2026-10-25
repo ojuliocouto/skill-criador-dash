@@ -9,7 +9,7 @@ import { render as renderTimeseries, larguraDoDesenho } from '../public/assets/j
 import { registry } from '../public/assets/js/widgets/index.js';
 
 const PONTOS = [{ date: '2026-09-05', value: 10 }, { date: '2026-09-06', value: 30 }, { date: '2026-09-07', value: 20 }];
-const viewBoxDe = (html) => Number((html.match(/viewBox="0 0 (\d+) 240"/) || [])[1]);
+const viewBoxDe = (html) => Number((html.match(/viewBox="0 0 (\d+) 250"/) || [])[1]);
 
 test('larguraDoDesenho: sem largura de tela, vale o col (comportamento de sempre)', () => {
   assert.equal(larguraDoDesenho(12), 1400);

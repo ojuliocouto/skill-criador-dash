@@ -234,14 +234,14 @@ test('timeseries: célula larga (col 12) usa viewBox mais largo', () => {
 test('timeseries: sem col, mantém o comportamento antigo (não quebra template custom)', () => {
   const [w, h] = viewBoxDe(renderTs({ title: 'X' }, PONTOS));
   assert.equal(w, 600);
-  assert.equal(h, 240);
+  assert.equal(h, 250); // 3.9.1: 250 pra caber a data com a fonte do eixo em 14
 });
 
 test('timeseries: col fora da faixa não gera viewBox absurdo', () => {
   for (const col of [0, -5, 99, 'abc', null]) {
     const [w, h] = viewBoxDe(renderTs({ title: 'X', col }, PONTOS));
     assert.ok(w >= 600 && w <= 1400, `col ${col} gerou largura ${w}`);
-    assert.equal(h, 240, 'altura é sempre a mesma');
+    assert.equal(h, 250, 'altura é sempre a mesma');
   }
 });
 

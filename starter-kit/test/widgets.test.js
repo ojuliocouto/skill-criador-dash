@@ -62,7 +62,7 @@ test('timeseries: svg com polyline e pontos', () => {
   ];
   const html = renderTimeseries({ title: 'Evolucao' }, pts);
   assert.ok(html.includes('<svg'), 'tem svg');
-  assert.ok(html.includes('viewBox="0 0 600 240"'), 'viewBox responsivo com margem pros eixos');
+  assert.ok(html.includes('viewBox="0 0 600 250"'), 'viewBox responsivo com margem pros eixos');
   assert.ok(!html.includes('preserveAspectRatio="none"'), 'nao distorce (sem preserveAspectRatio none)');
   assert.ok(!html.includes('non-scaling-size'), 'sem o vetor invalido non-scaling-size');
   assert.ok(html.includes('<polyline'), 'tem polyline');
