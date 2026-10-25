@@ -1,6 +1,7 @@
 // Widget ranking: barras horizontais ordenadas desc, largura proporcional ao maior.
 // Funcao de render pura -> retorna string HTML.
 
+import { SEM_DADOS_NO_PERIODO } from '../lib/estado-vazio.js';
 import { esc, fmtBy } from './_util.js';
 
 /**
@@ -14,7 +15,7 @@ export function render(props = {}, items) {
   const list = Array.isArray(items) ? items.slice() : [];
 
   if (list.length === 0) {
-    return `<div class="ranking">${titleHtml}<div class="ranking__empty">Sem dados</div></div>`;
+    return `<div class="ranking">${titleHtml}<div class="ranking__empty">${esc(SEM_DADOS_NO_PERIODO)}</div></div>`;
   }
 
   list.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));

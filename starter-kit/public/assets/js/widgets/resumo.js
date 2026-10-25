@@ -5,6 +5,7 @@
 // Tela estreita: cada célula leva data-label com o nome da coluna, e o CSS empilha a tabela
 // em blocos (um por linha) quando o cartão fica estreito. A página nunca rola de lado.
 
+import { SEM_DADOS_NO_PERIODO } from '../lib/estado-vazio.js';
 import { esc, fmtBy } from './_util.js';
 import { seletorDeOrdemHtml } from '../lib/tabela-ordena.js';
 
@@ -36,7 +37,7 @@ export function render(props = {}, dados) {
   const { title = '' } = props || {};
   const titleHtml = title ? `<div class="resumo__title">${esc(title)}</div>` : '';
   if (!dados || !dados.ok || !Array.isArray(dados.colunas) || !dados.colunas.length) {
-    return `<div class="resumo">${titleHtml}<div class="resumo__empty">Sem dados</div></div>`;
+    return `<div class="resumo">${titleHtml}<div class="resumo__empty">${esc(SEM_DADOS_NO_PERIODO)}</div></div>`;
   }
   const { colunas, linhas, total, dimLabel, ocultas = [], totalDeGrupos = linhas.length } = dados;
 

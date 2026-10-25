@@ -274,8 +274,8 @@ test('render: escapa rótulo vindo da planilha', () => {
 });
 
 test('render: dado inválido ou vazio vira estado vazio, sem quebrar', () => {
-  assert.match(renderResumo({}, { ok: false }), /Sem dados/);
-  assert.match(renderResumo({}, null), /Sem dados/);
+  assert.match(renderResumo({}, { ok: false }), /Nenhum dado neste período\./);
+  assert.match(renderResumo({}, null), /Nenhum dado neste período\./);
 });
 
 // ---------- registry ----------
