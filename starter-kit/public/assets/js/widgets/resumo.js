@@ -51,9 +51,11 @@ export function render(props = {}, dados) {
     colunas.map((c) => celula(c, total.valores[c.key])).join('') + `</tr>`;
 
   const notas = [];
-  if (linhas.some((l) => l.tons && Object.keys(l.tons).length)) {
-    notas.push('Verde: melhor que o total. Vermelho: pior.');
-  }
+  // 3.9.1: a legenda só fala da cor que aparece (uma tabela só com vermelho dizia "Verde: melhor...").
+  const tons = new Set(linhas.flatMap((l) => Object.values(l.tons || {})));
+  if (tons.has('bom') && tons.has('ruim')) notas.push('Verde: melhor que o total. Vermelho: pior.');
+  else if (tons.has('bom')) notas.push('Verde: melhor que o total.');
+  else if (tons.has('ruim')) notas.push('Vermelho: pior que o total.');
   if (totalDeGrupos > linhas.length) {
     notas.push(`Mostrando ${linhas.length} de ${totalDeGrupos} linhas. O total considera todas.`);
   }
