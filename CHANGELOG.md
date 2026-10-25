@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.9.1
+
+Rodada da aula (26/10), a partir do teste de aluno no clone limpo da 3.9.0.
+
+- Exemplos acompanham o dia: `lancador.py iniciar` desloca a coluna Data dos 6 CSVs de exemplo (`examples/` e `public/modelos/`) até ontem, na cópia do aluno; `lancador.py exemplos <pasta>` refaz num outro dia. Antes, com "Hoje" do calendário, "7 dias" abria o painel inteiro vazio porque o exemplo terminava em 04/10. O repositório não muda.
+- Celular: o cartão em destaque ocupa a largura cheia no topo (348 de 350 px).
+- Vão entre o número e o minigráfico: de 47 px (desktop) e 59 px (celular) para 10 px em todos os cartões.
+- Em "Tudo", o destaque diz "Escolha um período para comparar", no lugar da seta.
+- Período cortado no último dado ("7 dias" com hoje ainda sem dado) diz "vs. período anterior", com as datas na dica, no lugar de "vs. 6 dias anteriores".
+- Ondas do fundo só nas margens, a 0,18 de opacidade.
+- Gaveta Filtros do celular: atalhos em 2 linhas de 3, sem rolar de lado.
+- Legenda de cor da tabela só cita a cor que aparece nela.
+- Eixo do gráfico com fonte de 12 px na tela (era 9 px).
+- Testes: `npm test` 1436; `rodar-testes.mjs` 28 (novo `test-exemplos-ate-ontem.py`).
+
 ## 3.9.0
 
 Revisão da 3.7.4 com auditoria adversarial em 25/10/2026 (nota média 5,8; confiabilidade dos números 4). Três frentes: números certos, segurança e receita do Meta, e visual.

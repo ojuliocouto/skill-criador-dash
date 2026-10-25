@@ -178,6 +178,10 @@ node <skill-dir>/scripts/rodar-testes.mjs --lista         # list what would run
 
 No shell globs (Windows does not expand them): the runner reads the folder itself, runs `.py` files through `py.mjs`, and reports any test that skipped itself with `PULADO: <reason>`. GitHub Actions (`.github/workflows/portabilidade.yml`) runs it on Windows, macOS and Linux, plus the browser-free subset from a folder with an accent and a space on Windows; in CI a skip for lack of Playwright counts as a failure.
 
+## What changed in 3.9.1
+
+Fixes from a student run of 3.9.0 for the 26/10 class. `lancador.py iniciar` moves the dates of the six sample CSVs so they end yesterday in the student's copy (before, "7 dias" opened empty because the sample ended on 04/10). On phones the highlighted card spans the full width at the top. The gap between number and sparkline drops to 10 px. "Tudo" shows "Escolha um período para comparar" on the highlighted card, and a period cut at the last data day reads "vs. período anterior" with the dates in the tooltip. Background lines stay in the margins, the phone filter shortcuts wrap in two rows, the color legend names only colors present, and the chart axis text is 12 px.
+
 ## What changed in 3.9.0
 
 An adversarial review of 3.7.4 (mean score 5.8, number reliability 4) led to three fixes: right numbers, security plus Meta revenue, and visual polish.
