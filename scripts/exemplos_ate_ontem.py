@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Traz as datas dos CSVs de exemplo até ONTEM, na cópia do starter-kit do aluno (3.9.1).
+"""Traz as datas dos CSVs de exemplo até HOJE, na cópia do starter-kit do aluno (3.9.1; até hoje desde a 3.9.2).
 
 Por que na cópia e não na leitura: o CSV que o aluno sobe vai inteiro para o KV do painel, e o painel
 não sabe mais que ele veio de um exemplo. Deslocar datas na leitura mexeria em dado de verdade (ou
 dependeria de uma marca frágil no arquivo). Na cópia é uma vez só, determinístico, testável, e o
 repositório da skill não muda (os testes que fixaram o relógio em 04/10 seguem valendo).
 
-Regra: todas as datas da coluna "Data" andam o MESMO número de dias, até a maior virar ontem.
+Regra: todas as datas da coluna "Data" andam o MESMO número de dias, até a maior virar hoje.
+(3.9.2: na 3.9.1 terminava ontem, e "Hoje" abria vazio e "7 dias" comparava 6 dias na aula.)
 Intervalos, ordem, formato (ISO ou dd/mm/aaaa) e o resto de cada linha ficam iguais, byte a byte.
 
     node <dir-da-skill>/scripts/py.mjs lancador.py exemplos <pasta-do-projeto>   # atualiza de novo num outro dia
@@ -38,7 +39,7 @@ def _escrever(data, modelo):
 
 
 def deslocar_texto(texto, hoje):
-    """Devolve o CSV com as datas da coluna Data deslocadas até ontem (relativo a `hoje`)."""
+    """Devolve o CSV com as datas da coluna Data deslocadas até `hoje`."""
     linhas = texto.splitlines(keepends=True)
     if not linhas:
         return texto
@@ -51,7 +52,7 @@ def deslocar_texto(texto, hoje):
     achadas = [d for d in achadas if d]
     if not achadas:
         return texto
-    passo = (hoje - dt.timedelta(days=1)) - max(achadas)
+    passo = hoje - max(achadas)
     if passo.days == 0:
         return texto
     for i, campos in corpo:

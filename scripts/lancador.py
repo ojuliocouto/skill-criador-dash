@@ -11,8 +11,8 @@ Uso (de qualquer pasta; <dir-da-skill> é a pasta onde está o SKILL.md):
 
     node <dir-da-skill>/scripts/py.mjs lancador.py                          # todos os comandos do roteiro, prontos
     node <dir-da-skill>/scripts/py.mjs lancador.py --projeto ~/meu-dash     # idem, com a pasta do projeto
-    node <dir-da-skill>/scripts/py.mjs lancador.py iniciar ~/meu-dash       # cria a pasta do projeto (cópia do starter-kit, exemplos até ontem)
-    node <dir-da-skill>/scripts/py.mjs lancador.py exemplos ~/meu-dash      # traz as datas dos CSVs de exemplo até ontem de novo
+    node <dir-da-skill>/scripts/py.mjs lancador.py iniciar ~/meu-dash       # cria a pasta do projeto (cópia do starter-kit, exemplos até hoje)
+    node <dir-da-skill>/scripts/py.mjs lancador.py exemplos ~/meu-dash      # traz as datas dos CSVs de exemplo até hoje de novo
     node <dir-da-skill>/scripts/py.mjs lancador.py porta-livre              # porta livre para o npm run dev (a 8788 costuma estar ocupada)
     node <dir-da-skill>/scripts/py.mjs lancador.py comando prova-dash.js "<URL>" --out prova-parcial
 """
@@ -86,7 +86,7 @@ def iniciar(destino):
 
 
 def exemplos_ate_ontem(projeto, hoje=None):
-    """3.9.1: os CSVs de exemplo da cópia terminam ontem ("Hoje" e "7 dias" contam do calendário)."""
+    """3.9.1: os CSVs de exemplo da cópia terminam hoje ("Hoje" e "7 dias" contam do calendário; até hoje desde a 3.9.2)."""
     sys.path.insert(0, str(AQUI))
     import exemplos_ate_ontem as ex  # noqa: E402
     return ex.atualizar_pasta(projeto, hoje)
@@ -126,7 +126,7 @@ def main(argv=None):
     p_ini = sub.add_parser("iniciar", help="cria a pasta do projeto copiando o starter-kit")
     p_ini.add_argument("pasta")
     p_ini.add_argument("--hoje", default=None, help=argparse.SUPPRESS)
-    p_ex = sub.add_parser("exemplos", help="traz as datas dos CSVs de exemplo do projeto até ontem")
+    p_ex = sub.add_parser("exemplos", help="traz as datas dos CSVs de exemplo do projeto até hoje")
     p_ex.add_argument("pasta")
     p_ex.add_argument("--hoje", default=None, help=argparse.SUPPRESS)
     p_porta = sub.add_parser("porta-livre", help="imprime a primeira porta livre a partir de 8788 (para o npm run dev)")
@@ -140,13 +140,13 @@ def main(argv=None):
             dest = iniciar(a.pasta)
             mudados = exemplos_ate_ontem(dest, _data(a.hoje))
             print(f"Pasta do projeto criada: {dest}")
-            print(f"Exemplos com datas até ontem: {len(mudados)} arquivo(s) em examples/ e public/modelos/.")
+            print(f"Exemplos com datas até hoje: {len(mudados)} arquivo(s) em examples/ e public/modelos/.")
             print("Daí em diante, todo comando roda de dentro dela. Próximo comando:")
             print("  " + comando("preflight.py", "--starter-kit", caminho(dest)))
             return 0
         if a.cmd == "exemplos":
             mudados = exemplos_ate_ontem(Path(a.pasta).expanduser().resolve(), _data(a.hoje))
-            print(f"Exemplos com datas até ontem: {len(mudados)} arquivo(s) atualizado(s).")
+            print(f"Exemplos com datas até hoje: {len(mudados)} arquivo(s) atualizado(s).")
             return 0
         if a.cmd == "porta-livre":
             print(porta_livre(a.a_partir_de))

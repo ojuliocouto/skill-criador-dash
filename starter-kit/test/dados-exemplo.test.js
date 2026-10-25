@@ -57,12 +57,18 @@ test('todo exemplo espalha as linhas por pelo menos 5 datas distintas', () => {
   }
 });
 
-test('estoque-exemplo.csv: 5 ou 6 datas dentro da janela 06/07 a 11/07/2026', () => {
+// 3.9.2: janela relativa à maior data do arquivo. O lancador.py iniciar desloca as datas dos exemplos
+// até hoje na cópia do aluno, e o npm test da cópia tem que continuar verde (na 3.9.1 deu 2 falhas).
+const brParaMs = (s) => { const [d, m, a] = s.split('/').map(Number); return Date.UTC(a, m - 1, d); };
+const msParaIso = (ms) => new Date(ms).toISOString().slice(0, 10);
+const DIA = 86400000;
+
+test('estoque-exemplo.csv: 5 ou 6 datas dentro de uma janela de 6 dias seguidos', () => {
   const rows = loadExample('estoque-exemplo.csv');
-  const datas = distinctDates(rows).sort();
+  const datas = distinctDates(rows).map(brParaMs).sort((a, b) => a - b);
   assert.ok(datas.length >= 5 && datas.length <= 6, `datas distintas: ${datas.length} (esperado 5 ou 6)`);
-  const janela = ['06/07/2026', '07/07/2026', '08/07/2026', '09/07/2026', '10/07/2026', '11/07/2026'];
-  for (const d of datas) assert.ok(janela.includes(d), `data fora da janela: ${d}`);
+  const fim = datas[datas.length - 1];
+  for (const d of datas) assert.ok(fim - d <= 5 * DIA, `data fora da janela de 6 dias: ${msParaIso(d)}`);
 });
 
 test('estoque-exemplo.csv: "Faturamento no tempo" rende varios pontos, nao um ponto solto', () => {
@@ -77,8 +83,9 @@ test('estoque-exemplo.csv: "Faturamento no tempo" rende varios pontos, nao um po
 
 test('estoque-exemplo.csv: KPIs ganham a seta contra o período anterior', () => {
   const rows = loadExample('estoque-exemplo.csv');
-  // Os 3 últimos dias (09 a 11/07) contra os 3 anteriores (06 a 08/07): os dois têm dado.
-  const trends = tendenciasDoPeriodo(estoque, rows, COL_ESTOQUE, { from: '2026-07-09', to: '2026-07-11', dims: {} });
+  // Os 3 últimos dias contra os 3 anteriores: os dois têm dado (janela relativa à maior data, 3.9.2).
+  const fim = Math.max(...distinctDates(rows).map(brParaMs));
+  const trends = tendenciasDoPeriodo(estoque, rows, COL_ESTOQUE, { from: msParaIso(fim - 2 * DIA), to: msParaIso(fim), dims: {} });
   assert.ok(Object.keys(trends).length > 0, 'pelo menos um KPI mostra tendencia');
   for (const t of Object.values(trends)) assert.equal(t.rotulo, 'vs. 3 dias anteriores');
 });
