@@ -246,7 +246,7 @@ export function renderAparencia(corpo, ctx) {
   const fonte = getSource(state.source && state.source.type);
   const historico = el('select', { class: 'input' }, [
     el('option', { value: '', text: 'Ao vivo: lê os números toda vez que alguém abre' }),
-    el('option', { value: 'd1', text: 'Com histórico: guarda uma cópia a cada atualização' }),
+    el('option', { value: 'd1', text: 'Com histórico: guarda os números de cada dia, mesmo depois que a fonte apagar' }),
   ]);
   historico.value = state.storage === 'd1' ? 'd1' : '';
   historico.addEventListener('change', () => { state.storage = historico.value; });

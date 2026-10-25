@@ -191,14 +191,19 @@ test('worker: snapshot da Meta grava as 5 linhas das 3 páginas', async () => {
       async list() { return { keys: [{ name: 'dash:m' }] }; },
       async get() { return JSON.stringify({ id: 'm', source: { type: 'meta', meta: { token: 'TK', account: '1' } } }); },
     },
-    DASHBOARD_DB: { prepare(sql) { return { bind(...p) { this.p = p; return this; }, async run() { inserts.push({ sql, params: this.p }); return { success: true }; } }; } },
+    // 3.9.0: o Worker grava por dia num db.batch (tabela snapshot_dias).
+    DASHBOARD_DB: {
+      prepare(sql) { return { sql, bind(...p) { this.p = p; return this; }, async run() { inserts.push({ sql, params: this.p }); return { success: true }; } }; },
+      async batch(stmts) { for (const s of stmts) await s.run(); return []; },
+    },
   };
   const log = console.log;
   console.log = () => {};
   try {
     await comFetch(fetchFn, () => worker.scheduled({}, env, { waitUntil() {} }));
   } finally { console.log = log; }
-  assert.equal(inserts.length, 1);
-  const ds = JSON.parse(inserts[0].params[2]);
-  assert.equal(ds.rows.length, 5);
+  const dias = inserts.filter((i) => /^INSERT INTO snapshot_dias/.test(i.sql));
+  assert.ok(dias.length >= 1);
+  const linhas = dias.reduce((s, i) => s + JSON.parse(i.params[5]).length, 0);
+  assert.equal(linhas, 5, 'as 5 linhas das 3 páginas, repartidas por dia');
 });

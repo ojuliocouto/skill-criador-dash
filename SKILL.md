@@ -365,7 +365,7 @@ Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados"):
 - AO VIVO: lê a fonte na hora, só KV pra config, setup mínimo. Bom pra maioria.
-- HISTÓRICO: Worker cron tira snapshots no D1; dá histórico de verdade e não depende da fonte no ar. Mais setup.
+- HISTÓRICO: Worker cron grava no D1 um registro por dia; o dia que sai da janela da fonte (o Meta só dá 30 dias) continua no painel, com retenção de 400 dias, e o painel não depende da fonte no ar. Mais setup.
 
 ### 4. Provisionar a infra DELA
 
@@ -734,8 +734,12 @@ AO VIVO (padrão, mais simples): o `dashboard.html` chama o conector, que busca 
 KV guarda só a config; `DASHBOARD_CACHE` (opcional) cacheia 5 min. Sem banco. Limite: sem histórico
 próprio e depende da fonte estar no ar.
 
-HISTÓRICO (D1 + cron, mais robusto): um Worker cron (`workers/snapshot/`) grava snapshots da fonte
-no D1; o dashboard lê o snapshot mais recente via conector `d1.js`. COMO LIGA: a config precisa de
+HISTÓRICO (D1 + cron, mais robusto): um Worker cron (`workers/snapshot/`) grava a fonte no D1 por DIA
+(tabela `snapshot_dias`, um registro por painel e por dia). Cada rodada substitui os dias que a foto nova
+cobre e mantém os que saíram da janela da fonte; dias mais velhos que `HISTORICO_DIAS` (400 por padrão,
+variável do Worker) são apagados. O dashboard lê a série inteira via conector `d1.js` (ou um período,
+`?de=AAAA-MM-DD&ate=AAAA-MM-DD`). Os dias saem pela coluna de data do colMap (data ISO ou brasileira).
+Quem instalou até a 3.8 aplica o `db/schema.sql` de novo para ganhar a tabela. COMO LIGA: a config precisa de
 `storage: "d1"` (no wizard, o seletor "Modo de dados" no passo Finalizar grava isso; na mão, inclua
 o campo, senão lê ao vivo). Só faz sentido pra fonte viva (planilha/Meta); CSV estático o cron ignora.
 Setup completo do D1 + cron + bindings: `references/infra.md`.

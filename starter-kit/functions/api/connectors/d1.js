@@ -1,7 +1,9 @@
 // Conector do modo histórico (Contrato 2), lendo do Cloudflare D1.
-// Em vez de bater na fonte ao vivo, lê o snapshot mais recente que o cron gravou.
+// Em vez de bater na fonte ao vivo, lê a série por dia que o cron gravou (tabela snapshot_dias, 3.9.0),
+// inteira ou num período (?de=AAAA-MM-DD&ate=AAAA-MM-DD). Banco de antes da 3.9.0 (sem dias gravados
+// ainda): cai na última foto inteira da tabela snapshots.
 // A lógica pura de SQL e de reidratação vive em functions/lib/snapshots.mjs.
-import { latestSnapshotSQL, rowToDataSet } from '../../lib/snapshots.mjs';
+import { latestSnapshotSQL, rowToDataSet, serieSQL, diasParaDataSet } from '../../lib/snapshots.mjs';
 import { needsAuth, authOk } from '../../lib/auth-config.mjs';
 import { authRateLimit } from '../../lib/rate-limit.mjs';
 import { colunasDoPainel, podarDataSet, podaOsDados } from '../../lib/vista-do-painel.mjs';
@@ -78,11 +80,31 @@ export async function onRequest(context) {
     }
   }
 
+  let serie;
   try {
-    const { sql, params } = latestSnapshotSQL(id);
-    const row = await db.prepare(sql).bind(...params).first();
+    serie = serieSQL(id, { de: searchParams.get('de') || '', ate: searchParams.get('ate') || '' });
+  } catch (e) {
+    return json({ error: e.message }, 400);
+  }
 
-    if (!row) {
+  try {
+    let dataset = null;
+    let dias = null;
+    try {
+      dias = (await db.prepare(serie.sql).bind(...serie.params).all()).results;
+    } catch (e) {
+      // Banco criado antes da 3.9.0, sem a tabela snapshot_dias: segue pela última foto.
+      if (!/no such table/i.test(String(e && e.message))) throw e;
+    }
+    if (Array.isArray(dias) && dias.length) {
+      dataset = diasParaDataSet(dias);
+    } else {
+      const { sql, params } = latestSnapshotSQL(id);
+      const row = await db.prepare(sql).bind(...params).first();
+      if (row) dataset = rowToDataSet(row);
+    }
+
+    if (!dataset) {
       return json(
         {
           error: 'Ainda não há dados capturados. Rode o cron ou aguarde a primeira captura.',
@@ -91,7 +113,6 @@ export async function onRequest(context) {
       );
     }
 
-    const dataset = rowToDataSet(row);
     // Mesma regra da vista do painel (3.9.0): só as colunas que o painel usa. O Meta fica inteiro (as
     // colunas são as do conector, e o painel liga Resultados e Receita sozinho).
     return json(podaOsDados(config) ? podarDataSet(dataset, colunasDoPainel(config)) : dataset, 200);

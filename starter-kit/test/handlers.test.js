@@ -68,6 +68,10 @@ function fakeD1(rows = []) {
             async first() {
               return rows.length ? rows[0] : null;
             },
+            // 3.9.0: a leitura pede primeiro a série por dia (snapshot_dias); vazia, cai na última foto.
+            async all() {
+              return { results: [] };
+            },
             async run() {
               return { success: true };
             },
