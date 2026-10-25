@@ -792,7 +792,7 @@ toda resposta de erro da API vem em PT-BR dizendo o que corrigir (ex: 403 `admin
 **Grupo de painéis com abas, pelo POST** (um link só para vários painéis): `{"name":"...","kind":"group","tabs":[{"id":"<id do painel>","label":"Nome da aba"}]}`
 com o `id` que cada painel tem (o do painel com senha é o embaralhado que o POST devolveu). Painel com senha vira aba
 normalmente: a aba pede a senha ali mesmo. O assistente de grupo (`/group.html`) só lista painéis sem senha, porque a
-listagem pública não mostra o nome dos protegidos. Detalhes em `references/recursos.md`.
+listagem (que exige a chave de administrador) não mostra o nome dos protegidos. Detalhes em `references/recursos.md`.
 
 ## Estender (domínio, conector, widget)
 

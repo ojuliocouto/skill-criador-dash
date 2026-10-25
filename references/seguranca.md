@@ -2,14 +2,42 @@
 
 ## Modelo de acesso (FAIL-CLOSED, avise a pessoa)
 
-A LEITURA de um dashboard publicado é pública (ele existe pra ser visto). Mas CRIAR, sobrescrever e
+Abrir UM dashboard pelo link é público (ele existe pra ser visto). A LISTA de dashboards
+(`GET /api/dashboards` sem `id`, a raiz do site) não é: desde a 3.9.0 ela exige a chave de
+administrador, com a mesma trava das mutações (403 `adminNotConfigured` sem `ADMIN_TOKEN` no servidor,
+401 `needsAdmin` com a chave errada). Antes, qualquer um que abrisse a raiz do site via o id de todo
+painel sem senha e, com o id, baixava o dado. CRIAR, sobrescrever e
 APAGAR (POST/DELETE) são fail-closed: exigem o header `x-admin-token`. Sem um `ADMIN_TOKEN` configurado
 no servidor, a API BLOQUEIA toda mutação (responde 403 `adminNotConfigured`), então ninguém cria ou
 apaga nada anonimamente. Além disso, dashboard com senha protege a config E os dados por id. Ou seja:
 configurar o `ADMIN_TOKEN` faz parte do setup, não é opcional (comandos em `references/infra.md`, Passo 4).
 
 Token errado (ou ausente, com `ADMIN_TOKEN` setado) responde 401 `{ needsAdmin: true }`: o wizard pede o
-token uma vez, guarda no localStorage (`cd-admin-token`) e reenviará sozinho dali em diante.
+token uma vez, guarda no localStorage (`cd-admin-token`) e reenviará sozinho dali em diante. A raiz do
+site faz o mesmo: sem a chave guardada, ela explica que a lista é de quem administra e pede a chave ali
+(`lib/lista-chave.js`); a chave só fica guardada depois de conferida por `POST /api/admin-check`.
+
+## O que sai para quem abre um painel (vista do painel)
+
+`GET /api/dashboards?id=<id>` sem a chave de administrador devolve a VISTA DO PAINEL
+(`functions/lib/vista-do-painel.mjs`), não a config inteira:
+
+- CSV: o texto guardado sai podado para as colunas do colMap (as que o painel mostra). Coluna que o
+  painel não usa (e-mail, telefone, CPF do comprador) não sai.
+- Planilha do Google: o link e a aba não saem. O painel pede os dados em
+  `GET /api/connectors/sheets?id=<id>`; o servidor usa o link guardado, confere a senha do painel e
+  devolve só as colunas do colMap.
+- Meta Ads: só `{ type: 'meta' }`. Conta e período ficam no servidor (o token já nunca saía).
+- Histórico (D1): `GET /api/connectors/d1?id=<id>` devolve as mesmas colunas da vista do painel.
+- Com a chave de administrador certa, o GET devolve a config inteira (sem segredo): é o que o
+  assistente usa para editar.
+
+O que o painel MOSTRA continua aberto para quem tem o link. Painel com Receita (ou Valor, Entrada e
+Saída) e sem senha: o passo da aparência avisa, perto do botão de criar, que quem tiver o link vê esse
+número (`lib/aviso-painel-aberto.js`). Número sigiloso pede senha no painel.
+
+Testes: `test/seguranca-lista-e-dados.test.js` (anônimo não lista e não baixa dado bruto),
+`test/seguranca-cliente.test.js`, `test/lista-chave.test.js` e `test/aviso-painel-aberto.test.js`.
 
 ## Validação da fonte no POST
 
@@ -43,7 +71,8 @@ Dashboard SEM senha tem id legível, derivado do nome: "Vendas Time Comercial" v
 `vendas-time-comercial`. Dashboard COM senha recebe um id OPACO e aleatório (`dash-` mais 32
 caracteres hex, 128 bits de entropia), sem nenhuma relação com o nome.
 
-O motivo: o id sai na listagem pública e na URL. A listagem já era endurecida para não devolver
+O motivo: o id sai na URL (e, até a 3.8.0, saía na listagem pública; desde a 3.9.0 a listagem exige a
+chave de administrador). A listagem já era endurecida para não devolver
 name/domain/accent de dashboard protegido, mas enquanto o id fosse o slug do nome ela devolvia
 `{"id":"faturamento-acme-janeiro","protected":true}` e entregava o nome do cliente para qualquer um
 que abrisse a landing. Pior: um id adivinhável virava oráculo, porque
@@ -59,8 +88,9 @@ fecha mais e quebra menos:
   você manda para o cliente e no histórico do navegador dele, e o oráculo 401 contra 404 continuaria
   confirmando nomes.
 - Parar de listar também tiraria do dono a única tela de gestão que existe: a landing lista os
-  dashboards e é de lá que se abre e se exclui. Ela chama a API sem header nenhum, então nem abrir
-  exceção para quem tem o `ADMIN_TOKEN` resolveria sem mexer no front.
+  dashboards e é de lá que se abre e se exclui. (Na 3.9.0 a landing passou a mandar a chave de
+  administrador e a lista inteira passou a exigi-la; o id opaco continua valendo, porque o id
+  também sai na URL que você manda para o cliente.)
 - Com o id opaco a landing continua funcionando igual, o dashboard protegido segue aparecendo como
   `{ id, protected: true }` e nada do nome vaza.
 

@@ -4,6 +4,7 @@
 import { latestSnapshotSQL, rowToDataSet } from '../../lib/snapshots.mjs';
 import { needsAuth, authOk } from '../../lib/auth-config.mjs';
 import { authRateLimit } from '../../lib/rate-limit.mjs';
+import { colunasDoPainel, podarDataSet, podaOsDados } from '../../lib/vista-do-painel.mjs';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
@@ -91,7 +92,9 @@ export async function onRequest(context) {
     }
 
     const dataset = rowToDataSet(row);
-    return json(dataset, 200);
+    // Mesma regra da vista do painel (3.9.0): só as colunas que o painel usa. O Meta fica inteiro (as
+    // colunas são as do conector, e o painel liga Resultados e Receita sozinho).
+    return json(podaOsDados(config) ? podarDataSet(dataset, colunasDoPainel(config)) : dataset, 200);
   } catch (err) {
     const msg = err && err.message ? err.message : 'Falha ao ler o snapshot do banco de dados.';
     return json({ error: msg }, 500);

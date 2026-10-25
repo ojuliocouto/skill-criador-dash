@@ -173,7 +173,9 @@ test('sem ADMIN_TOKEN: DELETE -> 403 adminNotConfigured (fail-closed, nao apaga)
 });
 
 // 8. O gate admin NAO afeta GET, mesmo com ADMIN_TOKEN setado e sem header admin.
-test('admin gate: GET nao muda com ADMIN_TOKEN setado', async () => {
+// 3.9.0 (achado 6 da auditoria): abrir UM painel pelo link continua sem chave; a LISTA passou a exigir
+// a chave de administrador (antes ela entregava o id de todo painel aberto para qualquer um).
+test('admin gate: GET de um painel nao muda; a lista exige a chave com ADMIN_TOKEN setado', async () => {
   const cfg = makeConfig({ id: 'aberto', createdAt: '2026-01-01T00:00:00.000Z' });
   const kv = fakeKV({ 'dash:aberto': JSON.stringify(cfg) });
   const env = { DASHBOARDS_KV: kv, ADMIN_TOKEN: ADMIN };
@@ -182,7 +184,11 @@ test('admin gate: GET nao muda com ADMIN_TOKEN setado', async () => {
   assert.equal(one.status, 200);
   assert.equal((await readJSON(one)).id, 'aberto');
 
-  const all = await dashboards(ctx('GET', { env }));
+  const anonima = await dashboards(ctx('GET', { env }));
+  assert.equal(anonima.status, 401);
+  assert.equal((await readJSON(anonima)).needsAdmin, true);
+
+  const all = await dashboards(ctx('GET', { env, headers: { 'x-admin-token': ADMIN } }));
   assert.equal(all.status, 200);
   assert.ok(Array.isArray(await readJSON(all)));
 });

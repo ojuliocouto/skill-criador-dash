@@ -69,8 +69,8 @@ Comportamentos que valem saber (provados no ar em 08/10/2026):
 - **Aba que aponta para um painel com senha:** a aba mostra "Esta aba tem senha", pede a senha ali mesmo
   (`lib/senha-na-aba.js`) e abre o painel na aba; a senha fica só na sessão do navegador, então ir a outra aba e voltar
   não pede de novo. Senha errada diz "Senha incorreta" na própria aba.
-- **Colocar um painel com senha no grupo:** o assistente não o lista (a listagem pública só mostra o id dele, nunca o
-  nome). Use a API com o id que o POST do painel devolveu: `{"id":"dash-<32 caracteres>","label":"Com senha"}` na lista
+- **Colocar um painel com senha no grupo:** o assistente não o lista (a listagem, que exige a chave de administrador,
+  só mostra o id dele, nunca o nome). Use a API com o id que o POST do painel devolveu: `{"id":"dash-<32 caracteres>","label":"Com senha"}` na lista
   `tabs`. O id do painel protegido fica visível na lista de abas do grupo, que é pública: quem abre o grupo vê o rótulo
   da aba, e só vê os números com a senha.
 - O grupo em si não tem senha (o POST de grupo com `auth` não é um caso testado): proteja cada painel-filho.

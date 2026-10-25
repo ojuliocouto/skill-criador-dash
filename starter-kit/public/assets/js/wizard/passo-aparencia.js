@@ -15,6 +15,7 @@ import { prepararLogo } from './logo-arquivo.js';
 import { criarPrevia } from './previa.js';
 import { criarEscolhaDeModo, criarCamposDePresenca } from './passo-modo.js';
 import { menosMovimento } from '../lib/movimento.js';
+import { avisoDePainelAberto } from '../lib/aviso-painel-aberto.js';
 
 const CORES = [
   ['#5b62d6', 'Índigo'], ['#2563eb', 'Azul'], ['#0e9f6e', 'Verde'], ['#d9730d', 'Laranja'],
@@ -232,7 +233,16 @@ export function renderAparencia(corpo, ctx) {
   desenharOcultos();
 
   const senha = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: state.protegido ? 'Em branco: mantém a senha atual' : 'Em branco: painel aberto', value: state.senha || '' });
-  senha.addEventListener('input', () => { state.senha = senha.value; });
+  // Painel aberto com dinheiro na tela (Receita, Valor, Entrada): o aviso fica perto do botão de criar,
+  // fora de "Mais opções", e some quando a pessoa escreve uma senha (lib/aviso-painel-aberto.js).
+  const avisoAberto = el('p', { class: 'hint recado', id: 'avisoPainelAberto', role: 'status' });
+  const atualizarAviso = () => {
+    const texto = avisoDePainelAberto({ template: tplBase, colMap: state.colMap, protegido: state.protegido, senha: state.senha });
+    avisoAberto.textContent = texto;
+    avisoAberto.hidden = !texto;
+  };
+  atualizarAviso();
+  senha.addEventListener('input', () => { state.senha = senha.value; atualizarAviso(); });
   const fonte = getSource(state.source && state.source.type);
   const historico = el('select', { class: 'input' }, [
     el('option', { value: '', text: 'Ao vivo: lê os números toda vez que alguém abre' }),
@@ -294,6 +304,7 @@ export function renderAparencia(corpo, ctx) {
       el('p', { class: 'hint', text: 'Marque o que ninguém usa para decidir. Sai da faixa de números, das tabelas e do funil deste painel.' }),
     ]),
     mais,
+    avisoAberto,
     retorno,
     acoes({ aoVoltar: () => ctx.ir(3) }, criar),
   ]);

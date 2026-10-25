@@ -23,7 +23,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { acharPlaywright } = require('./video/achar-playwright.cjs');
-const { subirPilha } = require('./stack-local.cjs');
+const { subirPilha, TOKEN_ADMIN_DE_TESTE } = require('./stack-local.cjs');
 
 const CI = Boolean(process.env.CI);
 const PRINTS = process.env.NAVEGADORES_PRINTS || '';
@@ -74,6 +74,8 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g
 
 async function abrirContexto(browser, perfil, extra = {}) {
   const ctx = await browser.newContext({ ...perfil.ctx, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', ...extra });
+  // 3.9.0: a lista de painéis exige a chave de administrador; o dono a tem guardada no navegador.
+  await ctx.addInitScript((t) => { try { localStorage.setItem('cd-admin-token', t); } catch (_) { /* sem storage */ } }, TOKEN_ADMIN_DE_TESTE);
   const pagina = await ctx.newPage();
   const problemas = [];
   pagina.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') problemas.push(`console.${m.type()}: ${m.text()}`); });

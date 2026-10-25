@@ -6,7 +6,8 @@
 // auth-config.mjs para que os conectores nao dependam desta camada de config.
 // Reexportamos needsAuth e authOk aqui para nao quebrar quem ja importa de
 // dashboards.js (ex: os testes).
-import { needsAuth, authOk, checkAdminToken, derivePasswordAuth } from '../lib/auth-config.mjs';
+import { needsAuth, authOk, checkAdminToken, derivePasswordAuth, safeEqual } from '../lib/auth-config.mjs';
+import { vistaDoPainel } from '../lib/vista-do-painel.mjs';
 import { authRateLimit } from '../lib/rate-limit.mjs';
 import { DOMAINS, isDomain } from '../lib/domains.mjs';
 import { validarFonte } from '../lib/source-shape.mjs';
@@ -224,8 +225,9 @@ export async function onRequest(context) {
   try {
     // Trava GLOBAL de mutacao, modelo FAIL-CLOSED: POST e DELETE exigem que o
     // servidor tenha ADMIN_TOKEN definido E o header x-admin-token bata com ele.
-    // Roda ANTES da checagem per-dashboard e so vale para POST/DELETE (GET nao muda,
-    // a leitura de dashboard publicado continua PUBLICA).
+    // Roda ANTES da checagem per-dashboard. Aqui vale para POST/DELETE; a LISTA (GET sem id)
+    // usa a mesma trava logo abaixo, e a leitura de UM painel pelo link continua aberta (com a
+    // senha do painel, quando houver, e so com a vista do painel para quem nao e administrador).
     //
     // SEM env.ADMIN_TOKEN a mutacao fica BLOQUEADA (403 adminNotConfigured): nao ha
     // mais criacao/sobrescrita/delecao anonima. Para liberar as mutacoes, o operador
@@ -237,7 +239,15 @@ export async function onRequest(context) {
     }
 
     if (method === 'GET') {
-      return id ? await getOne(kv, id, providedHash, env, request) : await listAll(kv);
+      if (id) return await getOne(kv, id, providedHash, env, request);
+      // 3.9.0 (achado 6 da auditoria): a LISTA de painéis deixou de ser pública. Ela entregava o id de
+      // todo painel sem senha para qualquer um que abrisse a raiz do site, e com o id vinha o dado.
+      // Agora vale a mesma trava das mutações (fail-closed): sem ADMIN_TOKEN no servidor, 403; sem a
+      // chave certa no header x-admin-token, 401 needsAdmin. Quem abre UM painel pelo link não precisa
+      // da lista.
+      const adminGate = checkAdminToken(env, request);
+      if (adminGate) return adminGate;
+      return await listAll(kv);
     }
     if (method === 'POST') {
       return await create(kv, request, providedHash, env);
@@ -261,7 +271,7 @@ async function listAll(kv) {
       try { return JSON.parse(raw); } catch { return null; }
     })
   );
-  // A listagem e publica (a landing lista todos): devolve so campos seguros.
+  // A listagem so sai com a chave de administrador (3.9.0). Mesmo assim devolve so campos seguros.
   // NAO expoe `source` (link da planilha, conta do Meta) nem nada da fonte, senao
   // vazaria a origem de um dashboard PROTEGIDO pra qualquer anonimo.
   //
@@ -302,7 +312,18 @@ async function getOne(kv, id, providedHash, env, request) {
     if (!rl.ok) return tooMany(rl.retryAfter);
     return json({ error: 'Senha necessária ou incorreta.', needsPassword: true }, 401);
   }
-  return json(stripSecrets(config));
+  // Quem administra (chave de administrador certa) recebe a config inteira, sem segredo: é o que o
+  // assistente usa para editar. Quem só abre o painel recebe a vista do painel: as colunas que o painel
+  // mostra, sem o link da planilha nem a conta do Meta (functions/lib/vista-do-painel.mjs).
+  const semSegredo = stripSecrets(config);
+  return json(ehAdmin(env, request) ? semSegredo : vistaDoPainel(semSegredo));
+}
+
+// A chave de administrador veio certa? Sem ADMIN_TOKEN no servidor, ninguém é administrador.
+function ehAdmin(env, request) {
+  const token = env && env.ADMIN_TOKEN;
+  if (!token || !request) return false;
+  return safeEqual(request.headers.get('x-admin-token') || '', token);
 }
 
 // Carrega a config crua do KV (ou null). Usado para checar protecao antes de mutar.

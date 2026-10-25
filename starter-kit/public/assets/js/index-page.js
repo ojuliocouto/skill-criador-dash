@@ -1,5 +1,6 @@
 // Landing/lista de dashboards. Busca as configs no KV via api-client e renderiza.
-import { listDashboards, deleteDashboard, setDashboardAuth } from './lib/api-client.js';
+import { listDashboards, deleteDashboard, setDashboardAuth, checarChaveAdmin, setAdminToken } from './lib/api-client.js';
+import { pedidoDeChaveDaListaHtml } from './lib/lista-chave.js';
 import { esc } from './lib/html.js';
 import { safeLogoSrc } from './lib/brand.js';
 import { sha256Hex } from './lib/auth.js';
@@ -181,6 +182,29 @@ async function excluir(id, btn) {
   }
 }
 
+// A lista de painéis só sai com a chave de administrador (3.9.0). Sem ela, a página explica e pede a chave
+// ali mesmo; a chave só fica guardada neste navegador depois de conferida pelo servidor.
+function pedirChave({ semConfig = false, motivo = '' } = {}) {
+  lista.innerHTML = pedidoDeChaveDaListaHtml({ semConfig, motivo });
+  if (semConfig) return;
+  const campo = lista.querySelector('#chaveLista');
+  const botao = lista.querySelector('#chaveListaBtn');
+  const enviar = async () => {
+    const valor = campo.value.trim();
+    if (!valor) { campo.focus(); return; }
+    botao.disabled = true;
+    const resposta = await checarChaveAdmin(valor);
+    if (resposta === 'sem-config') { pedirChave({ semConfig: true }); return; }
+    if (resposta === 'precisa') { pedirChave({ motivo: 'Essa chave não confere. Copie de novo o valor de ADMIN_TOKEN, sem espaço no começo nem no fim.' }); return; }
+    if (resposta === 'espere') { pedirChave({ motivo: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.' }); return; }
+    setAdminToken(valor);
+    carregar();
+  };
+  botao.addEventListener('click', enviar);
+  campo.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') enviar(); });
+  campo.focus({ preventScroll: true });
+}
+
 async function carregar() {
   lista.innerHTML = esqueletoDaListaHtml();
   comecarProgresso();
@@ -192,7 +216,13 @@ async function carregar() {
     }
     renderLista(dashboards);
   } catch (err) {
-    renderErro(err);
+    if (err && (err.needsAdmin || err.adminNotConfigured)) {
+      // Chave guardada que deixou de valer (trocaram o ADMIN_TOKEN): sai do navegador e pede de novo.
+      if (err.needsAdmin) setAdminToken('');
+      pedirChave({ semConfig: !!err.adminNotConfigured });
+    } else {
+      renderErro(err);
+    }
   } finally {
     terminarProgresso();
   }
