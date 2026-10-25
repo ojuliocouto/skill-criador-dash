@@ -41,6 +41,16 @@ REGISTRO = ".etapas-verificadas.json"
 EXTENSOES_DE_VIDEO = (".webm", ".mp4")
 
 
+def dentro_de(caminho, raiz):
+    """Diz se `caminho` fica dentro de `raiz`. Mesmo efeito do Path.is_relative_to, que só existe
+    do Python 3.9 em diante: a skill promete 3.8 (trava em test-python-38.py)."""
+    try:
+        caminho.relative_to(raiz)
+        return True
+    except ValueError:
+        return False
+
+
 def digest(p):
     if not p.is_file() or p.stat().st_size == 0:
         raise ValueError(f"Evidência ausente, vazia ou sem arquivo: {p.name}")
@@ -177,7 +187,7 @@ def conferir_passe_de_gosto(projeto, doc):
             raise ValueError(f"Etapa 6: passe_de_gosto.itens.{chave} precisa de `print` (a imagem olhada) e `visto` (o que se viu). "
                              "Item de gosto não se mede: declarar zero sem olhar não passa.")
         alvo = (projeto / item["print"]).resolve()
-        if not alvo.is_file() or alvo.stat().st_size == 0 or not alvo.is_relative_to(projeto) or norm(item["print"]) not in [norm(a) for a in arquivos]:
+        if not alvo.is_file() or alvo.stat().st_size == 0 or not dentro_de(alvo, projeto) or norm(item["print"]) not in [norm(a) for a in arquivos]:
             raise ValueError(f"Etapa 6: o print de passe_de_gosto.itens.{chave} ({item['print']}) não existe ou não está em arquivos.")
         vistos[chave] = hashlib.sha256(alvo.read_bytes()).hexdigest()
     if vistos["olhado_claro"] == vistos["olhado_escuro"]:
@@ -255,7 +265,7 @@ def validar(projeto, arquivo, etapa, campos, perfil, local=False):
     hashes = {}
     for nome in arquivos:
         p = (projeto / nome).resolve()
-        if not p.is_relative_to(projeto) or p == arquivo or p.name == REGISTRO:
+        if not dentro_de(p, projeto) or p == arquivo or p.name == REGISTRO:
             raise ValueError("A evidência precisa estar dentro do projeto e não pode ser o próprio registro.")
         hashes[p.relative_to(projeto).as_posix()] = digest(p)
     return hashes
@@ -312,7 +322,7 @@ def main():
             if args.arquivo is None:
                 raise ValueError("Use --arquivo com o JSON da etapa concluída.")
             arquivo = (projeto / args.arquivo).resolve()
-            if not arquivo.is_relative_to(projeto):
+            if not dentro_de(arquivo, projeto):
                 raise ValueError("O JSON precisa estar dentro do projeto.")
             hashes = validar(projeto, arquivo, args.etapa, etapas[args.etapa], args.perfil, local)
             hashes[arquivo.relative_to(projeto).as_posix()] = digest(arquivo)
