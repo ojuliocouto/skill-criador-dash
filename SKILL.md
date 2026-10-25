@@ -124,6 +124,8 @@ cd ~/meu-dash
 O `iniciar` copia o `starter-kit` sem o cache do wrangler nem o `.dev.vars` (nada de conta ou segredo vai junto),
 recusa pasta que já tem conteúdo e imprime o próximo comando. Faz o mesmo que
 `cp -R <dir-da-skill>/starter-kit ~/meu-dash`, mas também funciona no Windows e com caminho de espaço ou acento.
+Ele também traz as datas dos CSVs de exemplo até ontem ("Hoje" e "7 dias" contam do calendário); num outro dia,
+ou numa pasta copiada com `cp -R`, rode `node <dir-da-skill>/scripts/py.mjs lancador.py exemplos ~/meu-dash`.
 
 Daí em diante, todo comando roda de dentro de `~/meu-dash`, e todo caminho relativo do roteiro
 (`evidencias/`, `prova/`, `projetos/`, `.dev.vars`, `public/`) é relativo a ela. Os scripts da
