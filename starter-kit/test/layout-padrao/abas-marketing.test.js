@@ -27,8 +27,11 @@ test('marketing: cinco abas, com nome em palavra comum', () => {
 
 test('marketing / Visão geral: faixa de indicadores, resumo por canal e calculadora de meta', () => {
   const t = aba('visao-geral');
+  // 3.8.0: Resultados e Custo por resultado (Meta Ads) com seMapeada: somem quando a fonte não tem a coluna.
   assert.deepEqual(t.layout.filter((i) => i.widget === 'kpi').map((i) => i.props.metricKey),
-    ['investimento', 'leads', 'CPL', 'conversoes', 'CPA', 'receita', 'ROAS']);
+    ['investimento', 'resultados', 'custo_resultado', 'leads', 'CPL', 'conversoes', 'CPA', 'receita', 'ROAS']);
+  assert.deepEqual(t.layout.filter((i) => i.widget === 'kpi' && i.props.seMapeada).map((i) => i.props.metricKey),
+    ['resultados', 'custo_resultado']);
   assert.deepEqual(tipos('visao-geral'), ['resumo', 'meta']);
   const resumo = t.layout.find((i) => i.widget === 'resumo');
   assert.equal(resumo.props.groupBy, 'canal');

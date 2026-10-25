@@ -37,7 +37,7 @@ function normalizarMetricas(metrics, template) {
     const key = typeof m === 'string' ? m : (m && m.key);
     const def = defs.find((d) => d.key === key);
     if (!def) continue;
-    out.push({ def, label: (m && typeof m === 'object' && m.label) || def.label || key });
+    out.push({ def, label: (m && typeof m === 'object' && m.label) || def.label || key, seMapeada: !!(m && typeof m === 'object' && m.seMapeada) });
   }
   return out;
 }
@@ -119,8 +119,10 @@ export function resumir({ rows, colMap, template, groupBy, metrics, limit, order
   const geral = computeAllMapped(defs, lista, colMap);
   const colunas = [];
   const ocultas = [];
-  for (const { def, label } of pedidas) {
-    if (geral.mapped[def.key] === false) { ocultas.push(label); continue; }
+  for (const { def, label, seMapeada } of pedidas) {
+    // seMapeada: coluna que só algumas fontes têm (Resultados do Meta Ads). Sem ela, sai calada,
+    // sem a nota "ficou de fora".
+    if (geral.mapped[def.key] === false) { if (!seMapeada) ocultas.push(label); continue; }
     colunas.push({
       key: def.key, label, format: def.format || 'number', betterWhen: def.betterWhen,
       compara: ehMetricaDeTaxa(def) && !!def.betterWhen, def,

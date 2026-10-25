@@ -34,6 +34,7 @@ import { pedirSenhaNaAba, pedidoDeSenhaDaPaginaHtml } from './lib/senha-na-aba.j
 import { brandInnerHtml } from './lib/brand.js';
 import { areaDoPainel, trilhaHtml, acoesHtml, ligarCopiarLink, ligarBarraSolida } from './lib/barra-topo.js';
 import { aplicarPersonalizacao } from './lib/personalizacao.js';
+import { completarColMapDaMeta } from './lib/colmap-meta.js';
 import { aplicarRotulos } from './lib/rotulos.js';
 import { DURACAO, CURVA, textoDaContagemEntre, transformDoMarcador, menosMovimento, animar } from './lib/movimento.js';
 import { brParaISO, isoParaBR, mascaraDataBR } from './lib/data-br.js';
@@ -275,7 +276,16 @@ function findMetricDef(template, key) {
 // o traco) em vez do valor calculado (que seria 0 so por falta de coluna, um
 // numero com cara de certo). Default {} preserva o comportamento antigo (tudo
 // mapeado) para quem ainda chama sem o 4o argumento.
-export function renderKpiBlock(items, template, computed, mapped = {}, trends = {}, goal = null, sparks = {}) {
+// Cartão marcado com seMapeada que, neste painel, não tem coluna: some da faixa (3.8.0).
+function kpiSome(item, mapped) {
+  const p = item && item.props;
+  return !!(p && p.seMapeada && mapped && mapped[p.metricKey] === false);
+}
+
+export function renderKpiBlock(itensDoLayout, template, computed, mapped = {}, trends = {}, goal = null, sparks = {}) {
+  // Cartão com seMapeada (Resultados e Custo por resultado do Meta Ads) só entra quando a fonte tem
+  // a coluna: num CSV sem ela, some em vez de virar mais um "Não mapeada".
+  const items = (Array.isArray(itensDoLayout) ? itensDoLayout : []).filter((it) => !kpiSome(it, mapped));
   // HIERARQUIA (26/08/2026): o template SEMPRE declarou `primaryMetric`, e o layout jogava
   // esse dado fora: os 6 KPIs saiam com peso visual identico e o olho nao sabia onde pousar.
   // Agora a metrica principal daquele dominio vira o card heroi (dobro de largura, valor maior,
@@ -380,7 +390,10 @@ export function planoDoEsqueleto(template, abaId, colMap) {
   const t = template && typeof template === 'object' ? template : {};
   const abas = abasDoTemplate(t);
   const blocos = planLayout(layoutDaAba(t, abaId));
-  const faixa = blocos.find((b) => b.type === 'kpis');
+  const faixaDoLayout = blocos.find((b) => b.type === 'kpis');
+  // Mesma regra do renderKpiBlock: cartão seMapeada sem coluna não ocupa lugar no esqueleto.
+  const mappedDoEsqueleto = colMap && typeof colMap === 'object' ? computeAllMapped(t.metrics || [], [], colMap).mapped : {};
+  const faixa = faixaDoLayout ? { ...faixaDoLayout, items: faixaDoLayout.items.filter((it) => !kpiSome(it, mappedDoEsqueleto)) } : null;
   const kpis = faixa ? faixa.items.length : 0;
   // Mesma regra do renderKpiBlock: destaque só em faixa de 3 ou mais indicadores.
   const heroi = faixa && kpis >= 3 && t.primaryMetric
@@ -1170,7 +1183,7 @@ async function loadDashboardInto(container, config, id, opts = {}) {
   // Esqueleto no formato DESTE painel (abas, quantos indicadores, cartões da aba que vai abrir):
   // cada bloco ocupa o lugar que o conteúdo vai ocupar, então nada pula quando ele entra.
   const comFaixa = opts.showHeader !== false;
-  container.innerHTML = esqueletoHtml({ ...planoDoEsqueleto(template, abaDoHash(location.hash), config.colMap), comFaixa });
+  container.innerHTML = esqueletoHtml({ ...planoDoEsqueleto(template, abaDoHash(location.hash), completarColMapDaMeta(config.colMap, { source: config.source })), comFaixa });
 
   // Modo historico: le o snapshot mais recente do D1. Ao vivo: busca a fonte na hora.
   const buscar = () => (config.storage === 'd1' ? fetchD1(id) : fetchDataForSource(config.source, id));
@@ -1193,7 +1206,8 @@ async function loadDashboardInto(container, config, id, opts = {}) {
   }
 
   if (!aindaVale()) return false;
-  const colMap = config.colMap || {};
+  // Dash do Meta criado antes da 3.8.0 ganha a coluna Resultados sem precisar refazer o painel.
+  const colMap = completarColMapDaMeta(config.colMap || {}, { source: config.source, dataset });
   const baseCtx = { config, template, dataset, colMap };
   // Com saudação na tela, o painel é desenhado no instante em que a cortina começa a descer e
   // as peças dele entram em sequência com ela. Sem saudação, entra agora.

@@ -36,7 +36,8 @@ for (const id of DOMAINS) {
     assert.ok(rows.length >= 5, 'modelo com linhas de exemplo');
     const colMap = autoMap(templates[id].slots, columns);
     assert.deepEqual(validateRequired(templates[id].slots, colMap), [], 'obrigatória não reconhecida no modelo');
-    const semColuna = templates[id].slots.filter((s) => !colMap[s.key]).map((s) => s.label);
+    // Campo extra (Resultados, só do Meta Ads e do export do Gerenciador) não faz parte do modelo.
+    const semColuna = templates[id].slots.filter((s) => !s.extra && !colMap[s.key]).map((s) => s.label);
     assert.deepEqual(semColuna, [], 'o modelo mostra o painel completo: toda coluna do template presente');
   });
 }

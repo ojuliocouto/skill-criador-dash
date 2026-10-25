@@ -50,6 +50,7 @@ export const ALL_SLOTS = Object.freeze({
     Object.freeze({ key: 'leads', label: 'Leads', required: false }),
     Object.freeze({ key: 'conversoes', label: 'Conversões', required: false }),
     Object.freeze({ key: 'receita', label: 'Receita', required: false }),
+    Object.freeze({ key: 'resultados', label: 'Resultados', required: false }),
   ]),
   vendas: Object.freeze([
     Object.freeze({ key: 'data', label: 'Data', required: true }),
