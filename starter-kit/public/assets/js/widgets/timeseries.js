@@ -94,7 +94,10 @@ export function render(props = {}, points) {
   // Escala "bonita": dominio + ticks em passos redondos (1/2/2.5/5 x 10^n), em vez
   // de min/meio/max cru (que gerava rotulo tipo "2.775,25" com casas decimais, cara
   // de numero gerado por maquina). O dominio arredondado ainda da folga pra linha.
-  const { niceMin: min, niceMax: max, ticks: yTicksVals } = niceScale(dataMin, dataMax, 4);
+  // 3.9: o eixo de valor comeca no ZERO. A area preenchida mede quantidade pela altura; com
+  // o eixo em 500 (auditoria de 25/10/2026) um dia de R$ 800 parecia metade de um de R$ 1.700.
+  // Serie com valor negativo mantem o negativo (o zero fica dentro do eixo).
+  const { niceMin: min, niceMax: max, ticks: yTicksVals } = niceScale(Math.min(0, dataMin), Math.max(0, dataMax), 4);
 
   // area de plotagem (dentro das margens dos eixos).
   const plotX = M.left;
@@ -124,14 +127,15 @@ export function render(props = {}, points) {
     })
     .join('');
 
-  // Eixo X: rotulos de data no primeiro e no ultimo ponto (data curta DD/MM).
-  const xLabelsHtml = renderXLabels(list, coords, plotY + plotH);
+  // Eixo X: datas curtas (DD/MM) nas pontas e, em serie longa, no meio (ate 6 no total).
+  const xLabelsHtml = renderXLabels(list, coords, plotY + plotH, Wc);
 
   const pts = coords.map((c) => `${c.x},${c.y}`).join(' ');
   // Area preenchida sob a linha (do traço ate a base do plot): o grafico ganha
   // corpo em vez de uma linha fina flutuando num card vazio (tell de "meio pronto"
   // pego na auditoria). Fecha o poligono no rodape da area de plotagem.
-  const baseline = round(plotY + plotH);
+  // A area fecha na linha do zero (que, com o eixo do zero, e a base do desenho).
+  const baseline = round(yAt(Math.max(min, Math.min(max, 0))));
   const areaPts = `${coords[0].x},${baseline} ${pts} ${coords[coords.length - 1].x},${baseline}`;
   const dots = coords
     .map((c, i) => `<circle class="chart__point" cx="${c.x}" cy="${c.y}" r="3" data-d="${esc(String(list[i].date == null ? '' : list[i].date).trim())}" data-v="${Number(list[i].value) || 0}" />`)
@@ -150,8 +154,12 @@ export function render(props = {}, points) {
 
   // Sem preserveAspectRatio="none": o SVG escala uniformemente (xMidYMid meet, padrao),
   // entao a curva mantem a inclinacao fiel e os pontos ficam redondos, nao ovais.
+  // Serie longa (mais de 31 dias): os pontos fixos viram ruido (61 bolinhas num card). Eles ficam
+  // no DOM (a regua e a transformacao leem as coordenadas deles), escondidos por CSS; o dia em
+  // foco continua aparecendo pelo ponto proprio da regua.
+  const denso = n > 31 ? ' chart--denso' : '';
   return (
-    `<div class="chart chart--timeseries">` +
+    `<div class="chart chart--timeseries${denso}">` +
       titleHtml +
       `<svg class="chart__svg" viewBox="0 0 ${Wc} ${H}" data-formato="${esc(format)}" role="img" aria-label="${esc(label)}" tabindex="0" aria-describedby="${dicaId}">` +
         gridHtml +
@@ -165,14 +173,25 @@ export function render(props = {}, points) {
   );
 }
 
-// Rotulos de data no eixo X: sempre o primeiro e o ultimo ponto (evita poluir
-// com todos). So e chamada com 2+ pontos (1 ponto ou zero tem estado proprio).
-function renderXLabels(list, coords, baselineY) {
+// Rotulos de data no eixo X: sempre o primeiro e o ultimo ponto e, em serie longa, datas
+// intermediarias igualmente espacadas (uma a cada ~150 unidades do desenho, no maximo 6 no total).
+// So e chamada com 2+ pontos (1 ponto ou zero tem estado proprio).
+export function indicesDasDatas(n, largura = W) {
+  if (!(n >= 2)) return [];
+  const cabem = Math.max(2, Math.min(6, Math.floor(Number(largura) / 150) + 1));
+  const total = Math.min(n, cabem);
+  const idxs = [];
+  for (let k = 0; k < total; k++) idxs.push(Math.round((k * (n - 1)) / (total - 1)));
+  return [...new Set(idxs)];
+}
+
+function renderXLabels(list, coords, baselineY, largura) {
   const y = round(baselineY + 16);
-  const idxs = [0, list.length - 1];
+  const idxs = indicesDasDatas(list.length, largura);
+  const ultimo = list.length - 1;
   return idxs
     .map((i) => {
-      const anchor = i === 0 ? 'start' : 'end';
+      const anchor = i === 0 ? 'start' : (i === ultimo ? 'end' : 'middle');
       const label = shortDate(list[i].date);
       if (!label) return '';
       return `<text class="chart__xtick" x="${coords[i].x}" y="${y}" text-anchor="${anchor}">${esc(label)}</text>`;
@@ -213,7 +232,9 @@ export function niceScale(dataMin, dataMax, maxTicks = 4) {
   let min = Number.isFinite(dataMin) ? dataMin : 0;
   let max = Number.isFinite(dataMax) ? dataMax : 1;
   if (min === max) { min -= 1; max += 1; }
-  const step = niceNum(niceNum(max - min, false) / Math.max(1, maxTicks - 1), true);
+  // 3.9: o passo sai do alcance cru (não do alcance já arredondado pra cima): com o eixo no zero,
+  // 0 a 2.300 dava passo 2.000 e topo em 4.000, metade do gráfico vazia. Agora: passo 1.000, topo 3.000.
+  const step = niceNum((max - min) / Math.max(1, maxTicks - 1), true);
   const niceMin = Math.floor(min / step) * step;
   const niceMax = Math.ceil(max / step) * step;
   const ticks = [];

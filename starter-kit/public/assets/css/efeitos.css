@@ -27,6 +27,9 @@
 .chart--sem-deslize .chart__dica, .chart--sem-deslize .chart__regua, .chart--sem-deslize .chart__foco { transition: none; }
 /* Com a régua ativa, os pontos fixos do gráfico saem do caminho: só o do dia em foco aparece. */
 .chart--em-foco .chart__point { opacity: 0.35; }
+/* Série longa (mais de 31 dias, 3.9): os pontos fixos somem; a linha conta a história e o dia em foco
+   aparece pelo ponto da régua. Os círculos seguem no DOM (régua e transformação leem as coordenadas). */
+.chart--denso .chart__point { display: none; }
 
 /* EFEITO 3: números de roleta. O texto final fica no DOM (transparente) e a roleta vai por cima.
    Cada casa é uma janela de UMA linha (overflow hidden) com só o dígito que sai e o que entra;
