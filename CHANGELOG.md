@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.8.0
+
+Conector Meta Ads: puxa Resultados, Custo por resultado e Leads do jeito que o Gerenciador de Anúncios mostra, e lê todas as páginas da Graph API. Reclamação do dono: "ele não puxava do Meta Ads resultados, leads e custo por resultado".
+
+Causa
+
+- `starter-kit/functions/lib/meta.mjs` pedia só `campaign_name,spend,impressions,clicks,actions,date_start`: sem `results` nem `cost_per_result`, o painel não tinha como mostrar Resultados nem Custo por resultado.
+- Leads contava só o `action_type` `lead`: conta que não devolve o agregado (só formulário instantâneo ou só pixel) saía com 0 lead.
+- `starter-kit/functions/api/connectors/meta-ads.js` (`fetchMeta`) e `starter-kit/workers/snapshot/src/index.js` (`fetchMetaDataSet`) faziam UM fetch e ignoravam `paging.next`. Com `time_increment=1` no nível de campanha, a Graph manda a resposta em páginas: o painel ficava com a primeira e o total saía errado.
+
+Documentação oficial lida em 25/10/2026
+
+- Insights da conta: https://developers.facebook.com/documentation/ads-commerce/marketing-api/reference/ad-account/insights. `results` e `cost_per_result` são `list<AdsInsightsResult>`; a página não descreve os subcampos de `AdsInsightsResult` (o SDK oficial em Python tipa como `list<Object>`). Por isso o conector aceita os dois desenhos, `{ indicator, values: [{ value, attribution_windows }] }` e `{ action_type, value }`, com teste para cada um, e nunca soma janelas de atribuição (vale a `default`).
+- Ações: https://developers.facebook.com/docs/marketing-api/reference/ads-action-stats/. `lead` é "All offsite leads plus all On-Facebook leads"; `onsite_conversion.lead_grouped` é "All On-Facebook Leads"; `leadgen_grouped` é "On-Facebook leads coming from Messenger and Instant Forms"; `offsite_conversion.fb_pixel_lead` é o lead do pixel.
+- Permissão: a página do Ads Insights API pede `ads_read`.
+
+O que mudou
+
+- URL: `fields` ganha `results,cost_per_result`; `limit=500`; `use_unified_attribution_setting=true` (a atribuição de cada conjunto de anúncios, a mesma do Gerenciador).
+- Leads sem dobra: com `lead`, vale só ele; sem ele, `lead_grouped` (ou `leadgen_grouped`, quando só ele vem) mais `fb_pixel_lead`. Mesma regra do `omni_purchase` nas Conversões.
+- DataSet: as 7 colunas de sempre na mesma ordem, mais `Resultados`, `Tipo de resultado` (em português: "Leads no formulário", "Conversas por mensagem", "Compras no site"...), `Custo por resultado` e `CPL`. Campanha sem `results` cai nos Leads, depois nas Compras, com "(calculado pelo painel)" no tipo; sem nada, Resultados 0 e custo vazio. Dois tipos na mesma linha: soma, junta os nomes e o custo vira investimento / total.
+- Paginação (`buscarTodasAsPaginas`, com o fetch injetado): segue `paging.next` até a última página, com teto de 40 páginas (20.000 linhas) e mensagem clara se passar; erro na página 2 em diante (inclusive limite de chamadas, códigos 4, 17, 32, 613 e 80000 em diante) vira mensagem pública com o número da página, e o texto cru da Meta fica só no log; erro na página 1 continua genérico (o preview não vira oráculo de token); só segue link da Graph API; link repetido para em vez de entrar em laço. O handler do Pages e o Worker de snapshot usam a mesma função: nenhum snapshot pela metade.
+- Painel de Marketing: slot `resultados` (campo `extra`: só aparece no passo das colunas quando o arquivo tem a coluna) e métricas `resultados` e `custo_resultado` (investimento / resultados, nunca a soma dos custos). Visão geral e o layout plano ganham os cartões Resultados e Custo por resultado; os resumos por canal e por semana ganham as colunas. Tudo marcado com `seMapeada`: num CSV sem a coluna, some calado, sem "Não mapeada" nem nota "ficou de fora". A planilha modelo e o placar das colunas de quem usa CSV não mudam ("8 de 8").
+- Dash do Meta criado antes da 3.8.0: `lib/colmap-meta.js` liga a coluna Resultados na hora de desenhar, sem regravar a config, sem mexer no que a pessoa escolheu e sem ligar em snapshot antigo que não tem a coluna.
+- Assistente e guia do token: a permissão é `ads_read` (`read_insights` é de Página e não é necessária); o guia ganhou a tabela do que o dash puxa e as mensagens novas de erro.
+
+Testes
+
+- Novos: `test/meta-resultados.test.js` (16), `test/meta-paginacao.test.js` (13), `test/meta-resultados-painel.test.js` (11). Reprovavam antes (import de `contarLeads`, `buscarTodasAsPaginas` e `lib/colmap-meta.js` inexistentes) e passam depois.
+- Atualizados de propósito: `test/meta.test.js` (fields e colunas novas), `test/layout-padrao/*` (faixa de fábrica do Marketing com os 2 cartões novos) e `test/modelos.test.js` (campo `extra` não faz parte da planilha modelo).
+- O que não foi provado: uma chamada de verdade à Graph API com conta real (os testes usam o formato oficial com fetch falso).
+
 ## 3.7.4
 
 Corrige a falha do CI da 3.7.3 (run 37870517417, só no ubuntu-latest): `WebKit iPhone 14: efeito 1, cartão que vira a tela` lia o número do cartão como `4.4724.472` em vez de `4.472`.

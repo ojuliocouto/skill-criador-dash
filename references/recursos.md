@@ -137,7 +137,7 @@ functions/
   lib/
     csv.mjs                     parseCSV + detectDelimiter (puro, testavel)
     sheets-url.mjs              sheetUrlToCsv (compartilhado por sheets.js e pelo worker)
-    meta.mjs                    buildInsightsUrl + mapInsightsToDataSet (puro)
+    meta.mjs                    buildInsightsUrl + buscarTodasAsPaginas + mapInsightsToDataSet (puro, fetch injetado)
     snapshots.mjs               SQL do modo histórico + rowToDataSet (puro)
     auth-config.mjs             needsAuth/authOk (PBKDF2 salgado)/safeEqual/checkAdminToken (neutro)
     rate-limit.mjs              rate limiter em KV (gate de senha + preview Meta)
