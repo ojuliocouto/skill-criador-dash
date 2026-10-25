@@ -2,9 +2,11 @@
 // segmentado com uma pílula que desliza até o escolhido. O campo de data digitado continua, como
 // a opção "Personalizado". Um clique dispara a transição dos dados (efeitos 2 e 3). ESM.
 //
-// "Hoje" e os intervalos contam a partir do ÚLTIMO DIA COM DADO, não do calendário: um painel com
-// dados até 04/10 não pode mostrar "Hoje" vazio. A parte pura (faixa de datas, atalho ativo, HTML)
-// fica no topo e tem teste; a ligação com o DOM vem depois.
+// "Hoje" é o dia do CALENDÁRIO de quem está vendo (3.9, achado 5 da auditoria de 25/10/2026). Antes
+// "Hoje" e os intervalos contavam do último dia com dado: num painel com a planilha parada em 04/10,
+// o botão "Hoje" mostrava em 25/10 os números de 04/10 e nada avisava. Agora a faixa conta de hoje; se
+// a fonte parou, o período fica vazio e o painel diz qual é o último dado (lib/estado-vazio.js). A parte
+// pura (faixa de datas, atalho ativo, HTML) fica no topo e tem teste; a ligação com o DOM vem depois.
 
 import { ligarBordas } from './rolagem-borda.js';
 import { esc } from './html.js';
@@ -28,23 +30,29 @@ const ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 const paraData = (iso) => { const m = ISO.exec(iso || ''); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; };
 const paraIso = (dt) => dt.toISOString().slice(0, 10);
 
+/** Data de hoje (ISO) no relógio e no fuso do aparelho: 23h30 de 25/10 em São Paulo ainda é 25/10. */
+export function hojeLocal(agora = new Date()) {
+  const d = agora instanceof Date ? agora : new Date(agora);
+  const dois = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
+}
+
 /**
- * Faixa de datas (ISO, inclusiva) de um atalho, contada do último dia com dado e nunca antes do
- * primeiro. 'tudo' = sem filtro ({from:null,to:null}). 'personalizado', atalho desconhecido ou
- * dados sem data = null (quem chama não mexe nos campos).
+ * Faixa de datas (ISO, inclusiva) de um atalho, contada de HOJE no calendário (`limites.hoje`, ou a
+ * data do aparelho). 'tudo' = sem filtro ({from:null,to:null}). 'personalizado', atalho desconhecido
+ * ou dados sem data (min/max nulos) = null (quem chama não mexe nos campos).
  */
 export function faixaDoAtalho(id, limites) {
-  const { min, max } = limites || {};
-  const fim = paraData(max);
-  const ini = paraData(min);
-  if (!fim || !ini) return null;
-  const aparar = (dt) => (dt < ini ? ini : dt);
+  const { min, max, hoje } = limites || {};
+  if (!paraData(max) || !paraData(min)) return null;
+  const dia = hoje && paraData(hoje) ? hoje : hojeLocal();
+  const fim = paraData(dia);
   switch (id) {
     case 'tudo': return { from: null, to: null };
-    case 'hoje': return { from: max, to: max };
-    case '7d': return { from: paraIso(aparar(new Date(fim.getTime() - 6 * DIA))), to: max };
-    case '30d': return { from: paraIso(aparar(new Date(fim.getTime() - 29 * DIA))), to: max };
-    case 'mes': return { from: paraIso(aparar(new Date(Date.UTC(fim.getUTCFullYear(), fim.getUTCMonth(), 1)))), to: max };
+    case 'hoje': return { from: dia, to: dia };
+    case '7d': return { from: paraIso(new Date(fim.getTime() - 6 * DIA)), to: dia };
+    case '30d': return { from: paraIso(new Date(fim.getTime() - 29 * DIA)), to: dia };
+    case 'mes': return { from: paraIso(new Date(Date.UTC(fim.getUTCFullYear(), fim.getUTCMonth(), 1))), to: dia };
     default: return null;
   }
 }
@@ -75,7 +83,7 @@ export function atalhosHtml(ativo = 'tudo') {
 const retangulo = (el) => ({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight });
 
 /**
- * Liga o controle. `limites` {min,max} são as datas dos dados; `aoMudar` é chamado depois que
+ * Liga o controle. `limites` {min,max,hoje?} são as datas dos dados (e o dia de hoje, para teste); `aoMudar` é chamado depois que
  * os campos De e Até já têm a faixa nova. Devolve { selecionar(id, {silencioso}), ativo() }.
  */
 export function ligarAtalhos(barra, limites, aoMudar) {
