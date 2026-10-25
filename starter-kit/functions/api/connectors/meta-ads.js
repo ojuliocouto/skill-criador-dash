@@ -7,7 +7,7 @@
 //  - GET ?id=<dashboardId>: le a config no KV, pega o token guardado em
 //    source.meta e busca os dados. O token fica SO no servidor, nunca vai pro browser.
 
-import { buildInsightsUrl, mapInsightsToDataSet } from '../../lib/meta.mjs';
+import { buildInsightsUrl, mapInsightsToDataSet, buscarTodasAsPaginas } from '../../lib/meta.mjs';
 import { needsAuth, authOk, checkAdminToken } from '../../lib/auth-config.mjs';
 import { rateLimit, authRateLimit, clientIp } from '../../lib/rate-limit.mjs';
 
@@ -34,14 +34,25 @@ const PREVIEW_WINDOW = 60;
 // um testaria tokens roubados e leria a resposta detalhada da Meta).
 const PREVIEW_ERRO_GENERICO = 'Não foi possível validar o token ou a conta do Meta Ads. Confira o token de acesso e o ID da conta de anúncios e tente de novo.';
 
+// Busca TODAS as páginas (paging.next, com teto) e mapeia. Antes da 3.8.0 era um fetch só e o
+// painel ficava com a primeira página: total errado em conta com muitas campanhas ou período longo.
 async function fetchMeta({ token, account, since, until } = {}) {
   const url = buildInsightsUrl({ token, accountId: account, since, until });
-  const res = await fetch(url);
-  const body = await res.json();
-  const ds = mapInsightsToDataSet(body); // lanca Error se a Graph API devolver {error}
+  const body = await buscarTodasAsPaginas(url, (u, init) => fetch(u, init));
+  const ds = mapInsightsToDataSet(body);
   ds.meta = ds.meta || {};
   ds.meta.fetchedAt = new Date().toISOString();
   return ds;
+}
+
+// Falha ao buscar: erro PÚBLICO (página 2 em diante, teto de páginas) vai com a mensagem clara;
+// qualquer outro (token, conta, página 1) vira a mensagem genérica, pra não virar oráculo de token.
+function falhaDaMeta(e) {
+  if (e && e.publico) {
+    if (e.cause) console.log(`meta-ads: ${e.message} Causa: ${e.cause.message || e.cause}`);
+    return erro(e.message, e.status || 502);
+  }
+  return erro(PREVIEW_ERRO_GENERICO, 400);
 }
 
 export async function onRequest(context) {
@@ -70,8 +81,8 @@ export async function onRequest(context) {
       // texto cru da Graph API (que revelaria se o token/conta e valido).
       try {
         return json(await fetchMeta(body));
-      } catch {
-        return erro(PREVIEW_ERRO_GENERICO, 400);
+      } catch (e) {
+        return falhaDaMeta(e);
       }
     }
 
@@ -102,8 +113,8 @@ export async function onRequest(context) {
       // o GET vira oraculo de validacao do token/conta GUARDADO no dashboard.
       try {
         return json(await fetchMeta(m));
-      } catch {
-        return erro(PREVIEW_ERRO_GENERICO, 400);
+      } catch (e) {
+        return falhaDaMeta(e);
       }
     }
 

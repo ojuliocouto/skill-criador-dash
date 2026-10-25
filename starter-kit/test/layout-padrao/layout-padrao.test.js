@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import { templates } from '../../public/assets/js/templates/index.js';
 
 const FABRICA = {
-  marketing: { heroi: 'leads', kpis: ['investimento', 'leads', 'CTR', 'CPL', 'CPA', 'ROAS'], widgets: ['timeseries', 'funnel', 'ranking', 'table'] },
+  // 3.8.0: Resultados e Custo por resultado entram na faixa com seMapeada (somem sem a coluna).
+  marketing: { heroi: 'leads', kpis: ['investimento', 'resultados', 'custo_resultado', 'leads', 'CTR', 'CPL', 'CPA', 'ROAS'], widgets: ['timeseries', 'funnel', 'ranking', 'table'] },
   vendas: { heroi: 'faturamento', kpis: ['faturamento', 'num_vendas', 'vendas_ganhas', 'taxa_conversao', 'ticket_medio'], widgets: ['timeseries', 'funnel', 'ranking', 'ranking', 'table'] },
   suporte: { heroi: 'atendimentos', kpis: ['atendimentos', 'resolvidos', 'taxa_resolucao', 'tempo_resposta', 'csat'], widgets: ['timeseries', 'funnel', 'ranking', 'table'] },
   financeiro: { heroi: 'saldo', kpis: ['entradas', 'saidas', 'saldo', 'margem'], widgets: ['timeseries', 'ranking', 'ranking', 'table'] },

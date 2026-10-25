@@ -42,7 +42,10 @@ export function resumoDaArea(template) {
     const def = (t.metrics || []).find((m) => m && m.key === key);
     return def ? (def.label || key) : null;
   };
-  const numeros = semRepetir(layout.filter((i) => i && i.widget === 'kpi').map((i) => rotuloDe(i.props && i.props.metricKey)));
+  // Cartão com seMapeada só aparece quando a fonte tem a coluna (ex.: Resultados do Meta Ads): no
+  // passo 1 ainda não se sabe a fonte, então ele não entra na lista dos números garantidos.
+  const numeros = semRepetir(layout.filter((i) => i && i.widget === 'kpi' && !(i.props && i.props.seMapeada))
+    .map((i) => rotuloDe(i.props && i.props.metricKey)));
   const blocos = abas.length ? [] : semRepetir(layout
     .filter((i) => i && i.widget && i.widget !== 'kpi')
     .map((i) => (i.props && i.props.title) || NOME_DO_TIPO[i.widget] || null));
@@ -51,7 +54,8 @@ export function resumoDaArea(template) {
 
 /** Colunas que a planilha precisa ter (obrigatórias) e as que melhoram o painel (opcionais). */
 export function colunasEsperadas(template) {
-  const slots = (template && Array.isArray(template.slots)) ? template.slots : [];
+  // Campo extra (Resultados do Meta Ads) não entra na lista do que a planilha deve ter.
+  const slots = ((template && Array.isArray(template.slots)) ? template.slots : []).filter((s) => s && !s.extra);
   const enxuto = (s) => ({ key: s.key, label: s.label || s.key });
   return {
     obrigatorias: slots.filter((s) => s && s.required).map(enxuto),

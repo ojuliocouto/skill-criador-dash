@@ -26,9 +26,10 @@ test('buildInsightsUrl: inclui access_token, level, time_increment e fields', ()
   assert.equal(qs.get('access_token'), 'meu-token');
   assert.equal(qs.get('level'), 'campaign');
   assert.equal(qs.get('time_increment'), '1');
+  // 3.8.0: results e cost_per_result (colunas Resultados e Custo por resultado do Gerenciador).
   assert.equal(
     qs.get('fields'),
-    'campaign_name,spend,impressions,clicks,actions,date_start'
+    'campaign_name,spend,impressions,clicks,actions,results,cost_per_result,date_start'
   );
 });
 
@@ -118,6 +119,10 @@ test('mapInsightsToDataSet: mapeia data com 2 itens para o DataSet', () => {
     'Cliques',
     'Leads',
     'Conversões',
+    'Resultados',
+    'Tipo de resultado',
+    'Custo por resultado',
+    'CPL',
   ]);
   assert.equal(ds.rows.length, 2);
 
@@ -129,6 +134,11 @@ test('mapInsightsToDataSet: mapeia data com 2 itens para o DataSet', () => {
     Cliques: '250',
     Leads: '12',
     Conversões: '5',
+    // Sem results da Meta: cai nos Leads calculados (150,50 / 12).
+    Resultados: '12',
+    'Tipo de resultado': 'Leads (calculado pelo painel)',
+    'Custo por resultado': '12.54',
+    CPL: '12.54',
   });
 
   // Segundo item sem actions: Leads e Conversões viram '0'.
@@ -253,6 +263,10 @@ test('mapInsightsToDataSet: sem data devolve DataSet vazio com columns fixas', (
     'Cliques',
     'Leads',
     'Conversões',
+    'Resultados',
+    'Tipo de resultado',
+    'Custo por resultado',
+    'CPL',
   ]);
   assert.deepEqual(ds.rows, []);
   assert.equal(ds.meta.rowCount, 0);

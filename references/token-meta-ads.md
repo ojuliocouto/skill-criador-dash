@@ -41,7 +41,8 @@ Se o portfólio já tem um app (aparece em **Configurações > Contas > Apps**),
 1. Com o `dash-leitura` aberto, clique em **Gerar token**.
 2. Escolha o **app** do passo 1.
 3. Validade: **Nunca**.
-4. Permissões: marque **ads_read** e **read_insights**. Só essas duas.
+4. Permissões: marque **ads_read**. É a permissão que a Meta exige para ler os números dos anúncios
+   (Insights). `read_insights` é de Página e não é necessária; se já marcou, não atrapalha.
 5. Clique em **Gerar token** e **copie na hora**: a Meta mostra o token uma vez só.
    Ele começa com `EAA`.
 
@@ -64,11 +65,32 @@ O dash testa na hora e mostra o nome da conta se deu certo.
 
 | O que aparece | O que é | O que fazer |
 |---|---|---|
-| `(#200) ... ads_read` ou "permissão" | O token foi gerado sem `ads_read` | Volte ao passo 4 e gere de novo marcando `ads_read` e `read_insights` |
+| `(#200) ... ads_read` ou "permissão" | O token foi gerado sem `ads_read` | Volte ao passo 4 e gere de novo marcando `ads_read` |
 | `(#100) ... does not exist` ou "conta não encontrada" | O usuário do sistema não tem acesso à conta, ou o ID está errado | Passo 3 (atribuir a conta) e passo 5 (conferir o número) |
 | `Invalid OAuth access token` | Token copiado pela metade, ou foi anulado | Gere outro no passo 4 e copie inteiro |
 | `Session has expired` | Você usou um token pessoal (do Explorer), que vence em horas | Use o token do usuário do sistema, com validade **Nunca** |
 | O dash abre com tudo zerado | A conta não teve gasto no período escolhido | Normal em conta nova: troque o período ou espere a primeira campanha rodar |
+| "o período tem mais de 40 páginas de dados" | Período longo demais para uma conta com muitas campanhas (mais de 20.000 linhas de campanha por dia) | Encurte o período (campos De e Até) ou crie um painel para cada conta |
+| "a Meta atingiu o limite de chamadas desta conta na página N" | Limite de uso da API da Meta (códigos 4, 17, 32, 613, 80000 e parecidos) | Espere uns 15 minutos e clique em Atualizar; se repetir, encurte o período |
+| "a Meta devolveu erro na página N" ou "parou de responder na página N" | A Meta falhou no meio da leitura | Nada foi mostrado pela metade. Tente de novo em alguns minutos |
+
+## O que o dash puxa da Meta (versão 3.8.0)
+
+Uma linha por campanha por dia, com estas colunas:
+
+| Coluna | De onde vem |
+|---|---|
+| Data, Campanha, Investimento, Impressões, Cliques | Os campos de sempre da Meta (`date_start`, `campaign_name`, `spend`, `impressions`, `clicks`) |
+| Leads | Formulário instantâneo, Messenger e pixel do site, sem contar o mesmo lead duas vezes: vale o total `lead` da Meta; sem ele, leads no Facebook mais leads do pixel |
+| Conversões | Compras (`omni_purchase`; sem ele, `purchase` mais compras do pixel) |
+| Resultados e Tipo de resultado | A coluna "Resultados" do Gerenciador de Anúncios (`results`): o que a campanha otimiza (lead, conversa, compra, alcance...) |
+| Custo por resultado | A coluna "Custo por resultado" do Gerenciador (`cost_per_result`) |
+| CPL | Investimento dividido por Leads, na linha |
+
+- Os números seguem a atribuição de cada conjunto de anúncios (`use_unified_attribution_setting`), a mesma do Gerenciador.
+- Campanha sem "Resultados" na Meta (campanha antiga): o dash usa os Leads, ou as Compras se não houver lead, e escreve "(calculado pelo painel)" no Tipo de resultado.
+- O dash lê todas as páginas da resposta (500 linhas por página, até 40 páginas). Passou disso, ele avisa em vez de mostrar um total pela metade.
+- Os números da Meta podem mudar por alguns dias depois (atribuição atrasada). É normal o painel de hoje não bater com o de ontem para os últimos dias.
 
 ## Por que não usar o token do Explorer da Graph API
 

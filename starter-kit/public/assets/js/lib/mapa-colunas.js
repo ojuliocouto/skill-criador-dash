@@ -32,6 +32,20 @@ export function pendentesDeConfirmacao(fracos, colMap, confirmados) {
   return Object.keys(fracos).filter((k) => colMap && colMap[k] === fracos[k] && !ok[k]);
 }
 
+/**
+ * Campos que o passo "Confira as colunas" mostra e conta. Campo `extra` (Resultados, que só o Meta
+ * Ads e o export do Gerenciador trazem) só aparece quando o arquivo tem a coluna: num CSV comum ele
+ * não vira mais um "falta" no placar.
+ * @param {{key:string, extra?:boolean}[]} slots
+ * @param {{[slot:string]:string|null}} colMap
+ * @param {string[]} [columns]
+ */
+export function slotsDoArquivo(slots, colMap, columns) {
+  const map = colMap || {};
+  const existentes = Array.isArray(columns) ? new Set(columns) : null;
+  return (slots || []).filter((s) => s && (!s.extra || (escolhida(map[s.key]) && (!existentes || existentes.has(map[s.key])))));
+}
+
 export function validateRequired(slots, colMap) {
   const map = colMap || {};
   return (slots || [])
@@ -45,7 +59,7 @@ export function validateRequired(slots, colMap) {
  * arquivo não conta (ex: trocou a planilha e o nome antigo ficou).
  */
 export function placarDoMapa(slots, colMap, columns) {
-  const lista = (slots || []).filter(Boolean);
+  const lista = slotsDoArquivo(slots, colMap, columns);
   const map = colMap || {};
   const existentes = Array.isArray(columns) ? new Set(columns) : null;
   const achou = (s) => escolhida(map[s.key]) && (!existentes || existentes.has(map[s.key]));

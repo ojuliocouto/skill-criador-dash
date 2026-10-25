@@ -22,7 +22,7 @@ export function formularioMeta(guardado) {
   const botao = el('button', { class: 'btn', id: 'connectMeta', type: 'button', text: 'Conectar Meta Ads' });
 
   const no = el('div', { class: 'origem-form' }, [
-    el('p', { class: 'origem-form__texto', text: 'Puxa os números das campanhas direto da Meta. Você precisa de um token de usuário do sistema (um usuário de robô, criado no Gerenciador de Negócios, que só lê os anúncios e não depende da sua senha), com validade Nunca e as permissões ads_read e read_insights, e do ID da conta de anúncios, o número depois de act= no endereço do Gerenciador de Anúncios. O token fica só no servidor e nunca aparece no painel.' }),
+    el('p', { class: 'origem-form__texto', text: 'Puxa os números das campanhas direto da Meta. Você precisa de um token de usuário do sistema (um usuário de robô, criado no Gerenciador de Negócios, que só lê os anúncios e não depende da sua senha), com validade Nunca e a permissão ads_read, e do ID da conta de anúncios, o número depois de act= no endereço do Gerenciador de Anúncios. O painel traz Resultados, Custo por resultado, Leads e CPL de cada campanha, dia a dia. O token fica só no servidor e nunca aparece no painel.' }),
     el('p', { class: 'origem-form__texto' }, [
       el('a', { href: META_GUIA_URL, target: '_blank', rel: 'noopener noreferrer', text: 'Como gerar o seu token' }),
       ' (passo a passo, com o que fazer em cada erro da Meta).',

@@ -12,7 +12,7 @@
 // Sem libs externas.
 import { parseCSV } from '../../../functions/lib/csv.mjs';
 import { sheetUrlToCsv } from '../../../functions/lib/sheets-url.mjs';
-import { buildInsightsUrl, mapInsightsToDataSet } from '../../../functions/lib/meta.mjs';
+import { buildInsightsUrl, mapInsightsToDataSet, buscarTodasAsPaginas } from '../../../functions/lib/meta.mjs';
 import { insertSnapshotSQL } from '../../../functions/lib/snapshots.mjs';
 // Registry de fontes: qual tipo suporta snapshot historico (canHistory). Mesma
 // fonte de verdade que o wizard usa, pra decidir aqui quais fontes tirar snapshot.
@@ -22,7 +22,7 @@ import { getSource, historyTypes } from '../../../public/assets/js/sources/index
 // Reexporta a lógica pura compartilhada para que o teste de paridade
 // (test/worker-parity.test.js) possa importar daqui e conferir que é a MESMA
 // função usada pelos conectores de Pages, sem cópia inline no Worker.
-export { parseCSV, sheetUrlToCsv, buildInsightsUrl, mapInsightsToDataSet, insertSnapshotSQL };
+export { parseCSV, sheetUrlToCsv, buildInsightsUrl, mapInsightsToDataSet, buscarTodasAsPaginas, insertSnapshotSQL };
 
 export default {
   /**
@@ -72,7 +72,9 @@ export default {
         console.log(`snapshot: gravado ${config.id} (${dataset.rows.length} linhas).`);
       } catch (err) {
         const msg = err && err.message ? err.message : String(err);
-        console.log(`snapshot: falha em ${key}: ${msg}`);
+        // A causa (texto cru da Meta numa falha de paginação) só vai pro log do Worker.
+        const causa = err && err.cause && err.cause.message ? ` Causa: ${err.cause.message}` : '';
+        console.log(`snapshot: falha em ${key}: ${msg}${causa}`);
       }
     }
   },
@@ -167,10 +169,9 @@ async function fetchMetaDataSet(source) {
     level: meta.level,
   });
 
-  const resp = await fetch(url, { redirect: 'follow' });
-  const apiJson = await resp.json();
-
-  // mapInsightsToDataSet já trata { error: { message } } lançando Error.
+  // Segue paging.next até a última página (com teto). Erro em qualquer página lança: o snapshot
+  // não é gravado pela metade (o catch do scheduled registra e passa pro próximo dashboard).
+  const apiJson = await buscarTodasAsPaginas(url, (u, init) => fetch(u, init));
   const dataset = mapInsightsToDataSet(apiJson);
 
   // A função pura deixa fetchedAt null (não usa Date); o Worker carimba a data.

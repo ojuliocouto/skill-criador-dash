@@ -6,7 +6,7 @@
 import { el, limpar, campo, erro, chamarAtencao, acoes } from './dom.js';
 import { getTemplate } from '../templates/index.js';
 import { autoMapDetalhado } from '../lib/automap.js';
-import { placarDoMapa, textoDoPlacar, exemplosDaColuna, fraseDoQueSePerde, validateRequired, pendentesDeConfirmacao } from '../lib/mapa-colunas.js';
+import { placarDoMapa, textoDoPlacar, exemplosDaColuna, fraseDoQueSePerde, validateRequired, pendentesDeConfirmacao, slotsDoArquivo } from '../lib/mapa-colunas.js';
 import { listaEmFrase } from '../lib/area-resumo.js';
 import { LIMITE_DO_ROTULO, rotuloValido } from '../lib/rotulos.js';
 
@@ -54,7 +54,8 @@ export function renderColunas(corpo, ctx) {
     ]),
   ]);
 
-  for (const campoDoModelo of tpl.slots) {
+  // Campo extra (Resultados) só ganha linha quando o arquivo tem a coluna.
+  for (const campoDoModelo of slotsDoArquivo(tpl.slots, state.colMap, columns)) {
     const chave = campoDoModelo.key;
     const nomePadrao = campoDoModelo.label;
     const nomeAtual = () => (rotuloValido(state.labels[chave]) ? state.labels[chave].trim() : nomePadrao);

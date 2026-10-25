@@ -83,8 +83,15 @@ Conectores implementados:
   `POST` (preview no wizard, recebe `{ token, account, since, until }` no corpo) e
   `GET ?id=<dashboardId>` (lê a config no KV, usa o token guardado em `source.meta` e
   busca os insights). O token fica **só no servidor**: nunca vai pro browser. A lógica
-  pura (montar a URL de insights, mapear a resposta para o `DataSet`) vive em
-  `functions/lib/meta.mjs` (`buildInsightsUrl`, `mapInsightsToDataSet`).
+  pura (montar a URL de insights, seguir as páginas, mapear a resposta para o `DataSet`) vive em
+  `functions/lib/meta.mjs` (`buildInsightsUrl`, `buscarTodasAsPaginas`, `mapInsightsToDataSet`).
+  Desde a 3.8.0: pede `results` e `cost_per_result` (as colunas "Resultados" e "Custo por resultado"
+  do Gerenciador) com `use_unified_attribution_setting=true`; segue `paging.next` com `limit=500` e
+  teto de 40 páginas (erro claro se passar; erro da página 2 em diante vira mensagem pública, o da
+  página 1 continua genérico); Leads sem dobra (`lead` é o agregado; sem ele, `lead_grouped` ou
+  `leadgen_grouped` mais `fb_pixel_lead`). Colunas: `Data, Campanha, Investimento, Impressões,
+  Cliques, Leads, Conversões` (as de sempre) e `Resultados, Tipo de resultado, Custo por resultado, CPL`.
+  O Worker de snapshot usa a mesma paginação.
 - `d1.js`: conector do MODO HISTORICO. Nao bate na fonte viva: le o snapshot mais recente
   gravado pelo cron no D1 (via `functions/lib/snapshots.mjs`). So faz sentido com `storage:'d1'`.
 

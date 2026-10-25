@@ -36,7 +36,7 @@ What was verified: the test suites pass with the Python launcher finding each of
 
 Optional, only if you need it:
 
-- A **Meta Ads** access token (Business Manager System User, never expires, `ads_read` + `read_insights`) and ad account id, only for the native Meta Ads connector (Marketing domain). Step-by-step guide (Portuguese): `references/token-meta-ads.md`.
+- A **Meta Ads** access token (Business Manager System User, never expires, `ads_read` permission) and ad account id, only for the native Meta Ads connector (Marketing domain). Step-by-step guide (Portuguese): `references/token-meta-ads.md`.
 - Nothing extra for D1 / historical mode: it reuses the same Cloudflare account, it just adds one more `wrangler d1 create` step later (see Deploy below).
 
 Nothing above requires a paid plan or a company account: a personal Cloudflare account and a personal Google account are enough to follow this guide end to end.
@@ -177,6 +177,17 @@ node <skill-dir>/scripts/rodar-testes.mjs --lista         # list what would run
 ```
 
 No shell globs (Windows does not expand them): the runner reads the folder itself, runs `.py` files through `py.mjs`, and reports any test that skipped itself with `PULADO: <reason>`. GitHub Actions (`.github/workflows/portabilidade.yml`) runs it on Windows, macOS and Linux, plus the browser-free subset from a folder with an accent and a space on Windows; in CI a skip for lack of Playwright counts as a failure.
+
+## What changed in 3.8.0
+
+The Meta Ads connector now pulls what Ads Manager shows. Before, it asked only for `campaign_name,spend,impressions,clicks,actions,date_start`, counted Leads only from the `lead` action type and read only the first page of the Graph API response, so long periods or accounts with many campaigns were cut short.
+
+- New fields: `results` and `cost_per_result` (the Ads Manager "Results" and "Cost per result" columns, which depend on the campaign objective), read with `use_unified_attribution_setting=true` so the numbers follow each ad set's attribution, like Ads Manager. The official reference types both as `list<AdsInsightsResult>` without documenting the sub-fields, so the connector accepts `{ indicator, values: [{ value, attribution_windows }] }` and `{ action_type, value }`, with a test for each, and never adds attribution windows together.
+- Leads without double counting: `lead` is Meta's total ("all offsite leads plus all On-Facebook leads"); without it, On-Facebook leads (`onsite_conversion.lead_grouped`, or `leadgen_grouped` when only that one comes) plus pixel leads (`offsite_conversion.fb_pixel_lead`).
+- New DataSet columns, after the old ones (dashboards already created keep working): `Resultados`, `Tipo de resultado`, `Custo por resultado`, `CPL`. A campaign without `results` falls back to Leads, then Purchases, and says "(calculado pelo painel)".
+- Pagination: follows `paging.next` with `limit=500` and a cap of 40 pages (a clear message above that); an error on page 2 or later becomes a clear public message and nothing is shown half-read; only Graph API links are followed. The live connector and the snapshot Worker share the same code.
+- Marketing dashboard: Results and Cost per result cards and table columns show up only when the source has the column (`seMapeada`), so a plain CSV gets no extra "Não mapeada". Meta dashboards created before 3.8.0 get the Results column when they are drawn, without being rebuilt.
+- Permission: `ads_read` is the one the Insights API requires; `read_insights` is not needed.
 
 ## What changed in 3.7.4
 

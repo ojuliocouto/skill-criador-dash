@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.7.4
+version: 3.8.0
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -416,8 +416,10 @@ Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloq
   conector sob medida.
 - **Meta Ads: a pessoa gera o token DELA.** Antes de pedir o token, leia `references/token-meta-ads.md`
   e conduza a pessoa por ele, um passo por vez, esperando ela confirmar cada um (app, usuário do sistema
-  com só leitura, atribuir a conta, gerar token com validade Nunca e `ads_read` + `read_insights`, pegar o
-  ID da conta). Nunca use token seu, do operador ou de outra conta: o dash é da pessoa. Se der erro,
+  com só leitura, atribuir a conta, gerar token com validade Nunca e `ads_read`, pegar o
+  ID da conta). Desde a 3.8.0 o conector traz Resultados, Tipo de resultado, Custo por resultado, Leads
+  (formulário, Messenger e pixel, sem dobra) e CPL, e lê todas as páginas da Graph API (teto de 40);
+  o painel de Marketing mostra Resultados e Custo por resultado só quando a fonte tem a coluna. Nunca use token seu, do operador ou de outra conta: o dash é da pessoa. Se der erro,
   a tabela "Se der erro" do mesmo arquivo diz o que é cada mensagem da Meta.
 - Mapeie colunas (auto-mapeamento pré-preenche), defina branding (cor), o número herói e as métricas
   que não entram (as decisões 1 e 3 do 2.5), meta opcional e senha opcional.
