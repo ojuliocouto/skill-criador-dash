@@ -55,8 +55,9 @@ test('nenhuma duração escrita à mão nos módulos ou no CSS dos efeitos passa
   }
 });
 
-test('o marco da meta batida fica entre 1,6 e 2,4 s e os demais efeitos não são mais longos que ele', () => {
-  assert.ok(DURACAO_TOTAL_DO_MARCO >= 1600 && DURACAO_TOTAL_DO_MARCO <= TETO_DO_EFEITO);
+// 3.9: o marco virou sinal discreto (barra e selo), de 0,8 a 1,3 s.
+test('o marco da meta batida fica entre 0,8 e 1,3 s e os demais efeitos não são mais longos que ele', () => {
+  assert.ok(DURACAO_TOTAL_DO_MARCO >= 800 && DURACAO_TOTAL_DO_MARCO <= 1300 && DURACAO_TOTAL_DO_MARCO <= TETO_DO_EFEITO);
   assert.ok(DURACAO.troca + 60 <= DURACAO_TOTAL_DO_MARCO);
 });
 

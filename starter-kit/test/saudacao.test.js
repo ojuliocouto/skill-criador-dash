@@ -85,9 +85,11 @@ test('dashboard.html traz a tela de saudação pronta (o servidor só preenche o
   assert.ok(html.includes(saudacaoHtml({ nome: '', comVirgula: true })), 'a marcação da página é a mesma que a função monta');
 });
 
-test('a abertura inteira cabe em 3 segundos', () => {
-  assert.ok(TEMPOS.revelar >= 900, 'dá tempo de ler o nome');
-  assert.ok(duracaoDaAbertura() <= 3000, `abertura de ${duracaoDaAbertura()} ms`);
+// 3.9: a saudação só aparece na primeira visita do aparelho e é curta (a auditoria mediu 2,3 s até o
+// primeiro número em toda sessão nova). Ainda dá tempo de ver o nome antes de a cortina descer.
+test('a abertura inteira cabe em 1,8 segundo', () => {
+  assert.ok(TEMPOS.revelar >= 560, 'dá tempo de ver o nome');
+  assert.ok(duracaoDaAbertura() <= 1800, `abertura de ${duracaoDaAbertura()} ms`);
   assert.ok(TEMPOS.pular <= 260, 'no clique, some na hora');
 });
 

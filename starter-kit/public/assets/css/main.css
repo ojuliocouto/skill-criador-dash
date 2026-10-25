@@ -366,9 +366,9 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 .chart .empty, .chart__empty { color: var(--text-faint); text-align: center; padding: 40px 0; }
 
 /* Funnel */
-.funnel { display: flex; flex-direction: column; gap: 12px; }
+.funnel { display: flex; flex-direction: column; gap: 6px; --funnel-rotulo: 130px; }
 .funnel__title { font-size: 13.5px; font-weight: 560; color: var(--text-dim); letter-spacing: -0.01em; margin: 0 0 16px; }
-.funnel__step { display: grid; grid-template-columns: 130px 1fr 62px; gap: 12px; align-items: center; }
+.funnel__step { display: grid; grid-template-columns: var(--funnel-rotulo) 1fr; gap: 12px; align-items: center; }
 .funnel__label { color: var(--text); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .funnel__bar-wrap { position: relative; background: var(--bg-elev-2); border-radius: var(--radius-sm); height: 30px; overflow: hidden; }
 .funnel__bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-graph, var(--accent)); border-radius: var(--radius-sm); min-width: 3px; opacity: 0.9; }
@@ -380,9 +380,13 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 /* Barra curta: valor FORA dela (inline left calc), em cor de TEXTO normal, pra nao
    sumir sobre a trilha clara. Corrige contraste no tema claro (bug pego na auditoria). */
 .funnel__value--out { color: var(--text); }
-.funnel__conv { font-family: var(--font); font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: 12px; text-align: right; white-space: nowrap; }
+/* 3.9: a taxa de passagem é uma linha própria entre as barras, alinhada com elas, com um fio que
+   liga uma etapa à outra. Assim ela lê como "quanto passou daqui pra lá", não como coluna solta. */
+.funnel__conv { position: relative; margin-left: calc(var(--funnel-rotulo) + 12px); padding: 1px 0 1px 14px; font-family: var(--font); font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+.funnel__conv::before { content: ""; position: absolute; left: 4px; top: -4px; bottom: -4px; width: 1px; background: var(--border); }
+.funnel__nota { margin: 8px 0 0; color: var(--text-faint); font-size: 11.5px; line-height: 1.45; }
 .funnel__empty { color: var(--text-faint); text-align: center; padding: 30px 0; }
-@media (max-width: 620px) { .funnel__step { grid-template-columns: 92px 1fr 54px; } }
+@media (max-width: 620px) { .funnel { --funnel-rotulo: 88px; } }
 
 /* Ranking. max-width limita as barras num card full-width (ex: marketing/suporte)
    pra nao virarem reguas full-bleed pesadas; num card estreito (vendas col-6) o
@@ -531,32 +535,35 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
    gradiente, brilho ou vidro, e cor diferente só com motivo (verde bom, vermelho ruim, destaque
    na aba ativa). */
 
-/* A faixa é escura nos DOIS temas (no claro ela ancora o topo da página; no escuro é uma
-   superfície um degrau acima do fundo), então tem tokens próprios em vez de herdar --text. */
+/* 3.9: a faixa deixou de ser um bloco preto (no tema claro era o bloco mais pesado da tela e repetia
+   o nome que já está na barra do topo). Agora é o título da página, sem caixa, nas cores do tema.
+   Os tokens continuam pra quem personaliza a faixa. */
 :root, [data-theme="dark"] {
-  --faixa-bg: #1b1f27;
-  --faixa-borda: #2b313b;
-  --faixa-texto: #f1f3f6;
-  --faixa-texto-dim: #a9b1be;
+  --faixa-bg: transparent;
+  --faixa-borda: transparent;
+  --faixa-texto: var(--text);
+  --faixa-texto-dim: var(--text-dim);
 }
 [data-theme="light"] {
-  --faixa-bg: #1a1d24;
-  --faixa-borda: #1a1d24;
-  --faixa-texto: #f4f5f7;
-  --faixa-texto-dim: #b3bac6;
+  --faixa-bg: transparent;
+  --faixa-borda: transparent;
+  --faixa-texto: var(--text);
+  --faixa-texto-dim: var(--text-dim);
 }
 
 .faixa {
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 28px;
   background: var(--faixa-bg); color: var(--faixa-texto);
-  border: 1px solid var(--faixa-borda); border-radius: var(--radius); padding: 22px 26px;
+  border: 1px solid var(--faixa-borda); border-radius: var(--radius); padding: 6px 0 4px;
 }
 .faixa__marca { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .faixa__textos { min-width: 0; }
 .faixa__nome { margin: 0; color: var(--faixa-texto); font-size: 24px; font-weight: 620; letter-spacing: -0.025em; line-height: 1.2; overflow-wrap: anywhere; }
 .faixa__dominio { margin: 4px 0 0; color: var(--faixa-texto-dim); font-size: 14px; }
+/* A área (Marketing, Vendas...) já está no selo da barra do topo: aqui seria repetição. */
+.faixa__dominio { display: none; }
 /* Logo sobre plaquinha clara: a maioria dos logos é desenhada pra fundo claro e sumiria na faixa. */
-.faixa__logo { flex-shrink: 0; display: block; background: #fff; border-radius: 8px; padding: 7px 10px; line-height: 0; }
+.faixa__logo { flex-shrink: 0; display: block; background: #fff; border-radius: 8px; padding: 7px 10px; line-height: 0; box-shadow: inset 0 0 0 1px var(--border); }
 /* Altura fixa e largura automática: SVG sem largura própria (só viewBox) colapsava pra zero
    quando a imagem só tinha max-height. */
 .faixa__logo-img { display: block; height: 32px; width: auto; max-width: 140px; object-fit: contain; }
@@ -564,7 +571,7 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 .faixa__periodo-rotulo { color: var(--faixa-texto-dim); font-size: 12.5px; }
 .faixa__periodo-valor { font-size: 15px; font-weight: 560; font-variant-numeric: tabular-nums; }
 @media (max-width: 620px) {
-  .faixa { padding: 18px; }
+  .faixa { padding: 4px 0; }
   .faixa__nome { font-size: 20px; }
   .faixa__periodo { text-align: left; }
 }
@@ -637,7 +644,12 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
   .resumo--m .resumo__el td::before { content: attr(data-label); color: var(--text-dim); font-size: 12px; font-weight: 400; white-space: normal; }
   .resumo--m .resumo__el tfoot tr { border-bottom: 0; margin-top: 10px; padding: 14px; background: var(--bg-elev-2); border-radius: var(--radius-sm); }
 }
-@container resumo (max-width: 1120px) {
+/* 3.9: tabela larga (9 métricas, como o Meta com Resultados e Custo por resultado) com respiro menor;
+   ela só vira cartões abaixo de 760 px de cartão. Antes virava já em 1120 px e, a 1440, a tabela
+   "Resultado por canal" do Meta (cartão de 779 px) aparecia em cartões. */
+.resumo--g .resumo__el th, .resumo--g .resumo__el td { padding: 10px 7px; font-size: 12.5px; }
+.resumo--g .resumo__el tbody th, .resumo--g .resumo__el tfoot th { font-size: 12.5px; }
+@container resumo (max-width: 760px) {
   .resumo--g .resumo__el, .resumo--g .resumo__el tbody, .resumo--g .resumo__el tfoot { display: block; }
   .resumo--g .resumo__el thead { display: none; }
   .resumo--g .resumo__el tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
@@ -655,6 +667,8 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 .meta__title { font-size: 13.5px; font-weight: 560; color: var(--text-dim); letter-spacing: -0.01em; margin: 0; }
 .meta__rotulo { display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 6px; }
 .meta__input { max-width: 220px; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* 3.9: o campo abre vazio; a sugestão no placeholder é leve, pra não passar por meta digitada. */
+.meta__input::placeholder { font-size: 15px; font-weight: 400; color: var(--text-faint); opacity: 1; }
 .meta__lista { margin: 0; }
 .meta__item { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; padding: 11px 0; border-bottom: 1px solid var(--border); }
 .meta__item:first-child { border-top: 1px solid var(--border); }
@@ -871,4 +885,4 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 }
 @container resumo (max-width: 480px) { .resumo--p .ordenar-por { display: flex; } }
 @container resumo (max-width: 740px) { .resumo--m .ordenar-por { display: flex; } }
-@container resumo (max-width: 1120px) { .resumo--g .ordenar-por { display: flex; } }
+@container resumo (max-width: 760px) { .resumo--g .ordenar-por { display: flex; } }

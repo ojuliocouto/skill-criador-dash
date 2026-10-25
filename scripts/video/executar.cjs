@@ -10,7 +10,19 @@ const { entrarComSenha } = require('./entrar-com-senha.cjs');
 const TEMPO_OBRIGATORIO_MS = 20000;
 const TEMPO_OPCIONAL_MS = 2500;
 
+// 3.9: no celular a barra de filtros fica atrás do botão "Filtros" da faixa. Passo que mexe num
+// controle de dentro dela abre a barra antes, como a pessoa faria.
+async function abrirFiltrosSePreciso(page, seletor) {
+  try {
+    const dentro = await page.evaluate((sel) => { const el = document.querySelector(sel); return !!(el && el.closest('#filterbar')); }, seletor);
+    if (!dentro) return;
+    const botao = page.locator('.filtros-abrir[aria-expanded="false"]').first();
+    if (await botao.isVisible()) { await botao.click(); await page.waitForTimeout(150); }
+  } catch (_) { /* seletor que não é CSS (texto do Playwright): segue sem abrir */ }
+}
+
 async function aparecer(page, seletor, opcional) {
+  await abrirFiltrosSePreciso(page, seletor);
   const alvo = page.locator(seletor).first();
   try {
     await alvo.waitFor({ state: 'visible', timeout: opcional ? TEMPO_OPCIONAL_MS : TEMPO_OBRIGATORIO_MS });

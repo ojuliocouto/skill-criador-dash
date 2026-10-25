@@ -2,8 +2,8 @@
 // domínio e o período dos dados. ESM, puro: monta string HTML já escapada.
 //
 // O logo da config entra quando passa em safeLogoSrc (https ou data:image). Ele vai sobre uma
-// plaquinha clara porque a faixa é escura nos dois temas e a maioria dos logos é desenhada
-// pra fundo claro: sem a plaquinha, um logo escuro sumiria.
+// plaquinha clara porque a maioria dos logos é desenhada pra fundo claro: no tema escuro, sem a
+// plaquinha, um logo escuro sumiria. 3.9: a faixa não é mais um bloco preto; é o título da página.
 
 import { esc } from './html.js';
 import { safeLogoSrc } from './brand.js';
@@ -20,6 +20,31 @@ export function periodoDosDados(rows, colMap, dateSlot) {
   const { min, max } = dateBounds(rows || [], col);
   if (!min || !max) return null;
   return { de: isoParaBR(min), ate: isoParaBR(max) };
+}
+
+/**
+ * Forma curta pro celular, onde o rótulo "Período dos dados" some: 'Dados de 05/09 a 04/10' quando
+ * as duas datas são do mesmo ano; com anos diferentes, as datas longas. Um dia só: 'Dados de 04/10'.
+ * O "Dados de" separa o período da planilha do filtro aplicado (que aparece no botão Filtros).
+ */
+export function textoDoPeriodoCurto(periodo) {
+  if (!periodo || !periodo.de || !periodo.ate) return '';
+  const ano = (d) => String(d).slice(6);
+  const dm = (d) => String(d).slice(0, 5);
+  if (periodo.de === periodo.ate) return `Dados de ${dm(periodo.de)}`;
+  if (ano(periodo.de) !== ano(periodo.ate)) return `Dados de ${textoDoPeriodo(periodo)}`;
+  return `Dados de ${dm(periodo.de)} a ${dm(periodo.ate)}`;
+}
+
+// Ícone do botão Filtros (celular): três linhas que encurtam, o desenho comum de filtro.
+const ICONE_FILTROS = '<svg class="filtros-abrir__icone" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"/></svg>';
+
+/**
+ * Botão que mostra e esconde a barra de filtros no celular (lib/filtros-celular.js liga o clique;
+ * celular.css esconde a barra enquanto ele está fechado). No computador ele não aparece.
+ */
+export function botaoDeFiltrosHtml() {
+  return `<button class="filtros-abrir" type="button" aria-controls="filterbar" aria-expanded="false">${ICONE_FILTROS}<span class="filtros-abrir__rotulo">Filtros</span></button>`;
 }
 
 /** '05/09/2026 a 04/10/2026'; um dia só mostra só o dia; sem período, ''. */
@@ -61,10 +86,12 @@ export function cabecalhoHtml({ nome, dominio, periodo, logo, logoFundo, dados }
     : '';
   const dominioHtml = dominio ? `<p class="faixa__dominio">${esc(dominio)}</p>` : '';
   const texto = textoDoPeriodo(periodo);
+  // A forma curta só aparece no celular (celular.css); o leitor de tela lê a longa.
   const periodoHtml = texto
     ? `<div class="faixa__periodo">` +
         `<span class="faixa__periodo-rotulo">Período dos dados</span>` +
         `<span class="faixa__periodo-valor" id="dashperiodo">${esc(texto)}</span>` +
+        `<span class="faixa__periodo-curto" aria-hidden="true">${esc(textoDoPeriodoCurto(periodo))}</span>` +
       `</div>`
     : '';
   return (
@@ -76,7 +103,7 @@ export function cabecalhoHtml({ nome, dominio, periodo, logo, logoFundo, dados }
           dominioHtml +
         `</div>` +
       `</div>` +
-      (dados ? `<div class="faixa__lado">${periodoHtml}${estadoDosDadosHtml(dados)}</div>` : periodoHtml) +
+      (dados ? `<div class="faixa__lado">${periodoHtml}${estadoDosDadosHtml(dados)}${botaoDeFiltrosHtml()}</div>` : periodoHtml) +
     `</div>`
   );
 }

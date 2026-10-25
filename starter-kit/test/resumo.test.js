@@ -179,7 +179,7 @@ test('ehMetricaDeTaxa: ratio, avg e derivada com denominador são taxa; soma nã
   assert.equal(ehMetricaDeTaxa({ agg: 'derived', compute: () => 1 }), false, 'derivada sem denominador pode ser volume');
 });
 
-test('resumo: tom (bom ou ruim) só em taxa, comparada com o total, e com folga de 1%', () => {
+test('resumo: tom (bom ou ruim) só em taxa, comparada com o total, e com folga de 5%', () => {
   const r = resumir({
     rows: [
       { Data: '2026-09-05', Canal: 'Barato', Investimento: '100,00', Conversoes: '10' },
@@ -312,4 +312,30 @@ test('resumo: orderBy ordena por uma métrica que nem precisa estar na tabela', 
 test('resumo: orderBy desconhecido ou sem coluna mapeada cai na primeira coluna', () => {
   const r = resumir({ rows, colMap: COLMAP, template: marketing, groupBy: 'canal', metrics: ['CTR'], orderBy: 'nao-existe' });
   assert.deepEqual(r.linhas.map((l) => l.label), ['Google', 'TikTok', 'Instagram']);
+});
+
+// 3.9: a tabela semanal pintava a célula por diferença de centavos (folga de 1%). Agora a diferença
+// precisa passar de 5% do total E de um mínimo absoluto por formato (R$ 0,10; 0,05 p.p.; 0,05).
+test('resumo: diferença pequena não ganha cor (menos de 5% ou abaixo do mínimo absoluto)', () => {
+  const r = resumir({
+    rows: [
+      { Data: '2026-09-05', Canal: 'Quase', Investimento: '204,00', Conversoes: '10' },
+      { Data: '2026-09-05', Canal: 'Bem acima', Investimento: '215,00', Conversoes: '10' },
+      { Data: '2026-09-05', Canal: 'Base', Investimento: '181,00', Conversoes: '10' },
+    ],
+    colMap: COLMAP, template: marketing, groupBy: 'canal', metrics: ['CPA'],
+  });
+  assert.equal(r.total.valores.CPA, 20);
+  assert.equal(linhaDe(r, 'Quase').tons.CPA, undefined, 'R$ 20,40 contra R$ 20,00 (2%) não pinta');
+  assert.equal(linhaDe(r, 'Bem acima').tons.CPA, 'ruim', 'R$ 21,50 contra R$ 20,00 (7,5%) pinta');
+  assert.equal(linhaDe(r, 'Base').tons.CPA, 'bom', 'R$ 18,10 contra R$ 20,00 (9,5%) pinta');
+  // CPA de centavos: 8% de diferença, mas só R$ 0,04: não pinta.
+  const c = resumir({
+    rows: [
+      { Data: '2026-09-05', Canal: 'X', Investimento: '0,54', Conversoes: '1' },
+      { Data: '2026-09-05', Canal: 'Y', Investimento: '0,46', Conversoes: '1' },
+    ],
+    colMap: COLMAP, template: marketing, groupBy: 'canal', metrics: ['CPA'],
+  });
+  assert.equal(linhaDe(c, 'X').tons.CPA, undefined);
 });

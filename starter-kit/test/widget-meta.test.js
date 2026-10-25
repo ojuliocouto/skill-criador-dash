@@ -173,10 +173,14 @@ test('render: campo numérico com o rótulo das props e o valor que veio do esta
   assert.match(html, />R\$ 77\.120,27</);
 });
 
-test('render: sem valor digitado, começa no que o período já fez', () => {
+// 3.9: abrir com o realizado (370) parecia a meta e mostrava a identidade "370 vendas pedem o que já foi gasto".
+// Agora o campo abre vazio, com uma sugestão no placeholder que se lê como sugestão.
+test('render: sem valor digitado, o campo abre vazio, com uma meta sugerida no placeholder', () => {
   const html = renderMeta(PROPS, { id: 'm', valor: undefined, totais: TOTAIS });
-  assert.match(html, /<input[^>]*value="370"/);
-  assert.match(html, />R\$ 57\.069,00</);
+  assert.match(html, /<input[^>]*value=""/);
+  assert.match(html, /placeholder="Sugestão: 450"/);
+  assert.match(html, /Digite uma meta maior que zero/);
+  assert.ok(!/R\$ 57\.069,00/.test(html), 'não mostra a conta do realizado como se fosse meta');
 });
 
 test('render: campo que a pessoa apagou continua vazio (não volta pro padrão)', () => {
@@ -205,7 +209,8 @@ test('registry: meta está registrado, usa os totais filtrados e respeita o valo
   const item = { widget: 'meta', props: PROPS };
   const padrao = registry.meta.toHtml(item, base);
   assert.match(padrao, /Calculadora de meta/);
-  assert.match(padrao, /value="370"/);
+  assert.match(padrao, /value=""/);
+  assert.match(padrao, /placeholder="Sugestão: /);
   const digitado = registry.meta.toHtml(item, { ...base, estado: { meta: { 'meta-conversoes': '500' } } });
   assert.match(digitado, /value="500"/);
   assert.match(digitado, />R\$ 77\.120,27</);

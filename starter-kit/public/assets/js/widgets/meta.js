@@ -169,11 +169,23 @@ export function saidaHtml(props, calc) {
   );
 }
 
-// Valor inicial do campo: o que a pessoa digitou (mesmo vazio), senão o que o período já fez.
-function valorInicial(valor, totais) {
-  if (typeof valor === 'string') return valor;
+// Valor inicial do campo: o que a pessoa digitou (mesmo vazio). 3.9: sem nada digitado o campo abre
+// VAZIO. Abrir com o realizado parecia a meta e mostrava a identidade "305 vendas pedem o que já foi
+// gasto" (auditoria de 25/10/2026, achado 18).
+function valorInicial(valor) {
+  return typeof valor === 'string' ? valor : '';
+}
+
+/**
+ * Meta sugerida (só no placeholder, nunca no campo): 20% acima do que o período fez, arredondada pra
+ * cima em 2 algarismos (370 vira 450, 1.234 vira 1.500, 305 vira 370). Sem realizado: sem sugestão.
+ */
+export function metaSugerida(totais) {
   const alvo = positivo(totais && totais.alvo);
-  return alvo ? String(Math.round(alvo)) : '';
+  if (!alvo) return null;
+  const bruto = alvo * 1.2;
+  const passo = 10 ** Math.max(0, Math.floor(Math.log10(bruto)) - 1);
+  return Math.ceil(bruto / passo) * passo;
 }
 
 /**
@@ -200,7 +212,9 @@ export function render(props = {}, dados = {}) {
   const d = dados || {};
   const totais = d.totais || {};
   const id = d.id || 'meta';
-  const valor = valorInicial(d.valor, totais);
+  const valor = valorInicial(d.valor);
+  const sugestao = metaSugerida(totais);
+  const placeholder = sugestao ? ` placeholder="Sugestão: ${esc(fmtInteger(sugestao))}"` : '';
   const titleHtml = p.title ? `<div class="meta__title">${esc(p.title)}</div>` : '';
   const rotuloDoCampo = p.label || 'Meta no período';
   const campoId = `campo-${id}`;
@@ -212,7 +226,7 @@ export function render(props = {}, dados = {}) {
       `<div class="meta__campo">` +
         `<label class="meta__rotulo" for="${esc(campoId)}">${esc(rotuloDoCampo)}</label>` +
         `<input id="${esc(campoId)}" class="input meta__input" type="number" inputmode="numeric" ` +
-          `min="1" step="1" autocomplete="off" value="${esc(valor)}" data-meta-campo />` +
+          `min="1" step="1" autocomplete="off" value="${esc(valor)}"${placeholder} data-meta-campo />` +
       `</div>` +
       `<div class="meta__saida" data-meta-saida aria-live="polite">` +
         saidaHtml(p, calcularMeta(lerMeta(valor), totais)) +

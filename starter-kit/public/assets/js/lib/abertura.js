@@ -7,17 +7,28 @@
 // (4) tira a tela do caminho no fim. As regras e os tempos estão em lib/saudacao.js.
 
 import {
-  TEMPOS, chaveDaSaudacao, deveSaudar, textoDaSaudacao, saudacaoHtml, classeDaSaudacao,
+  TEMPOS, chaveDaSaudacao, chaveDaContagem, deveSaudar, deveContar, textoDaSaudacao, saudacaoHtml, classeDaSaudacao,
 } from './saudacao.js';
-import { menosMovimento } from './movimento.js';
+import { menosMovimento, DURACAO } from './movimento.js';
 import { safeLogoSrc } from './brand.js';
 import { accentText, accentSolid, parseHex, DEFAULT_ACCENT } from './color.js';
 
+// 3.9: a marca vai no localStorage (o aparelho), não só na sessão: a saudação é da primeira visita.
+// A marca de sessão continua, porque o script inline (com hash na CSP) ainda lê a de sessão.
 function jaSaudou(id) {
-  try { return !!sessionStorage.getItem(chaveDaSaudacao(id)); } catch { return false; }
+  try { return !!(localStorage.getItem(chaveDaSaudacao(id)) || sessionStorage.getItem(chaveDaSaudacao(id))); } catch { return false; }
 }
 function marcarSaudado(id) {
-  try { sessionStorage.setItem(chaveDaSaudacao(id), '1'); } catch { /* sessão bloqueada: saúda de novo na próxima */ }
+  try { sessionStorage.setItem(chaveDaSaudacao(id), '1'); } catch { /* sessão bloqueada */ }
+  try { localStorage.setItem(chaveDaSaudacao(id), '1'); } catch { /* aparelho bloqueado: saúda de novo na próxima */ }
+}
+function jaContou(id) {
+  try { return !!localStorage.getItem(chaveDaContagem(id)); } catch { return false; }
+}
+// Depois da primeira contagem, nenhum número conta do zero de novo (nem na troca de aba).
+function encerrarContagem(id) {
+  document.documentElement.setAttribute('data-sem-contagem', '');
+  try { localStorage.setItem(chaveDaContagem(id), '1'); } catch { /* aparelho bloqueado: conta de novo na próxima */ }
 }
 
 function preencher(tela, config) {
@@ -48,6 +59,18 @@ export function prepararAbertura(id) {
   let estado = 'sem'; // 'sem' | 'tocando' | 'revelada'
   let fila = [];
   let relogio = 0;
+  let inicio = 0;
+  // Contagem do zero: só na primeira carga deste aparelho. Fora dela, o número final na hora.
+  const conta = !!id && deveContar({ jaContou: jaContou(id), menosMovimento: menosMovimento() });
+  if (id && !conta) root.setAttribute('data-sem-contagem', '');
+  let contagemProgramada = false;
+  // Fim da primeira contagem: o painel conta 200 ms depois da primeira peça (dashboard.js) e leva
+  // DURACAO.contagem. Depois disso, marca o aparelho e desliga a contagem pro resto da visita.
+  const programarFimDaContagem = (espera) => {
+    if (!conta || contagemProgramada) return;
+    contagemProgramada = true;
+    setTimeout(() => encerrarContagem(id), espera + TEMPOS.entradaBase + 200 + DURACAO.contagem + 300);
+  };
 
   const limpar = () => {
     document.removeEventListener('keydown', pular, true);
@@ -73,6 +96,7 @@ export function prepararAbertura(id) {
   }
   const tocar = (decorrido) => {
     estado = 'tocando';
+    inicio = Date.now() - decorrido;
     marcarSaudado(id);
     tela.addEventListener('pointerdown', pular);
     document.addEventListener('keydown', pular, true);
@@ -101,7 +125,13 @@ export function prepararAbertura(id) {
     },
     /** Chama `fn` no instante em que o painel pode aparecer: já, ou quando a cortina começar a descer. */
     quandoRevelar(fn) {
-      if (estado === 'tocando') fila.push(fn); else fn(false);
+      if (estado === 'tocando') {
+        programarFimDaContagem(Math.max(0, TEMPOS.revelar - (Date.now() - inicio)));
+        fila.push(fn);
+      } else {
+        programarFimDaContagem(0);
+        fn(false);
+      }
     },
     tocando: () => estado === 'tocando',
   };
