@@ -84,7 +84,9 @@ test('loop sem fim só no fundo vivo e no carregamento', () => {
 
 test('gradiente só nas manchas do fundo, no brilho do esqueleto e na cortina da saudação', () => {
   for (const r of regras.filter((x) => /gradient\(/.test(x.corpo))) {
-    assert.ok(/fundo__brilho|esq-|saudacao__/.test(r.sel), `gradiente em ${r.sel}`);
+    // 3.9.1: .fundo__linhas usa gradiente só como MÁSCARA (apaga as curvas no miolo), nunca como pintura.
+    const soMascara = /fundo__linhas/.test(r.sel) && !/(^|[;\s])background[^;]*gradient\(/.test(r.corpo);
+    assert.ok(/fundo__brilho|esq-|saudacao__/.test(r.sel) || soMascara, `gradiente em ${r.sel}`);
   }
   assert.ok(regras.some((r) => /fundo__brilho/.test(r.sel) && /radial-gradient\(/.test(r.corpo)), 'as manchas existem');
 });

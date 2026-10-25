@@ -55,8 +55,12 @@
   animation: fundo-deriva-b 82s linear -30s infinite;
 }
 .fundo__linhas {
-  /* 3.9: as curvas passavam atrás dos filtros e entre os cartões e poluíam a leitura (teste de aluno de 25/10). */
-  opacity: 0.3;
+  /* 3.9: as curvas passavam atrás dos filtros e entre os cartões e poluíam a leitura (teste de aluno de 25/10).
+     3.9.1: ainda apareciam no miolo. A máscara apaga as curvas no meio da tela (onde mora o conteúdo) e só
+     deixa as margens, e a opacidade cai pra 0,18. É máscara, não pintura: a regra do gradiente não muda. */
+  opacity: 0.18;
+  -webkit-mask-image: linear-gradient(to right, #000, transparent 16%, transparent 84%, #000);
+  mask-image: linear-gradient(to right, #000, transparent 16%, transparent 84%, #000);
   position: absolute; left: -10%; top: 0; width: 120%; height: 100%; overflow: visible; will-change: transform;
   animation: fundo-onda-a 46s linear -6s infinite;
 }
