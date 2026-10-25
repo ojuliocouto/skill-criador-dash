@@ -91,7 +91,7 @@ It is NOT:
 
 The person chooses per dashboard:
 - Live (default, simplest): the dashboard reads the source on demand. KV stores only the config. No database.
-- Historical (D1 + cron): a cron Worker snapshots the source into a Cloudflare D1 database and the dashboard reads the latest snapshot. Gives real history and does not break if the source goes down. More setup.
+- Historical (D1 + cron): a cron Worker writes the source into a Cloudflare D1 database as one record per dashboard per day (`snapshot_dias`). Each run replaces the days the new capture covers and keeps the days that left the source window (Meta only returns 30 days), with a 400-day retention (`HISTORICO_DIAS`). The dashboard reads the whole series (or `?de=&ate=`) and does not break if the source goes down. More setup.
 
 ## Features
 
@@ -152,7 +152,7 @@ Number and date normalization (Brazilian formats included) happens in the metric
 - Google Sheets via gviz CSV (flagship connector): the user shares the spreadsheet as "anyone with the link" and pastes the link. No OAuth, no API key, no "publish to web" step. The connector extracts the spreadsheet ID from the link and fetches `https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:csv&gid={GID}`.
 - CSV upload (fallback): the CSV text is posted and parsed with automatic delimiter detection.
 - Meta Ads (native, advanced): pulls campaign insights from the Graph API using an access token (Business Manager System User) plus the ad account id. The token stays server-side only (stored in the config, never returned to the browser; the Function resolves it by dashboard id). Shown in the wizard only for the Marketing domain.
-- D1 (historical mode): the `d1.js` connector reads the latest snapshot written by the cron Worker, so the dashboard shows data from the database instead of the live source.
+- D1 (historical mode): the `d1.js` connector reads the per-day series written by the cron Worker (falling back to the latest full snapshot on a database created before 3.9.0), so the dashboard shows data from the database instead of the live source.
 - Second-wave stubs (documented, not finished): CRM, Hotmart.
 
 ## Install as a Claude Code skill
@@ -242,7 +242,7 @@ The data source needs no secret for the MVP (a link-shared Google Sheet or a CSV
 
 ### Access model (fail-closed)
 
-Reading a published dashboard is public (it exists to be viewed). Mutations are not: creating, overwriting, and deleting (POST/DELETE) are fail-closed and require the `x-admin-token` header. If no `ADMIN_TOKEN` is configured on the server, the API rejects every mutation with `403 adminNotConfigured`, so nobody can create or delete anything anonymously. Setting `ADMIN_TOKEN` is part of setup, not optional:
+Opening one published dashboard by its link is public (it exists to be viewed). The dashboard LIST (`GET /api/dashboards` without `id`, the site root) is not: it requires the admin key, like mutations. Whoever opens a dashboard without the admin key gets the dashboard view only: a CSV pruned to the mapped columns, no Google Sheets link (the data comes from `/api/connectors/sheets?id=`, which reads the saved link on the server), no Meta account. With the admin key the full config comes back without secrets, which is what the wizard uses to edit. Mutations are not public either: creating, overwriting, and deleting (POST/DELETE) are fail-closed and require the `x-admin-token` header. If no `ADMIN_TOKEN` is configured on the server, the API rejects every mutation with `403 adminNotConfigured`, so nobody can create or delete anything anonymously. Setting `ADMIN_TOKEN` is part of setup, not optional:
 - Generate a strong random token (`openssl rand -base64 32`) and set it as a Pages secret: `wrangler pages secret put ADMIN_TOKEN --project-name=<YOUR-PROJECT>`. On first use the wizard asks for it once (the `needsAdmin` flow), stores it in the browser, and sends `x-admin-token` from then on.
 - Additionally set a per-dashboard password for anything whose DATA should not be read by link (it gates the config and the data, not just writes).
 
@@ -268,7 +268,7 @@ starter-kit/
   ARCHITECTURE.md               # the 3-layer contracts (source of truth)
   package.json
   wrangler.toml
-  db/schema.sql                 # snapshots table for historical mode (D1)
+  db/schema.sql                 # per-day history table (snapshot_dias) and the legacy snapshots table (D1)
   examples/
     marketing-exemplo.csv
     vendas-exemplo.csv
@@ -281,14 +281,14 @@ starter-kit/
         sheets.js               # flagship connector (gviz CSV)
         csv.js                  # upload connector
         meta-ads.js             # Meta Ads connector (Graph API, token server-side)
-        d1.js                   # historical-mode connector (reads latest D1 snapshot)
+        d1.js                   # historical-mode connector (reads the per-day D1 series)
         crm.js                  # second-wave stub
         hotmart.js              # second-wave stub
     lib/
       csv.mjs                   # parseCSV + detectDelimiter (pure, testable)
       sheets-url.mjs            # sheetUrlToCsv (shared by connector and Worker)
       meta.mjs                  # buildInsightsUrl + mapInsightsToDataSet (pure)
-      snapshots.mjs             # historical-mode SQL + rowToDataSet (pure)
+      snapshots.mjs             # historical-mode SQL: per-day write, retention, series read (pure)
       auth-config.mjs           # needsAuth/authOk (salted PBKDF2)/safeEqual/checkAdminToken (neutral)
       rate-limit.mjs            # KV fixed-window limiter (password gate + Meta preview throttle)
       domains.mjs               # server DOMAINS list (validates POST); kept in parity with the browser copy

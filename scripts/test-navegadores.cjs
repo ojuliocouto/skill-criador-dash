@@ -23,7 +23,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { acharPlaywright } = require('./video/achar-playwright.cjs');
-const { subirPilha } = require('./stack-local.cjs');
+const { subirPilha, TOKEN_ADMIN_DE_TESTE } = require('./stack-local.cjs');
 
 const CI = Boolean(process.env.CI);
 const PRINTS = process.env.NAVEGADORES_PRINTS || '';
@@ -77,6 +77,8 @@ async function abrirContexto(browser, perfil, extra = {}) {
   // 3.9: "Hoje" e "7 dias" contam do dia do CALENDÁRIO (achado 5). O CSV de exemplo termina em ULTIMO: o relógio
   // do navegador fica nesse dia, ao meio-dia de São Paulo, para "7 dias" ser a última semana do CSV.
   await ctx.clock.setFixedTime(new Date(`${ULTIMO}T12:00:00-03:00`));
+  // 3.9.0: a lista de painéis exige a chave de administrador; o dono a tem guardada no navegador.
+  await ctx.addInitScript((t) => { try { localStorage.setItem('cd-admin-token', t); } catch (_) { /* sem storage */ } }, TOKEN_ADMIN_DE_TESTE);
   const pagina = await ctx.newPage();
   const problemas = [];
   pagina.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') problemas.push(`console.${m.type()}: ${m.text()}`); });

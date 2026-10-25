@@ -29,7 +29,8 @@ test('buildInsightsUrl: inclui access_token, level, time_increment e fields', ()
   // 3.8.0: results e cost_per_result (colunas Resultados e Custo por resultado do Gerenciador).
   assert.equal(
     qs.get('fields'),
-    'campaign_name,spend,impressions,clicks,actions,results,cost_per_result,date_start'
+    // 3.9.0: inline_link_clicks (clique no link) e action_values (valor das compras, a Receita).
+    'campaign_name,spend,impressions,clicks,inline_link_clicks,actions,action_values,results,cost_per_result,date_start'
   );
 });
 
@@ -94,6 +95,7 @@ test('mapInsightsToDataSet: mapeia data com 2 itens para o DataSet', () => {
         spend: '150.50',
         impressions: '10000',
         clicks: '250',
+        inline_link_clicks: '200',
         date_start: '2026-01-01',
         actions: [
           { action_type: 'lead', value: '12' },
@@ -105,6 +107,7 @@ test('mapInsightsToDataSet: mapeia data com 2 itens para o DataSet', () => {
         spend: '80',
         impressions: '4000',
         clicks: '90',
+        inline_link_clicks: '70',
         date_start: '2026-01-02',
       },
     ],
@@ -123,6 +126,7 @@ test('mapInsightsToDataSet: mapeia data com 2 itens para o DataSet', () => {
     'Tipo de resultado',
     'Custo por resultado',
     'CPL',
+    'Cliques (todos)',
   ]);
   assert.equal(ds.rows.length, 2);
 
@@ -131,7 +135,8 @@ test('mapInsightsToDataSet: mapeia data com 2 itens para o DataSet', () => {
     Campanha: 'Campanha A',
     Investimento: '150.50',
     Impressões: '10000',
-    Cliques: '250',
+    // 3.9.0: Cliques é o clique no link (inline_link_clicks); todos os cliques vão para "Cliques (todos)".
+    Cliques: '200',
     Leads: '12',
     Conversões: '5',
     // Sem results da Meta: cai nos Leads calculados (150,50 / 12).
@@ -139,6 +144,7 @@ test('mapInsightsToDataSet: mapeia data com 2 itens para o DataSet', () => {
     'Tipo de resultado': 'Leads (calculado pelo painel)',
     'Custo por resultado': '12.54',
     CPL: '12.54',
+    'Cliques (todos)': '250',
   });
 
   // Segundo item sem actions: Leads e Conversões viram '0'.
@@ -267,6 +273,7 @@ test('mapInsightsToDataSet: sem data devolve DataSet vazio com columns fixas', (
     'Tipo de resultado',
     'Custo por resultado',
     'CPL',
+    'Cliques (todos)',
   ]);
   assert.deepEqual(ds.rows, []);
   assert.equal(ds.meta.rowCount, 0);

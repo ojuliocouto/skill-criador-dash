@@ -59,8 +59,10 @@ async function jsonOrThrow(res) {
 }
 
 // ---- Dashboards (config no KV) ----
+// A lista de painéis só sai com a chave de administrador (3.9.0): manda a chave guardada e, sem ela, o
+// erro vem marcado (.needsAdmin ou .adminNotConfigured) para a tela pedir a chave em vez de quebrar.
 export async function listDashboards() {
-  return jsonOrThrow(await fetch('/api/dashboards'));
+  return mutationOrThrow(await fetch('/api/dashboards', { headers: adminHeader() }));
 }
 // Guarda/le o hash de senha do dashboard na sessao (nao persiste entre abas).
 const AUTH_KEY = (id) => `dashauth:${id}`;
@@ -69,7 +71,9 @@ export function setDashboardAuth(id, hash) {
 }
 
 export async function getDashboard(id) {
-  const headers = {};
+  // Com a chave de administrador guardada, o servidor devolve a config inteira (o assistente edita com
+  // ela). Sem a chave, vem a vista do painel: só as colunas que o painel mostra, sem o link da planilha.
+  const headers = { ...adminHeader() };
   let stored = null;
   try { stored = sessionStorage.getItem(AUTH_KEY(id)); } catch { /* ignora */ }
   if (stored) headers['x-dash-auth'] = stored;
@@ -158,6 +162,10 @@ export async function fetchSheet(url, gid = '0') {
   const qs = new URLSearchParams({ url, gid });
   return jsonOrThrow(await fetch(`/api/connectors/sheets?${qs}`));
 }
+// Planilha de um painel salvo: o link fica no servidor, que devolve só as colunas do painel (3.9.0).
+export async function fetchSheetById(id) {
+  return jsonOrThrow(await fetch(`/api/connectors/sheets?id=${encodeURIComponent(id)}`, { headers: authHeader(id) }));
+}
 export async function uploadCsv(text) {
   return jsonOrThrow(await fetch('/api/connectors/csv', {
     method: 'POST',
@@ -199,7 +207,8 @@ export async function fetchD1(id) {
 // O 'd1' nao entra aqui: o modo historico usa a funcao dedicada fetchD1(id), fora
 // deste roteamento (o dashboard.js chama fetchD1 direto quando esta em historico).
 const LIVE_FETCHERS = {
-  sheets: (source) => fetchSheet(source.url, source.gid || '0'),
+  // Com o link (assistente, ou quem administra): lê pelo link. Sem o link (vista do painel): por id.
+  sheets: (source, id) => (source.url ? fetchSheet(source.url, source.gid || '0') : fetchSheetById(id)),
   csv: (source) => uploadCsv(source.data || ''),
   meta: (source, id) => fetchMetaById(id),
 };

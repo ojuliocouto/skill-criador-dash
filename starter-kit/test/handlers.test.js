@@ -68,6 +68,10 @@ function fakeD1(rows = []) {
             async first() {
               return rows.length ? rows[0] : null;
             },
+            // 3.9.0: a leitura pede primeiro a série por dia (snapshot_dias); vazia, cai na última foto.
+            async all() {
+              return { results: [] };
+            },
             async run() {
               return { success: true };
             },
@@ -364,7 +368,7 @@ test('dashboards GET listAll -> 200 array sem hash, com flag protected', async (
     'dash:a': JSON.stringify(makeConfig({ id: 'a', createdAt: '2026-01-01T00:00:00.000Z' })),
     'dash:b': JSON.stringify(makeConfig({ id: 'b', createdAt: '2026-02-01T00:00:00.000Z', auth: await saltedAuth(hash) })),
   });
-  const res = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  const res = await dashboards(ctx('GET', { headers: { 'x-admin-token': 'chave-da-lista' }, env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: 'chave-da-lista' } }));
   assert.equal(res.status, 200);
   const arr = await readJSON(res);
   assert.ok(Array.isArray(arr));
@@ -385,7 +389,7 @@ test('dashboards listAll: protegido esconde nome/dominio (so id+protected)', asy
     'dash:aberto': JSON.stringify(makeConfig({ id: 'aberto', name: 'Publico', domain: 'marketing', createdAt: '2026-01-01T00:00:00.000Z' })),
     'dash:privado': JSON.stringify(makeConfig({ id: 'privado', name: 'Cliente Secreto', domain: 'suporte', auth: await saltedAuth(hash), createdAt: '2026-02-01T00:00:00.000Z' })),
   });
-  const res = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  const res = await dashboards(ctx('GET', { headers: { 'x-admin-token': 'chave-da-lista' }, env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: 'chave-da-lista' } }));
   assert.equal(res.status, 200);
   const arr = await readJSON(res);
   const byId = Object.fromEntries(arr.map((x) => [x.id, x]));
@@ -453,7 +457,7 @@ test('dashboards listAll: expoe kind do grupo (aberto)', async () => {
     'dash:grp': JSON.stringify({ id: 'grp', name: 'Grupo', kind: 'group', tabs: [{ id: 'x', label: 'X' }], createdAt: '2026-03-01T00:00:00.000Z' }),
     'dash:d': JSON.stringify(makeConfig({ id: 'd', createdAt: '2026-01-01T00:00:00.000Z' })),
   });
-  const res = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  const res = await dashboards(ctx('GET', { headers: { 'x-admin-token': 'chave-da-lista' }, env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: 'chave-da-lista' } }));
   const arr = await readJSON(res);
   const byId = Object.fromEntries(arr.map((x) => [x.id, x]));
   assert.equal(byId.grp.kind, 'group');
@@ -563,7 +567,8 @@ test('dashboards POST com accent2 invalido -> 400', async () => {
 // 9. GET protegido sem senha -> 401 (nao le D1); com senha correta + snapshot -> 200 DataSet reidratado.
 test('d1 GET protegido: gate de senha antes de ler D1, depois reidrata DataSet', async () => {
   const hash = await sha256Hex('d1-senha');
-  const cfg = makeConfig({ id: 'hist', auth: await saltedAuth(hash) });
+  // colMap com as colunas do snapshot: desde a 3.9.0 o D1 devolve só as colunas que o painel usa.
+  const cfg = makeConfig({ id: 'hist', auth: await saltedAuth(hash), colMap: { data: 'data', valor: 'valor' } });
   const kv = fakeKV({ 'dash:hist': JSON.stringify(cfg) });
 
   const dataset = { columns: ['data', 'valor'], rows: [{ data: '2026-01-01', valor: 10 }], meta: { fonte: 'x' } };

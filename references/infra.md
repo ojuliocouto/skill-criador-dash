@@ -78,10 +78,16 @@ Sempre a partir de `~/meu-dash`:
 ```
 wrangler d1 create dashboard-db
 # imprime database_id = "..."; cole em workers/snapshot/wrangler.toml (DASHBOARD_DB) e no binding D1 do Pages
-wrangler d1 execute dashboard-db --remote --file=db/schema.sql   # cria a tabela snapshots no D1 REMOTO
+wrangler d1 execute dashboard-db --remote --file=db/schema.sql   # cria as tabelas snapshot_dias e snapshots no D1 REMOTO
 ```
 O `--remote` é OBRIGATÓRIO: sem ele o schema vai pro D1 LOCAL (só do seu `wrangler dev`), e o Worker de
-produção fica sem a tabela `snapshots`, quebrando o dashboard histórico mesmo com o cron rodando.
+produção fica sem a tabela `snapshot_dias`, e o cron registra a falha no log a cada rodada.
+Quem instalou até a 3.8 roda o mesmo comando de novo (é seguro: `IF NOT EXISTS`) para ganhar a tabela
+`snapshot_dias`; até lá o painel segue abrindo pela última foto da tabela `snapshots`.
+
+Retenção: o histórico guarda um registro por dia e apaga os dias mais velhos que 400. Para outro número,
+ponha `HISTORICO_DIAS = "180"` (por exemplo) em `[vars]` no `workers/snapshot/wrangler.toml`. A primeira
+rodada da 3.9.0 também apaga as fotos inteiras antigas da tabela `snapshots`.
 
 Em `workers/snapshot/wrangler.toml`, preencha os bindings DASHBOARD_DB (D1) e DASHBOARDS_KV, e o cron.
 ATENÇÃO: o `id` do `DASHBOARDS_KV` tem que ser EXATAMENTE o MESMO nos dois arquivos (raiz e worker) e
@@ -107,6 +113,6 @@ cd workers/snapshot && wrangler dev --remote --test-scheduled   # --test-schedul
 curl "http://localhost:8787/__scheduled?cron=0+*+*+*+*"
 ```
 Sem o flag `--test-scheduled` a rota `/__scheduled` não existe e o curl dá 404. Depois é só recarregar
-o dashboard. (Alternativa: inserir um snapshot manual no D1 com um INSERT em `snapshots`.)
+o dashboard. (Alternativa: inserir um dia manual no D1 com um INSERT em `snapshot_dias`: `dashboard_id`, `dia` AAAA-MM-DD, `captured_at`, `fonte`, `columns_json` e `rows_json`.)
 
 Deploy do Pages: sem CLOUDFLARE_API_TOKEN forçado, usa o OAuth do `wrangler login`.

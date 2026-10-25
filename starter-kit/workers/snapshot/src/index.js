@@ -1,6 +1,9 @@
 // Worker do modo histórico (exemplo de referência).
 // Roda de hora em hora (cron trigger). Para cada dashboard cadastrado no KV cuja
-// fonte seja viva (sheets ou meta), busca o DataSet atual e grava um snapshot no D1.
+// fonte seja viva (sheets ou meta), busca o DataSet atual e grava no D1 por DIA
+// (tabela snapshot_dias, 3.9.0): a foto nova substitui os dias que cobre, os dias que
+// saíram da janela da fonte ficam, e o que passa da retenção (HISTORICO_DIAS, 400 por
+// padrão) sai. Ver gravarDiasSQL em functions/lib/snapshots.mjs.
 // Fontes 'csv' são estáticas (o dado já está salvo na config), então são puladas.
 //
 // Este Worker vive em workers/snapshot/, fora de functions/. O bundler do
@@ -13,7 +16,7 @@
 import { parseCSV } from '../../../functions/lib/csv.mjs';
 import { sheetUrlToCsv } from '../../../functions/lib/sheets-url.mjs';
 import { buildInsightsUrl, mapInsightsToDataSet, buscarTodasAsPaginas } from '../../../functions/lib/meta.mjs';
-import { insertSnapshotSQL } from '../../../functions/lib/snapshots.mjs';
+import { insertSnapshotSQL, gravarDiasSQL, DIAS_DE_HISTORICO } from '../../../functions/lib/snapshots.mjs';
 // Registry de fontes: qual tipo suporta snapshot historico (canHistory). Mesma
 // fonte de verdade que o wizard usa, pra decidir aqui quais fontes tirar snapshot.
 // O modulo e puro (sem DOM/browser), roda igual no runtime do Worker.
@@ -22,7 +25,7 @@ import { getSource, historyTypes } from '../../../public/assets/js/sources/index
 // Reexporta a lógica pura compartilhada para que o teste de paridade
 // (test/worker-parity.test.js) possa importar daqui e conferir que é a MESMA
 // função usada pelos conectores de Pages, sem cópia inline no Worker.
-export { parseCSV, sheetUrlToCsv, buildInsightsUrl, mapInsightsToDataSet, buscarTodasAsPaginas, insertSnapshotSQL };
+export { parseCSV, sheetUrlToCsv, buildInsightsUrl, mapInsightsToDataSet, buscarTodasAsPaginas, insertSnapshotSQL, gravarDiasSQL };
 
 export default {
   /**
@@ -64,14 +67,17 @@ export default {
         const dataset = await fetchSnapshotDataSet(type, source);
         if (!dataset) continue;
 
-        // Monta o INSERT pela MESMA função pura que os handlers de Pages usam
-        // (functions/lib/snapshots.mjs). Zero SQL inline aqui: sem drift.
-        const { sql, params } = insertSnapshotSQL(config.id, capturedAt, dataset);
-        await env.DASHBOARD_DB.prepare(sql).bind(...params).run();
+        // Grava por dia, pela MESMA função pura que a leitura conhece (functions/lib/snapshots.mjs).
+        // Zero SQL inline aqui. O batch do D1 é uma transação: a foto entra inteira ou não entra.
+        const colunaData = (config.colMap && config.colMap.data) || (type === 'meta' ? 'Data' : null);
+        const dias = Number(env.HISTORICO_DIAS) || DIAS_DE_HISTORICO;
+        const cmds = gravarDiasSQL(config.id, capturedAt, type, dataset, colunaData, { dias });
+        await env.DASHBOARD_DB.batch(cmds.map(({ sql, params }) => env.DASHBOARD_DB.prepare(sql).bind(...params)));
 
-        console.log(`snapshot: gravado ${config.id} (${dataset.rows.length} linhas).`);
+        console.log(`snapshot: gravado ${config.id} (${dataset.rows.length} linhas, retenção de ${dias} dias).`);
       } catch (err) {
-        const msg = err && err.message ? err.message : String(err);
+        let msg = err && err.message ? err.message : String(err);
+        if (/no such table: snapshot_dias/i.test(msg)) msg += ' Aplique o db/schema.sql de novo no D1 (wrangler d1 execute dashboard-db --remote --file=db/schema.sql): a 3.9.0 guarda o histórico por dia.';
         // A causa (texto cru da Meta numa falha de paginação) só vai pro log do Worker.
         const causa = err && err.cause && err.cause.message ? ` Causa: ${err.cause.message}` : '';
         console.log(`snapshot: falha em ${key}: ${msg}${causa}`);

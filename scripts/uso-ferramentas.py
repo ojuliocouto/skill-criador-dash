@@ -46,6 +46,13 @@ REGISTRO = ".ferramentas-usadas.json"
 COBRADAS = {
     "Playwright": "prova de tela do dashboard publicado (PNG desktop e mobile)",
     "skill frontend-design": "direcao estetica do painel decidida antes de montar",
+}
+
+# Opcionais (3.9.0, 25/10/2026): o SKILL.md chama high-end-visual-design e animate de "skills de
+# acabamento (opcionais)", e o Passo 0 nunca as cobrou. Mesmo assim o gate 6.1 reprovava a entrega
+# de quem TINHA as duas instaladas e nao usou: o mesmo painel passava na maquina do aluno (sem elas)
+# e reprovava na do dono. Vivas e sem uso registrado, elas so geram aviso; usadas, saem como USADA.
+OPCIONAIS = {
     "skill high-end-visual-design": "passe de acabamento premium",
     "skill animate": "microinteracao (hover de card, entrada, transicao de filtro)",
 }
@@ -246,6 +253,18 @@ def cmd_checar(args):
             faltando.append((f, papel, motivo))
 
     mortas = [f for f in COBRADAS if f in estados and not estados[f]]
+    avisos = []
+    if modo == "completo":
+        for f, papel in sorted(OPCIONAIS.items()):
+            if not estados.get(f):
+                continue
+            reg = dados.get(f)
+            if reg and not reg.get("dispensada") and evidencia_vale(reg.get("evidencia"), projeto)[0]:
+                ok_list.append((f, evidencia_vale(reg.get("evidencia"), projeto)[1], reg.get("detalhe", "")))
+            elif reg and reg.get("dispensada"):
+                dispensadas.append((f, reg.get("motivo", "")))
+            else:
+                avisos.append((f, papel))
 
     print("\nGATE DE USO DAS FERRAMENTAS\n" + "=" * 74)
     print(f"  caminho: {getattr(args, 'caminho', 'criar')} "
@@ -261,6 +280,8 @@ def cmd_checar(args):
         print(f"          motivo: {motivo}")
     for f in mortas:
         print(f"  [n/a  ] {f}: não respondeu no gate de entrada, uso não cobrado")
+    for f, papel in avisos:
+        print(f"  [aviso] {f}: opcional ({papel}); está instalada e não foi usada. Não reprova.")
     print("=" * 74)
 
     if faltando:
@@ -274,7 +295,7 @@ def cmd_checar(args):
         return 1
     declaradas = [f for f, _, _ in ok_list
                   if dados[f]["evidencia"].get("tipo") == "declarado"]
-    print(f"  {len(ok_list)} de {len(vivas)} ferramentas vivas usadas com evidencia.")
+    print(f"  {len([o for o in ok_list if o[0] in vivas])} de {len(vivas)} ferramentas cobradas usadas com evidencia.")
     if dispensadas:
         print(f"  {len(dispensadas)} DISPENSADA(S) com motivo. Copie estas linhas para o bloco")
         print("  de entrega: dispensa que o dono não lê é pulo com papel passado.")

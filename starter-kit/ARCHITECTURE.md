@@ -4,8 +4,8 @@ Dashboard genérico para **Marketing**, **Vendas**, **Suporte**, **Financeiro** 
 Cloudflare Pages + Functions (e D1 no modo histórico). O usuário conecta uma fonte
 de dados (planilha Google, CSV, Meta Ads ou um conector sob medida), escolhe um
 domínio, mapeia colunas e publica. Dois modos de dados: ao vivo (lê a fonte na
-hora, KV só guarda config) ou histórico (um cron grava snapshots no D1 e o
-dashboard lê o snapshot mais recente). Zero código para o usuário final.
+hora, KV só guarda config) ou histórico (um cron grava no D1 um registro por dia e o
+dashboard lê a série). Zero código para o usuário final.
 
 Este documento é o **contrato**: todo módulo abaixo deve respeitar exatamente
 estas interfaces para que as camadas fiquem desacopladas e testáveis isoladamente.
@@ -91,9 +91,17 @@ Conectores implementados:
   página 1 continua genérico); Leads sem dobra (`lead` é o agregado; sem ele, `lead_grouped` ou
   `leadgen_grouped` mais `fb_pixel_lead`). Colunas: `Data, Campanha, Investimento, Impressões,
   Cliques, Leads, Conversões` (as de sempre) e `Resultados, Tipo de resultado, Custo por resultado, CPL`.
-  O Worker de snapshot usa a mesma paginação.
-- `d1.js`: conector do MODO HISTORICO. Nao bate na fonte viva: le o snapshot mais recente
-  gravado pelo cron no D1 (via `functions/lib/snapshots.mjs`). So faz sentido com `storage:'d1'`.
+  Desde a 3.9.0: pede `action_values` e `inline_link_clicks`. `Cliques` passa a ser o clique no link
+  (base do CTR e do CPC, como no Gerenciador) e `Cliques (todos)` guarda o `clicks`. A coluna `Receita`
+  soma o valor das compras com a mesma regra das Conversões (`omni_purchase`; sem ele, `purchase` mais
+  `fb_pixel_purchase`) e só entra no DataSet quando alguma linha tem valor de compra.
+  O Worker de snapshot usa a mesma paginação e o mesmo mapeamento.
+- `d1.js`: conector do MODO HISTORICO. Nao bate na fonte viva: le a serie por dia que o cron
+  gravou no D1 (tabela `snapshot_dias`, via `serieSQL`/`diasParaDataSet` de `functions/lib/snapshots.mjs`),
+  inteira ou num periodo (`?de=&ate=`). Banco de antes da 3.9.0: cai na ultima foto da tabela
+  `snapshots`. So faz sentido com `storage:'d1'`. Desde a 3.9.0 o Worker grava por dia
+  (`gravarDiasSQL`: apaga os dias que a foto nova cobre, grava um registro por dia, apaga o que passa
+  de `HISTORICO_DIAS`, 400 por padrao, num `db.batch` que e transacao).
 
 Conectores de 2a onda (fora do MVP, deixar como stub documentado): `crm.js`, `hotmart.js`.
 
@@ -339,7 +347,7 @@ Campos opcionais da config (o código só os grava quando o usuário os preenche
   painel", abaixo). Ausentes, o painel antigo se comporta como antes, exceto que o fundo vivo e a
   saudação nascem ligados. O servidor valida a forma em `functions/lib/aparencia-shape.mjs`.
 - `storage: 'd1'`: liga o modo histórico. Nesse modo o Worker de snapshot (cron) grava o `DataSet`
-  no D1 e o dashboard lê o snapshot mais recente. Ausente (ou diferente de `'d1'`) = modo ao vivo.
+  no D1 por dia (pela coluna `colMap.data`) e o dashboard lê a série inteira. Ausente (ou diferente de `'d1'`) = modo ao vivo.
 
 Trava global de mutação (FAIL-CLOSED, obrigatória): a env `ADMIN_TOKEN` no projeto Pages. `POST` e
 `DELETE` de `/api/dashboards` exigem o header `x-admin-token` igual a ela (comparação em tempo constante);

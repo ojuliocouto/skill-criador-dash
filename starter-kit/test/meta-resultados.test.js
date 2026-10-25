@@ -35,7 +35,7 @@ test('DataSet: colunas antigas continuam, na mesma ordem, e as novas vêm depois
   const ds = mapInsightsToDataSet({ data: [] });
   assert.deepEqual(ds.columns, [
     'Data', 'Campanha', 'Investimento', 'Impressões', 'Cliques', 'Leads', 'Conversões',
-    'Resultados', 'Tipo de resultado', 'Custo por resultado', 'CPL',
+    'Resultados', 'Tipo de resultado', 'Custo por resultado', 'CPL', 'Cliques (todos)',
   ]);
 });
 

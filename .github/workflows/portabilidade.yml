@@ -71,6 +71,38 @@ jobs:
       - name: Suíte inteira
         run: node scripts/rodar-testes.mjs
 
+  python-3-8:
+    # O SKILL.md, o README e o py.mjs prometem Python 3.8 ou mais novo. A suíte principal usa o 3.12, que
+    # não pega recurso do 3.9 em diante (na 3.7.4 o gate-etapas.py quebrava no 3.8 com Path.is_relative_to).
+    # Aqui os testes .py rodam num Python 3.8 de verdade, instalado pelo uv (tem 3.8 para qualquer sistema).
+    name: testes .py no Python 3.8 (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Python 3.8 na frente do PATH
+        run: |
+          uv python install 3.8
+          echo "$(dirname "$(uv python find 3.8)")" >> "$GITHUB_PATH"
+
+      - name: Versões
+        run: |
+          python3 --version
+          node scripts/py.mjs --descobrir
+
+      - name: Testes .py
+        run: node scripts/rodar-testes.mjs --so-portateis --filtro .py
+
   caminho-com-acento-e-espaco:
     name: testes portáteis em pasta com acento e espaço (Windows)
     runs-on: windows-latest

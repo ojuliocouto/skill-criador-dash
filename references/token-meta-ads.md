@@ -74,20 +74,26 @@ O dash testa na hora e mostra o nome da conta se deu certo.
 | "a Meta atingiu o limite de chamadas desta conta na página N" | Limite de uso da API da Meta (códigos 4, 17, 32, 613, 80000 e parecidos) | Espere uns 15 minutos e clique em Atualizar; se repetir, encurte o período |
 | "a Meta devolveu erro na página N" ou "parou de responder na página N" | A Meta falhou no meio da leitura | Nada foi mostrado pela metade. Tente de novo em alguns minutos |
 
-## O que o dash puxa da Meta (versão 3.8.0)
+## O que o dash puxa da Meta
 
 Uma linha por campanha por dia, com estas colunas:
 
 | Coluna | De onde vem |
 |---|---|
-| Data, Campanha, Investimento, Impressões, Cliques | Os campos de sempre da Meta (`date_start`, `campaign_name`, `spend`, `impressions`, `clicks`) |
+| Data, Campanha, Investimento, Impressões | Os campos de sempre da Meta (`date_start`, `campaign_name`, `spend`, `impressions`) |
+| Cliques | Cliques no link (`inline_link_clicks`), o número que o Gerenciador usa no CTR e no CPC de link. É a base do CTR e do CPC do painel |
+| Cliques (todos) | Todos os cliques no anúncio (`clicks`): curtida, foto, perfil e link |
 | Leads | Formulário instantâneo, Messenger e pixel do site, sem contar o mesmo lead duas vezes: vale o total `lead` da Meta; sem ele, leads no Facebook mais leads do pixel |
 | Conversões | Compras (`omni_purchase`; sem ele, `purchase` mais compras do pixel) |
+| Receita | Valor das compras (`action_values`), com a mesma regra das Conversões: `omni_purchase`; sem ele, `purchase` mais compras do pixel. Nunca soma o total com as partes |
 | Resultados e Tipo de resultado | A coluna "Resultados" do Gerenciador de Anúncios (`results`): o que a campanha otimiza (lead, conversa, compra, alcance...) |
 | Custo por resultado | A coluna "Custo por resultado" do Gerenciador (`cost_per_result`) |
 | CPL | Investimento dividido por Leads, na linha |
 
 - Os números seguem a atribuição de cada conjunto de anúncios (`use_unified_attribution_setting`), a mesma do Gerenciador.
+- A coluna Receita só existe quando a Meta manda valor de compra (pixel ou API de conversões com `value`). Conta de captação, sem compra, fica sem Receita e sem ROAS, em vez de mostrar R$ 0,00. Painel do Meta criado antes ganha a Receita sozinho quando a coluna chega.
+- O valor sai na moeda da conta de anúncios. O painel formata em R$: conta em outra moeda precisa de conversão antes.
+- Documentação oficial dos campos: https://developers.facebook.com/docs/marketing-api/reference/ad-account/insights/ (`action_values`, `inline_link_clicks`, `clicks`) e https://developers.facebook.com/docs/marketing-api/reference/ads-action-stats/ (tipos de ação).
 - Campanha sem "Resultados" na Meta (campanha antiga): o dash usa os Leads, ou as Compras se não houver lead, e escreve "(calculado pelo painel)" no Tipo de resultado.
 - O dash lê todas as páginas da resposta (500 linhas por página, até 40 páginas). Passou disso, ele avisa em vez de mostrar um total pela metade.
 - Os números da Meta podem mudar por alguns dias depois (atribuição atrasada). É normal o painel de hoje não bater com o de ontem para os últimos dias.

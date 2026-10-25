@@ -184,7 +184,7 @@ test('POST: dashboard publico que ganha senha rotaciona o id, migra o KV e devol
   assert.equal(rOld.status, 404, 'id antigo nao pode mais existir');
 
   // 5) listagem anonima: nao sobra nome nenhum, e o unico id listado e o novo (opaco).
-  const rList = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  const rList = await dashboards(ctx('GET', { headers: { 'x-admin-token': 'chave-da-lista' }, env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: 'chave-da-lista' } }));
   const lista = await readJSON(rList);
   assert.equal(lista.length, 1, 'so um registro deve existir apos a migracao');
   assert.equal(lista[0].protected, true);
@@ -260,7 +260,7 @@ test('POST: proteger dashboard publico que ja existe, MESMO nome e SEM id explic
   assert.equal([...kv._map.keys()].length, 1, 'nao pode sobrar registro orfao publico no KV');
 
   // 4) listagem anonima: nenhum nome vaza, so o id novo (opaco) aparece.
-  const rList = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  const rList = await dashboards(ctx('GET', { headers: { 'x-admin-token': 'chave-da-lista' }, env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: 'chave-da-lista' } }));
   const lista = await readJSON(rList);
   assert.equal(lista.length, 1);
   assert.equal(lista[0].id, j2.id);
@@ -346,7 +346,7 @@ test('GET listagem anonima: nenhum id de dashboard protegido revela o nome', asy
   );
 
   // Listagem ANONIMA: sem x-admin-token e sem x-dash-auth.
-  const res = await dashboards(ctx('GET', { env: { DASHBOARDS_KV: kv } }));
+  const res = await dashboards(ctx('GET', { headers: { 'x-admin-token': 'chave-da-lista' }, env: { DASHBOARDS_KV: kv, ADMIN_TOKEN: 'chave-da-lista' } }));
   assert.equal(res.status, 200);
   const lista = await readJSON(res);
   const corpo = JSON.stringify(lista);

@@ -39,7 +39,9 @@ function fakeKV(initial = {}) {
   };
 }
 
-// D1 fake: registra cada INSERT (sql + params) num array pra inspeção.
+// D1 fake: registra cada INSERT do histórico por dia (sql + params) num array pra inspeção.
+// 3.9.0: o Worker grava num db.batch, um INSERT INTO snapshot_dias por dia, com os params
+// [dashboard_id, dia, captured_at, fonte, columns_json, rows_json].
 function fakeD1() {
   const inserts = [];
   return {
@@ -53,12 +55,23 @@ function fakeD1() {
           return this;
         },
         async run() {
-          inserts.push({ sql: this._sql, params: this._params });
+          if (/^INSERT INTO snapshot_dias/.test(this._sql)) inserts.push({ sql: this._sql, params: this._params });
           return { success: true };
         },
       };
     },
+    async batch(stmts) {
+      for (const s of stmts) await s.run();
+      return [];
+    },
   };
+}
+
+// Junta os dias gravados de um painel num DataSet (colunas da foto, todas as linhas).
+function gravadoDe(inserts, id) {
+  const meus = inserts.filter((i) => i.params[0] === id);
+  if (!meus.length) return null;
+  return { columns: JSON.parse(meus[0].params[4]), rows: meus.flatMap((i) => JSON.parse(i.params[5])) };
 }
 
 // CSV de exemplo que o gviz devolveria para a fonte sheets.
@@ -110,6 +123,8 @@ function makeFetchStub({ sheetsOk = true, metaOk = true } = {}) {
 // Configs de dashboard para popular o KV.
 const CFG_SHEETS = JSON.stringify({
   id: 'dash-sheets',
+  // colMap.data diz ao Worker qual coluna separa os dias (3.9.0: histórico por dia).
+  colMap: { data: 'Data' },
   source: { type: 'sheets', url: 'https://docs.google.com/spreadsheets/d/ABC123/edit', gid: '0' },
 });
 const CFG_META = JSON.stringify({
@@ -150,10 +165,10 @@ test('scheduled: grava sheets e meta, pula csv e config corrompida', async () =>
 
   const inserts = env.DASHBOARD_DB.inserts;
 
-  // Caso 1 + 2 + 3: exatamente 2 snapshots (sheets + meta). csv e corrompida fora.
-  assert.equal(inserts.length, 2, 'esperado exatamente 2 INSERTs (sheets + meta)');
+  // Caso 1 + 2 + 3: só sheets (2 dias) e meta (1 dia) gravam. csv e corrompida fora.
+  assert.equal(inserts.length, 3, 'esperado 3 dias gravados (2 da sheets + 1 da meta)');
 
-  // Indexa por dashboard_id (params: [dashboard_id, capturedAt, dataset_json]).
+  // Indexa por dashboard_id (params: [dashboard_id, dia, captured_at, fonte, columns_json, rows_json]).
   const porId = new Map(inserts.map((ins) => [ins.params[0], ins]));
 
   // Caso 1: dashboard_id certo para cada fonte.
@@ -167,14 +182,14 @@ test('scheduled: grava sheets e meta, pula csv e config corrompida', async () =>
   assert.ok(!porId.has('dash-corrompida'), 'config corrompida não deve gerar snapshot');
 
   // Caso 1: dataset_json parseável com columns/rows para sheets.
-  const dsSheets = JSON.parse(porId.get('dash-sheets').params[2]);
+  const dsSheets = gravadoDe(inserts, 'dash-sheets');
   assert.ok(Array.isArray(dsSheets.columns), 'dataset sheets deve ter columns array');
   assert.ok(Array.isArray(dsSheets.rows), 'dataset sheets deve ter rows array');
   assert.deepEqual(dsSheets.columns, ['Data', 'Campanha', 'Investimento']);
   assert.equal(dsSheets.rows.length, 2, 'CSV de exemplo tem 2 linhas de dados');
 
   // Caso 1: dataset_json parseável com columns/rows para meta.
-  const dsMeta = JSON.parse(porId.get('dash-meta').params[2]);
+  const dsMeta = gravadoDe(inserts, 'dash-meta');
   assert.ok(Array.isArray(dsMeta.columns), 'dataset meta deve ter columns array');
   assert.ok(Array.isArray(dsMeta.rows), 'dataset meta deve ter rows array');
   assert.equal(dsMeta.rows.length, 1, 'JSON de insights de exemplo tem 1 linha');
@@ -211,5 +226,5 @@ test('scheduled: falha no fetch da sheets não impede o snapshot da meta', async
 
   // A meta continua e grava normalmente: prova o try/catch por dashboard.
   assert.ok(ids.includes('dash-meta'), 'meta deve gravar mesmo com a sheets falhando');
-  assert.equal(inserts.length, 1, 'apenas o snapshot de meta deve existir');
+  assert.equal(inserts.length, 1, 'apenas o dia da meta deve existir');
 });

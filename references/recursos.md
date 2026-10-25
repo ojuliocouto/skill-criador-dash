@@ -69,8 +69,8 @@ Comportamentos que valem saber (provados no ar em 08/10/2026):
 - **Aba que aponta para um painel com senha:** a aba mostra "Esta aba tem senha", pede a senha ali mesmo
   (`lib/senha-na-aba.js`) e abre o painel na aba; a senha fica só na sessão do navegador, então ir a outra aba e voltar
   não pede de novo. Senha errada diz "Senha incorreta" na própria aba.
-- **Colocar um painel com senha no grupo:** o assistente não o lista (a listagem pública só mostra o id dele, nunca o
-  nome). Use a API com o id que o POST do painel devolveu: `{"id":"dash-<32 caracteres>","label":"Com senha"}` na lista
+- **Colocar um painel com senha no grupo:** o assistente não o lista (a listagem, que exige a chave de administrador,
+  só mostra o id dele, nunca o nome). Use a API com o id que o POST do painel devolveu: `{"id":"dash-<32 caracteres>","label":"Com senha"}` na lista
   `tabs`. O id do painel protegido fica visível na lista de abas do grupo, que é pública: quem abre o grupo vê o rótulo
   da aba, e só vê os números com a senha.
 - O grupo em si não tem senha (o POST de grupo com `auth` não é um caso testado): proteja cada painel-filho.
@@ -121,7 +121,7 @@ da IMAGEM no WhatsApp, aí sim precisaria de um gerador raster (PNG via workers-
 ```
 ARCHITECTURE.md                 contratos das 3 camadas (fonte da verdade)
 package.json  wrangler.toml
-db/schema.sql                   tabela de snapshots do modo histórico (D1)
+db/schema.sql                   tabelas do modo histórico (D1): snapshot_dias (por dia) e snapshots (até a 3.8)
 examples/                       marketing-exemplo.csv, vendas-exemplo.csv, suporte-exemplo.csv
 functions/
   _middleware.js                CORS + cache KV + security headers (CSP) + injeta OpenGraph no HTML do dashboard
@@ -132,20 +132,20 @@ functions/
       sheets.js                 conector carro-chefe (gviz CSV)
       csv.js                     conector de upload
       meta-ads.js                conector Meta Ads (Graph API, token no servidor)
-      d1.js                      conector do modo histórico (lê snapshot do D1)
+      d1.js                      conector do modo histórico (lê a série por dia do D1)
       crm.js  hotmart.js         stubs (ponto de partida)
   lib/
     csv.mjs                     parseCSV + detectDelimiter (puro, testavel)
     sheets-url.mjs              sheetUrlToCsv (compartilhado por sheets.js e pelo worker)
     meta.mjs                    buildInsightsUrl + buscarTodasAsPaginas + mapInsightsToDataSet (puro, fetch injetado)
-    snapshots.mjs               SQL do modo histórico + rowToDataSet (puro)
+    snapshots.mjs               SQL do modo histórico: grava por dia, retenção, lê a série (puro)
     auth-config.mjs             needsAuth/authOk (PBKDF2 salgado)/safeEqual/checkAdminToken (neutro)
     rate-limit.mjs              rate limiter em KV (gate de senha + preview Meta)
     domains.mjs                 lista DOMAINS do servidor (valida o POST); paridade com a do browser
     source-shape.mjs            validarFonte: valida a forma de source por tipo no POST (puro)
     og.mjs                      metadados de preview de link (buildMeta/metaTagsHtml/ogImageSvg, puro)
 workers/
-  snapshot/ src/index.js        Worker com cron que grava snapshots no D1 (SNAPSHOT_FETCHERS)
+  snapshot/ src/index.js        Worker com cron que grava no D1 por dia (SNAPSHOT_FETCHERS)
 public/
   index.html  config.html (wizard)  group.html (wizard de grupo)  dashboard.html
   assets/css/main.css

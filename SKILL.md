@@ -365,7 +365,7 @@ Ao concluir, execute `node <dir-da-skill>/scripts/py.mjs gate-etapas.py --perfil
 Campos e evidências: `references/gate-etapas.md`. Saída diferente de zero bloqueia o avanço.
 Explique e deixe a pessoa escolher (detalhe na seção "Os dois modos de dados"):
 - AO VIVO: lê a fonte na hora, só KV pra config, setup mínimo. Bom pra maioria.
-- HISTÓRICO: Worker cron tira snapshots no D1; dá histórico de verdade e não depende da fonte no ar. Mais setup.
+- HISTÓRICO: Worker cron grava no D1 um registro por dia; o dia que sai da janela da fonte (o Meta só dá 30 dias) continua no painel, com retenção de 400 dias, e o painel não depende da fonte no ar. Mais setup.
 
 ### 4. Provisionar a infra DELA
 
@@ -550,7 +550,7 @@ node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checa
 **A regra, e ela não tem exceção:** toda ferramenta que o Passo 0 mediu como RESPONDENDO
 precisa aparecer no registro de uso, com evidência. Ferramenta que não respondeu não é cobrada,
 porque ali a degradação já foi declarada. Não existe terceira opção. **"A prova de tela eu pulei"
-com o Playwright vivo REPROVA a entrega.** (O 21st.dev é opcional e nunca é cobrado aqui.)
+com o Playwright vivo REPROVA a entrega.** Cobradas: Playwright e `frontend-design`. O 21st.dev nunca é cobrado aqui, e as skills de acabamento (`high-end-visual-design`, `animate`) são opcionais: instaladas e sem uso registrado, saem como `[aviso]` e não reprovam.
 
 **Por que este gate é diferente do Passo 0:** o Passo 0 garante que a ferramenta RESPONDE. Este
 garante que ela foi USADA. São buracos distintos, e tapar só o primeiro não resolve nada: dá
@@ -734,8 +734,12 @@ AO VIVO (padrão, mais simples): o `dashboard.html` chama o conector, que busca 
 KV guarda só a config; `DASHBOARD_CACHE` (opcional) cacheia 5 min. Sem banco. Limite: sem histórico
 próprio e depende da fonte estar no ar.
 
-HISTÓRICO (D1 + cron, mais robusto): um Worker cron (`workers/snapshot/`) grava snapshots da fonte
-no D1; o dashboard lê o snapshot mais recente via conector `d1.js`. COMO LIGA: a config precisa de
+HISTÓRICO (D1 + cron, mais robusto): um Worker cron (`workers/snapshot/`) grava a fonte no D1 por DIA
+(tabela `snapshot_dias`, um registro por painel e por dia). Cada rodada substitui os dias que a foto nova
+cobre e mantém os que saíram da janela da fonte; dias mais velhos que `HISTORICO_DIAS` (400 por padrão,
+variável do Worker) são apagados. O dashboard lê a série inteira via conector `d1.js` (ou um período,
+`?de=AAAA-MM-DD&ate=AAAA-MM-DD`). Os dias saem pela coluna de data do colMap (data ISO ou brasileira).
+Quem instalou até a 3.8 aplica o `db/schema.sql` de novo para ganhar a tabela. COMO LIGA: a config precisa de
 `storage: "d1"` (no wizard, o seletor "Modo de dados" no passo Finalizar grava isso; na mão, inclua
 o campo, senão lê ao vivo). Só faz sentido pra fonte viva (planilha/Meta); CSV estático o cron ignora.
 Setup completo do D1 + cron + bindings: `references/infra.md`.
@@ -792,7 +796,7 @@ toda resposta de erro da API vem em PT-BR dizendo o que corrigir (ex: 403 `admin
 **Grupo de painéis com abas, pelo POST** (um link só para vários painéis): `{"name":"...","kind":"group","tabs":[{"id":"<id do painel>","label":"Nome da aba"}]}`
 com o `id` que cada painel tem (o do painel com senha é o embaralhado que o POST devolveu). Painel com senha vira aba
 normalmente: a aba pede a senha ali mesmo. O assistente de grupo (`/group.html`) só lista painéis sem senha, porque a
-listagem pública não mostra o nome dos protegidos. Detalhes em `references/recursos.md`.
+listagem (que exige a chave de administrador) não mostra o nome dos protegidos. Detalhes em `references/recursos.md`.
 
 ## Estender (domínio, conector, widget)
 

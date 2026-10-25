@@ -1,5 +1,5 @@
 # Worker separado do modo histórico: um cron tira "fotos" (snapshots) das fontes
-# vivas dos dashboards e grava no D1. O dashboard lê o snapshot mais recente.
+# vivas dos dashboards e grava no D1 um registro por dia. O dashboard lê a série por dia.
 # Este Worker é um exemplo de referência: ajuste os ids dos bindings aos seus.
 #
 # Deploy:
@@ -14,6 +14,11 @@ compatibility_date = "2026-01-01"
 # Cron de hora em hora (minuto 0). Ajuste a cadência conforme a necessidade.
 [triggers]
 crons = ["0 * * * *"]
+
+# Retenção do histórico por dia (3.9.0): dias mais velhos que isso são apagados a cada rodada.
+# Sem a variável, vale 400 dias.
+# [vars]
+# HISTORICO_DIAS = "400"
 
 # Banco D1 onde os snapshots são gravados. Troque o database_id pelo seu.
 [[d1_databases]]
