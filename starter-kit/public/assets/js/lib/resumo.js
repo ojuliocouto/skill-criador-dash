@@ -9,8 +9,11 @@ import { computeAllMapped } from './metrics.js';
 import { ehPeriodo, agruparPorPeriodo, rotuloDaDimensaoDePeriodo } from './periodo.js';
 
 const LIMITE_PADRAO = 60;
-// Folga da comparação com o total: diferença menor que 1% não ganha cor (seria ruído pintado).
-const FOLGA = 0.01;
+// Folga da comparação com o total. 3.9: com 1% a tabela semanal pintava diferença de centavos. Agora a
+// diferença precisa passar de 5% do total E de um mínimo absoluto do formato (R$ 0,10 em dinheiro,
+// 0,05 ponto percentual em taxa, 0,05 no resto): o que não passa é ruído, fica sem cor.
+const FOLGA = 0.05;
+const MINIMO_ABSOLUTO = Object.freeze({ currency: 0.1, percent: 0.0005, number: 0.05, integer: 0.5 });
 
 /**
  * Métrica de TAXA: o valor de um grupo é comparável com o do total (CPA do canal x CPA geral).
@@ -83,6 +86,7 @@ function tonsDaLinha(colunas, valores, total) {
     if (v == null || t == null || t === 0) continue;
     const delta = (v - t) / Math.abs(t);
     if (Math.abs(delta) < FOLGA) continue;
+    if (Math.abs(v - t) < (MINIMO_ABSOLUTO[c.format] ?? MINIMO_ABSOLUTO.number)) continue;
     const maior = v > t;
     tons[c.key] = (c.betterWhen === 'higher' ? maior : !maior) ? 'bom' : 'ruim';
   }
