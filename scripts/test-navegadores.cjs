@@ -140,7 +140,16 @@ const parar = async (pagina, espera = 3500) => {
   return pagina.evaluate(() => { const g = window.__gravacao; g.rodando = false; g.sobrando = document.getAnimations().filter((a) => a.effect && Number.isFinite(a.effect.getComputedTiming().endTime) && a.playState === 'running').length; return g; });
 };
 
-const tocar = (perfil, loc) => (perfil.celular ? loc.tap() : loc.click());
+// 3.9: no celular a barra de filtros fica atrás do botão Filtros da faixa. Tocar num controle de dentro dela
+// abre a barra antes, como a pessoa faria (no computador o botão não aparece e nada muda).
+async function tocar(perfil, loc) {
+  const dentroDosFiltros = await loc.evaluate((el) => !!el.closest('#filterbar')).catch(() => false);
+  if (dentroDosFiltros) {
+    const botao = loc.page().locator('.filtros-abrir[aria-expanded="false"]');
+    if (await botao.isVisible().catch(() => false)) { await (perfil.celular ? botao.tap() : botao.click()); await loc.page().waitForTimeout(150); }
+  }
+  return perfil.celular ? loc.tap() : loc.click();
+}
 
 async function overflowDeLado(pagina) { return pagina.evaluate(() => ({ pagina: document.documentElement.scrollWidth, janela: window.innerWidth })); }
 
@@ -276,6 +285,9 @@ async function verificar(perfil, browser, base, ids, resultados, teste) {
 
   await teste(P('filtros do painel: o seletor "Canal" tem a altura dos outros campos e "Limpar filtros" tem o texto no centro'), async () => {
     await abrir(ids.meta);
+    // 3.9: no celular a barra fica atrás do botão Filtros; mede depois de abrir, como a pessoa a vê.
+    const botaoFiltros = pagina.locator('.filtros-abrir[aria-expanded="false"]');
+    if (await botaoFiltros.isVisible().catch(() => false)) { await tocar(perfil, botaoFiltros); await pagina.waitForTimeout(200); }
     const m = await pagina.evaluate(() => {
       const sel = document.querySelector('.filterbar select'); const reset = document.querySelector('.filterbar .fb-reset');
       const rg = document.createRange(); rg.selectNodeContents(reset); const rt = rg.getBoundingClientRect(); const rb = reset.getBoundingClientRect();
@@ -356,7 +368,8 @@ async function verificar(perfil, browser, base, ids, resultados, teste) {
     assert.match(dica.valor, /\d/, `etiqueta sem valor: "${dica.valor}"`);
     assert.ok(dica.caixa.left >= -1 && dica.caixa.right <= dica.tela.w + 1, 'a etiqueta saiu da tela');
     // tira o dedo/mouse: some
-    if (perfil.celular) await pagina.locator('.faixa__nome').first().tap(); else await pagina.mouse.move(8, 8, { steps: 4 }); // fora do gráfico e longe de qualquer link
+    // 3.9: no celular o nome do painel está na barra do topo; o toque fora do gráfico vai no período da faixa.
+    if (perfil.celular) await pagina.locator('.faixa__periodo-curto').first().tap(); else await pagina.mouse.move(8, 8, { steps: 4 }); // fora do gráfico e longe de qualquer link
     await pagina.waitForFunction(() => !document.querySelector('.chart__regua.is-ativa'), null, { timeout: 4000 });
     // transforma: troca de período com o gráfico na tela
     await gravar(pagina, []);

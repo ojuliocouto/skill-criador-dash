@@ -162,6 +162,9 @@ async function main() {
             problemas.push(...formatar(await rodarAxe(pagina, aba, perfil.nome)).map((x) => `aba ${aba}: ${x}`));
           }
           await pagina.locator('.aba', { hasText: 'Visão geral' }).click();
+          // 3.9: no celular os filtros ficam atrás do botão Filtros da faixa; abre como a pessoa faria (e mede o axe aberto).
+          const botaoFiltros = pagina.locator('.filtros-abrir[aria-expanded="false"]');
+          if (await botaoFiltros.isVisible().catch(() => false)) { await botaoFiltros.click(); await pagina.waitForTimeout(300); }
           await pagina.locator('.atalho[data-atalho="personalizado"]').click(); await pagina.waitForTimeout(900);
           problemas.push(...formatar(await rodarAxe(pagina, 'Personalizado', perfil.nome)).map((x) => `Personalizado: ${x}`));
           await ctx.close();
