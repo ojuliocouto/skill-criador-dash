@@ -47,13 +47,16 @@ async function main() {
             minigraficos: [...document.querySelectorAll('.kpi--mini .kpi__spark')].filter((s) => s.getBoundingClientRect().height > 0).length,
             roas: !!document.querySelector('.kpi:not(.kpi--mini):not(.kpi--hero) .kpi__spark'),
             paginaX: document.documentElement.scrollWidth - window.innerWidth,
-            larguras: [...document.querySelectorAll('.grid.kpis > .kpi')].map((k) => Math.round(k.getBoundingClientRect().width)),
+            larguras: [...document.querySelectorAll('.grid.kpis > .kpi:not(.kpi--hero)')].map((k) => Math.round(k.getBoundingClientRect().width)),
+            heroi: (() => { const h = document.querySelector('.grid.kpis > .kpi--hero'); const g = document.querySelector('.grid.kpis'); return h ? { w: Math.round(h.getBoundingClientRect().width), grade: Math.round(g.getBoundingClientRect().width), topo: h.getBoundingClientRect().top <= Math.min(...[...g.children].map((k) => k.getBoundingClientRect().top)) } : null; })(),
           }));
           assert.equal(m.minis, 5);
           assert.equal(m.roas, false, 'indicador sem série não ganha minigráfico');
           assert.ok(m.paginaX <= 0, `a página rola ${m.paginaX} px de lado`);
           if (largura < 500) {
-            assert.ok(m.larguras.slice(1, 5).every((w) => w < largura * 0.6), `2 colunas no celular: ${m.larguras}`);
+            assert.ok(m.larguras.slice(0, 4).every((w) => w < largura * 0.6), `2 colunas no celular: ${m.larguras}`);
+            // 3.9.1: o destaque abre a faixa em largura cheia.
+            if (m.heroi) assert.ok(m.heroi.w >= m.heroi.grade - 4 && m.heroi.topo, `destaque em largura cheia no topo: ${JSON.stringify(m.heroi)}`);
             assert.equal(m.minigraficos, 5, 'cabe em 360 e 390');
           }
           if (PRINTS) await pagina.screenshot({ path: path.join(PRINTS, `faixa-${largura}-${tema}.png`), fullPage: true });
