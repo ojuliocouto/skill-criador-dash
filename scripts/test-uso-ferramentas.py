@@ -50,6 +50,33 @@ class GateUso(unittest.TestCase):
         self.assertEqual(self.checar({"skill design-taste-frontend": True, "Playwright": True},
                                     {"Playwright": self.registro()}), 0)
 
+    def test_acabamento_e_movimento_vivos_e_nao_usados_so_avisam(self):
+        # 3.9.0 (pedido de 25/10/2026): high-end-visual-design e animate são opcionais (o SKILL.md
+        # as chama de "skills de acabamento (opcionais)"). Na máquina de quem as tem instaladas, o
+        # gate 6.1 reprovava a entrega por não usá-las; o aluno sem elas passava. Agora só avisam.
+        estados = {"skill high-end-visual-design": True, "skill animate": True,
+                   "Playwright": True, "skill frontend-design": True}
+        registros = {"Playwright": self.registro(), "skill frontend-design": self.registro()}
+        uso.salvar(self.projeto, registros)
+        saida = io.StringIO()
+        with patch.object(uso, "estado_das_ferramentas", return_value=(estados, None)), contextlib.redirect_stdout(saida):
+            codigo = uso.cmd_checar(argparse.Namespace(projeto=self.projeto, caminho="criar"))
+        self.assertEqual(codigo, 0, saida.getvalue())
+        texto = saida.getvalue()
+        self.assertIn("[aviso]", texto)
+        self.assertIn("skill animate", texto)
+        self.assertIn("skill high-end-visual-design", texto)
+        self.assertNotIn("[FALTA] skill animate", texto)
+
+    def test_acabamento_usado_aparece_como_usado(self):
+        estados = {"skill animate": True, "Playwright": True}
+        registros = {"Playwright": self.registro(), "skill animate": self.registro()}
+        uso.salvar(self.projeto, registros)
+        saida = io.StringIO()
+        with patch.object(uso, "estado_das_ferramentas", return_value=(estados, None)), contextlib.redirect_stdout(saida):
+            self.assertEqual(uso.cmd_checar(argparse.Namespace(projeto=self.projeto, caminho="criar")), 0)
+        self.assertIn("[USADA] skill animate", saida.getvalue())
+
     def test_pasta_nao_e_artefato(self):
         self.assertFalse(uso.evidencia_vale({"tipo": "arquivo", "valor": "."}, self.projeto)[0])
 

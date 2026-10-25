@@ -550,7 +550,7 @@ node <dir-da-skill>/scripts/py.mjs uso-ferramentas.py --projeto ~/meu-dash checa
 **A regra, e ela não tem exceção:** toda ferramenta que o Passo 0 mediu como RESPONDENDO
 precisa aparecer no registro de uso, com evidência. Ferramenta que não respondeu não é cobrada,
 porque ali a degradação já foi declarada. Não existe terceira opção. **"A prova de tela eu pulei"
-com o Playwright vivo REPROVA a entrega.** (O 21st.dev é opcional e nunca é cobrado aqui.)
+com o Playwright vivo REPROVA a entrega.** Cobradas: Playwright e `frontend-design`. O 21st.dev nunca é cobrado aqui, e as skills de acabamento (`high-end-visual-design`, `animate`) são opcionais: instaladas e sem uso registrado, saem como `[aviso]` e não reprovam.
 
 **Por que este gate é diferente do Passo 0:** o Passo 0 garante que a ferramenta RESPONDE. Este
 garante que ela foi USADA. São buracos distintos, e tapar só o primeiro não resolve nada: dá
