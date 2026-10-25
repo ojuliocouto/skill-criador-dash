@@ -310,7 +310,10 @@ h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 14
 /* 3.7.3: o cartão cresce junto com a linha do destaque (que tem a barra da meta), e o minigráfico que preenchia o
    cartão esticava até ~110 px de altura enquanto os outros tinham ~40: o serrilhado ficava exagerado. Agora todos têm
    a MESMA altura (44 px, teto de 56) e ficam no pé do cartão; a folga sobra entre o número e o traço. */
-.kpi--mini .kpi__linha { flex: 1 1 auto; min-height: 44px; display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
+/* 3.9.1: o traço vem logo abaixo do número, em todos os cartões. Antes a linha crescia e empurrava o
+   traço pro pé do cartão: com a meta num vizinho (texto de 2 ou 3 linhas), sobravam ~100 px vazios
+   entre o número e o traço (teste de aluno de 25/10). A folga da linha agora fica embaixo. */
+.kpi--mini .kpi__linha { flex: 0 0 auto; min-height: 44px; display: flex; align-items: center; gap: 12px; margin-top: 10px; }
 .kpi--mini .kpi__spark { flex: 1 1 auto; min-width: 0; height: 44px; max-height: 56px; min-height: 0; margin-top: 0; align-self: flex-end; }
 .kpi--mini .kpi__spark polyline { stroke: var(--text-dim); }
 .kpi--mini .kpi__trend { flex: 0 0 auto; margin-top: 0; text-align: right; }
@@ -689,6 +692,9 @@ label.field .lbl { display: block; color: var(--text-dim); font-size: 13px; marg
 @media (max-width: 560px) {
   /* 2 colunas no celular (3.7.1); o cartão ímpar do fim cresce e ocupa a linha inteira. */
   .grid.kpis > * { flex-basis: calc(50% - 1px); }
+  /* 3.9.1: o destaque abre a faixa em largura cheia (antes dividia a linha com um vizinho do mesmo
+     tamanho e o maior número da tela ficava num cartão comum). */
+  .grid.kpis > .kpi--hero { flex-basis: 100%; order: -1; }
 }
 
 /* Tablet: a regra geral transforma cartão de 4 colunas em meia largura, o que quebra o par

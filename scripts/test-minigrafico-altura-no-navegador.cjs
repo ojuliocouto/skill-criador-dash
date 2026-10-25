@@ -5,8 +5,8 @@
  * Regra medida aqui, com o painel de verdade (Functions reais, CSV de 60 dias, meta mensal):
  *   - todos os minigráficos renderizados da mesma grade têm a mesma altura (diferença de no máximo 2 px);
  *   - nenhum passa de 56 px, no computador e no celular;
- *   - ficam alinhados ao pé do cartão (a distância até a borda de baixo é igual em todos os cartões da mesma linha e o
-    bloco do traço termina no preenchimento do cartão).
+ *   - ficam logo abaixo do número, com o mesmo vão em todos os cartões vizinhos (3.9.1; antes iam pro pé do cartão
+    e, com a meta num vizinho, sobravam ~100 px entre o número e o traço).
  * Uso: node <dir-da-skill>/scripts/test-minigrafico-altura-no-navegador.cjs   (ALTURA_PRINTS=<pasta> guarda os PNG)
  */
 const fs = require('node:fs');
@@ -32,7 +32,8 @@ const medir = () => [...document.querySelectorAll('.grid.kpis .kpi__spark')].map
   const k = s.closest('.kpi').getBoundingClientRect();
   const rotulo = (s.closest('.kpi').querySelector('.kpi__label') || {}).textContent || '?';
   const linha = s.closest('.kpi__linha');
-  return { rotulo: rotulo.trim(), altura: r.height, largura: r.width, folgaDoPe: k.bottom - r.bottom, folgaDaLinha: linha ? k.bottom - linha.getBoundingClientRect().bottom : null, topoDoCartao: Math.round(k.top), heroi: !!s.closest('.kpi--hero') };
+  const valor = s.closest('.kpi').querySelector('.kpi__value').getBoundingClientRect();
+  return { rotulo: rotulo.trim(), altura: r.height, largura: r.width, vao: r.top - valor.bottom, linha: !!linha, topoDoCartao: Math.round(k.top), heroi: !!s.closest('.kpi--hero') };
 }).filter((m) => m.altura > 0 && m.largura > 0);
 
 async function main() {
@@ -53,7 +54,7 @@ async function main() {
   try {
     for (const [nomePerfil, perfil] of perfis) {
       for (const [quando, id] of [['com meta', ids.comMeta], ['sem meta', ids.semMeta]]) {
-        await teste(`${nomePerfil}, ${quando}: minigráficos com a mesma altura (±${TOLERANCIA} px), no máximo ${MAXIMO} px, no pé do cartão`, async () => {
+        await teste(`${nomePerfil}, ${quando}: minigráficos com a mesma altura (±${TOLERANCIA} px), no máximo ${MAXIMO} px, logo abaixo do número`, async () => {
           const ctx = await browser.newContext({ ...perfil, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', reducedMotion: 'reduce' });
           const pagina = await ctx.newPage();
           await pagina.goto(`${pilha.url}/dashboard.html?id=${id}`, { waitUntil: 'domcontentloaded' });
@@ -68,15 +69,11 @@ async function main() {
           const resumo = minis.map((x) => `${x.rotulo}=${x.altura.toFixed(0)}`).join(' ');
           if (Math.max(...alturas) - Math.min(...alturas) > TOLERANCIA) throw new Error(`alturas diferentes: ${resumo}`);
           if (Math.max(...m.map((x) => x.altura)) > MAXIMO) throw new Error(`passa de ${MAXIMO} px: ${m.map((x) => `${x.rotulo}=${x.altura.toFixed(0)}`).join(' ')}`);
-          // alinhados ao pé: dentro da mesma linha da grade, a folga até a borda de baixo é igual
-          const linhas = new Map();
-          for (const x of minis) linhas.set(x.topoDoCartao, [...(linhas.get(x.topoDoCartao) || []), x.folgaDoPe]);
-          for (const [topo, folgas] of linhas) {
-            if (Math.max(...folgas) - Math.min(...folgas) > TOLERANCIA) throw new Error(`na linha que começa em ${topo}px os minigráficos não estão no mesmo pé: folgas ${folgas.map((f) => f.toFixed(0)).join(', ')}`);
-          }
-          // o bloco do traço (com a variação ao lado ou embaixo) termina no preenchimento do cartão, não no meio dele
-          const longe = minis.filter((x) => x.folgaDaLinha !== null && x.folgaDaLinha > 20);
-          if (longe.length) throw new Error(`bloco do minigráfico longe do pé do cartão: ${longe.map((x) => `${x.rotulo}=${x.folgaDaLinha.toFixed(0)}`).join(' ')}`);
+          // 3.9.1: logo abaixo do número, o mesmo vão em todo cartão vizinho (antes o traço ia pro pé e, com a
+          // meta num vizinho, sobravam ~100 px entre o número e o traço: teste de aluno de 25/10).
+          const vaos = minis.filter((x) => x.linha).map((x) => x.vao);
+          if (Math.max(...vaos) - Math.min(...vaos) > TOLERANCIA) throw new Error(`vão número-traço diferente entre cartões: ${minis.map((x) => `${x.rotulo}=${x.vao.toFixed(0)}`).join(' ')}`);
+          if (Math.max(...vaos) > 20) throw new Error(`traço longe do número: ${minis.map((x) => `${x.rotulo}=${x.vao.toFixed(0)}`).join(' ')}`);
         });
       }
     }

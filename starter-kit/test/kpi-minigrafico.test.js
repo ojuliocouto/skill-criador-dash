@@ -94,9 +94,10 @@ test('sparkForHero continua devolvendo só a série do destaque', () => {
   assert.deepEqual(Object.keys(sparkForHero(marketing, rows, colMap)), ['leads']);
 });
 
-test('CSS: o minigráfico do vizinho ocupa o espaço que sobra do cartão e usa a cor de texto secundária, sem eixo', () => {
+// 3.9.1: o traço vem logo abaixo do número (a linha não cresce); a folga do cartão fica embaixo.
+test('CSS: o minigráfico do vizinho vem logo abaixo do número e usa a cor de texto secundária, sem eixo', () => {
   assert.match(css, /\.kpi--mini\s*\{[^}]*display:\s*flex/);
-  assert.match(css, /\.kpi--mini \.kpi__linha\s*\{[^}]*flex:\s*1/);
+  assert.match(css, /\.kpi--mini \.kpi__linha\s*\{[^}]*flex:\s*0 0 auto/);
   assert.match(css, /\.kpi--mini \.kpi__spark polyline\s*\{[^}]*stroke:\s*var\(--text-dim\)/);
 });
 
