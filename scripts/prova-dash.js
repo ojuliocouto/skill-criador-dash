@@ -81,10 +81,21 @@ const outDir = flag('--out', path.join(process.cwd(), 'prova'));
 
 // Um card de KPI so passa com numero de verdade. Traco, travessao, vazio, NaN, erro ou
 // "Nao mapeada" reprovam, e a mensagem diz o que fazer.
-function motivoCardRuim({ valor, naoMapeada }) {
+// 3.9 (achado 4 da auditoria de 25/10/2026): com zero venda o cartão mostrava CPA R$ 0,00, e esta prova
+// aprovava. Custo por X zerado (CPA, CPL, CPC, custo por resultado) é divisão por zero que escapou: o painel
+// certo diz "sem dado". E "sem dado" no período inicial também reprova: a coluna do denominador está toda em
+// zero, o que quase sempre é coluna errada.
+const ROTULO_DE_CUSTO = /^(CPA|CPL|CPC|CPM|custo por)/i;
+function motivoCardRuim({ valor, naoMapeada, label = '', taxa = '', semDado = false }) {
   const v = String(valor || '').trim();
   if (naoMapeada || /n[ãa]o mapead/i.test(v)) {
     return 'métrica não mapeada. Mapeie a coluna no wizard ou oculte a métrica na configuração (hiddenMetrics)';
+  }
+  if (semDado || /^sem dado$/i.test(v)) {
+    return 'mostra "sem dado": a métrica que divide (vendas, leads, investimento) está zerada em todo o período. Confira a coluna no wizard ou oculte a métrica';
+  }
+  if ((taxa === 'custo' || ROTULO_DE_CUSTO.test(String(label).trim())) && /^R\$\s*0,00$/.test(v.replace(/\u00a0/g, ' '))) {
+    return 'mostra R$ 0,00 num custo por X: é divisão por zero (não houve o X no período). O cartão precisa dizer "sem dado"';
   }
   if (!v) return 'valor vazio';
   if (/^[-–—]+$/.test(v)) return `mostra "${v}" no lugar do número`;
@@ -163,6 +174,8 @@ const VAZIO = ['—', 'NaN', 'undefined', 'Infinity', 'null'];
             label: (rotulo ? rotulo.innerText : '').trim() || '(sem rótulo)',
             valor: (el.innerText || '').trim(),
             naoMapeada: !!(kpi && (kpi.classList.contains('is-unmapped') || kpi.dataset.estado === 'nao-mapeada')),
+            semDado: !!(kpi && kpi.dataset.estado === 'sem-dado'),
+            taxa: (kpi && kpi.dataset.taxa) || '',
           };
         }));
       if (!cards.length) falhas.push(`[${perfil.nome}] nenhum card de KPI visível: o painel abriu vazio`);

@@ -23,8 +23,13 @@ const PAGINAS = {
   em_branco: card('Investimento', 'R$ 150,00') + card('CTR', ''),
   erro: card('Investimento', 'R$ 150,00') + card('CPA', 'Erro'),
   nao_mapeada: card('Investimento', 'R$ 150,00') + card('ROAS', 'Não mapeada', ' is-unmapped'),
+  // 3.9 (achado 4): CPA R$ 0,00 sem venda é divisão por zero; ROAS 0 com investimento é número de verdade.
+  zero_falso: card('Investimento', 'R$ 109,02') + card('CPA', 'R$&nbsp;0,00'),
+  zero_falso_marcado: card('Investimento', 'R$ 109,02') + '<div class="kpi" data-taxa="custo"><div class="kpi__label">Custo da venda</div><div class="kpi__value">R$ 0,00</div></div>',
+  sem_dado: card('Investimento', 'R$ 109,02') + card('CPA', 'sem dado'),
+  roas_zero: card('Investimento', 'R$ 109,02') + card('ROAS', '0'),
 };
-const ESPERADO = { ok: 0, vazio: 1, traco: 1, travessao: 1, nan: 1, em_branco: 1, erro: 1, nao_mapeada: 1 };
+const ESPERADO = { ok: 0, vazio: 1, traco: 1, travessao: 1, nan: 1, em_branco: 1, erro: 1, nao_mapeada: 1, zero_falso: 1, zero_falso_marcado: 1, sem_dado: 1, roas_zero: 0 };
 
 const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'prova-dash-teste-'));
 const servidor = http.createServer((req, res) => {
@@ -58,6 +63,7 @@ servidor.listen(0, '127.0.0.1', async () => {
     // A mensagem precisa dizer QUAL card falhou, senão o aluno não sabe o que consertar.
     if (rota === 'traco' && code === 1 && !/Leads/.test(saida)) { falhas++; console.log('FALHA traco: a saída não nomeia o card Leads'); }
     if (rota === 'nao_mapeada' && code === 1 && !/ocult/i.test(saida)) { falhas++; console.log('FALHA nao_mapeada: a saída não ensina a ocultar a métrica'); }
+    if (rota === 'zero_falso' && code === 1 && !/CPA.*divisão por zero/.test(saida)) { falhas++; console.log('FALHA zero_falso: a saída não diz que o R$ 0,00 do CPA é divisão por zero'); }
   }
   console.log(`Evidências: ${pasta}`);
   servidor.close();
