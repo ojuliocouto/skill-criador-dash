@@ -207,7 +207,15 @@ export function buildGoal(config, computed, mapped = {}, template = null, janela
   // Comparação proporcional que passou de 100%: o percentual sozinho parece meta batida. O texto diz que é ritmo;
   // o selo e o marco ficam para a meta de verdade batida (mês cheio, mês em curso já acima da meta inteira, período, total).
   const acima = justa === false && pct >= 1 ? ', acima do ritmo' : '';
-  return { metricKey: g.metricKey, pct, text: `${fmtPercent(pct)} ${rotulo}${acima}`, justa };
+  return { metricKey: g.metricKey, pct, text: `${textoDoAlcance(pct, rotulo)}${acima}`, justa };
+}
+
+// "499,73% da meta proporcional" não se lê (teste de aluno, 25/10/2026). Do dobro em diante, múltiplo com
+// até uma casa ("5x a meta", "2,5x a meta do período"); abaixo disso, o percentual de sempre.
+const MULTIPLO = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+export function textoDoAlcance(pct, rotulo) {
+  if (Number.isFinite(pct) && pct >= 2) return `${MULTIPLO.format(Math.round(pct * 10) / 10)}x ${String(rotulo).replace(/^da /, 'a ')}`;
+  return `${fmtPercent(pct)} ${rotulo}`;
 }
 
 /**

@@ -89,7 +89,8 @@ test('compatibilidade: config antiga sem periodo continua como era (período fil
   const r = alvoDaMeta({ value: 400 }, j('2026-07-01', '2026-09-28'));
   assert.deepEqual([r.alvo, r.justa, r.rotulo], [400, true, 'da meta']);
   const g = buildGoal({ goal: { metricKey: 'leads', value: 400 } }, { leads: 1152 });
-  assert.equal(g.text, '288,00% da meta');
+  // 3.9 (teste de aluno): do dobro em diante o texto vira múltiplo ("2,9x a meta" no lugar de "288,00% da meta").
+  assert.equal(g.text, '2,9x a meta');
   assert.ok(Math.abs(g.pct - 2.88) < 1e-9);
   assert.equal(g.justa, true);
 });
@@ -149,7 +150,7 @@ test('30 dias corridos acima do proporcional: sem selo, sem marco, e o texto diz
   const { g, html } = cartao(1494, j('2026-08-30', '2026-09-28'), { metricKey: 'leads', value: 500, periodo: 'mensal' });
   assert.ok(g.pct > 1);
   assert.equal(g.justa, false);
-  assert.match(g.text, /da meta proporcional/);
+  assert.match(g.text, /(da|a) meta proporcional/);
   assert.match(g.text, /acima do ritmo/);
   assert.doesNotMatch(html, /Meta batida/);
   assert.equal(cruzouMeta(0.5, g.justa === false ? 0 : g.pct), false);

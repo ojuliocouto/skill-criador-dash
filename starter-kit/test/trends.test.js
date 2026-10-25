@@ -133,3 +133,18 @@ test('buildGoal: taxa sem denominador não monta barra de meta (ROAS sem investi
   assert.equal(buildGoal({ goal: { metricKey: 'ROAS', value: 2 } }, { ROAS: 0, investimento: 0 }, {}, tpl), null);
   assert.ok(buildGoal({ goal: { metricKey: 'ROAS', value: 2 } }, { ROAS: 1, investimento: 10 }, {}, tpl));
 });
+
+// Achado extra (teste de aluno, 25/10/2026): "499,73% da meta proporcional" não se lê. Meta passada do
+// dobro vira múltiplo ("5x a meta"); até o dobro, o percentual continua.
+test('buildGoal: meta passada do dobro vira múltiplo legível', () => {
+  const tpl = { metrics: [{ key: 'leads', agg: 'sum', column: 'leads', betterWhen: 'higher' }] };
+  const g = buildGoal({ goal: { metricKey: 'leads', value: 100, periodo: 'periodo' } }, { leads: 499.73 }, {}, tpl);
+  assert.equal(g.text, '5x a meta do período');
+  assert.ok(g.pct > 4.99, 'a barra continua cheia com o percentual de verdade');
+  assert.equal(buildGoal({ goal: { metricKey: 'leads', value: 100, periodo: 'periodo' } }, { leads: 250 }, {}, tpl).text, '2,5x a meta do período');
+  assert.match(buildGoal({ goal: { metricKey: 'leads', value: 100, periodo: 'periodo' } }, { leads: 130 }, {}, tpl).text, /^130,00% da meta do período$/);
+  // Proporcional (pedaço de mês): múltiplo e o aviso de ritmo.
+  const prop = buildGoal({ goal: { metricKey: 'leads', value: 400, periodo: 'mensal' } }, { leads: 600 }, {}, tpl, { min: '2026-10-10', max: '2026-10-18' });
+  assert.match(prop.text, /^\d+(,\d)?x a meta proporcional \(.+\), acima do ritmo$/);
+  assert.doesNotMatch(prop.text, /%/);
+});
