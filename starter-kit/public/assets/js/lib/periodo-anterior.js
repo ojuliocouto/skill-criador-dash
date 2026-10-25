@@ -49,7 +49,9 @@ export function comparacaoDoPeriodo(filtro, limites) {
     atual: { from: paraIso(ini), to: paraIso(fim) },
     anterior: { from: de, to: ate },
     dias,
-    rotulo: rotuloDaComparacao(dias),
+    // Período cortado no último dado ("7 dias" com hoje ainda sem dado): "vs. 6 dias anteriores" confunde;
+    // o rótulo diz período anterior e a dica traz as datas (3.9.1).
+    rotulo: fim < fimPedido ? 'vs. período anterior' : rotuloDaComparacao(dias),
     titulo: de === ate ? `Comparado com ${isoParaBR(de)}` : `Comparado com ${isoParaBR(de)} a ${isoParaBR(ate)}`,
   };
 }

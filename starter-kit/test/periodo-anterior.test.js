@@ -42,7 +42,10 @@ test('comparacaoDoPeriodo: dias depois do último dado não entram (hoje ainda s
   const c = comparacaoDoPeriodo({ from: '2026-10-19', to: '2026-10-25' }, { min: '2026-08-26', max: '2026-10-24' });
   assert.deepEqual(c.atual, { from: '2026-10-19', to: '2026-10-24' });
   assert.deepEqual(c.anterior, { from: '2026-10-13', to: '2026-10-18' });
-  assert.equal(c.rotulo, 'vs. 6 dias anteriores');
+  // 3.9.1: o pedido era 7 dias; "vs. 6 dias anteriores" estranha na tela. O rótulo diz período anterior
+  // e a dica traz as datas exatas.
+  assert.equal(c.rotulo, 'vs. período anterior');
+  assert.equal(c.titulo, 'Comparado com 13/10/2026 a 18/10/2026');
 });
 
 test('comparacaoDoPeriodo: período inteiro depois do último dado não compara', () => {
