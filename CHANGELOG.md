@@ -1,5 +1,45 @@
 # Changelog
 
+## 3.9.0
+
+Revisão da 3.7.4 com auditoria adversarial em 25/10/2026 (nota média 5,8; confiabilidade dos números 4). Três frentes: números certos, segurança e receita do Meta, e visual.
+
+Atenção: mudança de sentido
+
+- Painel do Meta Ads: a coluna "Cliques" passa a ser o clique no link (`inline_link_clicks`), base do CTR e do CPC, como no Gerenciador de Anúncios. Todos os cliques vão para a coluna nova "Cliques (todos)". CTR e CPC de um painel Meta que já existia mudam de valor.
+- A lista de painéis (`GET /api/dashboards` sem `id`) passa a exigir a chave de administrador. Quem abre um painel sem a chave recebe só a vista do painel.
+- "Hoje", "7 dias" e "30 dias" contam do dia do calendário, não do último dia com dado. Com dado parado, o painel diz "Último dado: 04/10 (há 21 dias)" e mostra o estado vazio com o motivo.
+
+Números
+
+- A seta compara com os N dias anteriores ("vs. 7 dias anteriores"), não com a primeira metade do próprio período, que invertia o sinal (Leads em 7 dias: era ▼30,12%, agora ▲2,32%). Em "Tudo", ou sem período anterior nos dados, a seta some. `lib/periodo-anterior.js`.
+- Taxa com denominador zero (CPA, CPL, CPC, CTR, ROAS, custo por resultado) mostra "sem dado" e o motivo, nunca R$ 0,00. `scripts/prova-dash.js` passa a reprovar R$ 0,00 em custo por X.
+- Período sem linha mostra uma frase com o motivo e o botão "Ver todo o período", no lugar de 7 cartões zerados. `lib/estado-vazio.js`.
+- Aba Dados abre nas linhas mais recentes, com "Mostrar mais 50", e ordenar mexe no conjunto inteiro (antes eram as 50 mais antigas).
+- Meta passada do dobro vira múltiplo legível ("5x a meta") no lugar de "499,73% da meta proporcional".
+
+Segurança, receita e histórico
+
+- Lista com chave; vista do painel sem chave: CSV podado às colunas do colMap, sem o link da planilha; rota nova `/api/connectors/sheets?id=` que lê a planilha no servidor. O assistente avisa quando o painel vai ficar aberto mostrando Receita, Valor, Entrada ou Saída.
+- Meta Ads: pede `action_values` e `inline_link_clicks`; Receita com a mesma regra das Conversões (com `omni_purchase` vale só ele); a coluna Receita só entra quando a conta tem compra. Painel antigo ganha Receita e ROAS sozinho.
+- Modo histórico de verdade: tabela `snapshot_dias`, um registro por painel e por dia, retenção de `HISTORICO_DIAS` (400 por padrão), leitura por período. Banco anterior continua abrindo pela última foto. Reaplicar o `db/schema.sql` (ver `references/infra.md`).
+- `gate-etapas.py` roda no Python 3.8; teste que trava recurso do 3.9 em diante; job `python-3-8` no CI.
+- Gate 6.1: `high-end-visual-design` e `animate` viram aviso, não reprovação (o aluno não tem essas skills).
+
+Visual
+
+- Abertura: saudação só na primeira visita do aparelho e no tema da página; números contam do zero só na primeira carga. Primeiro número legível: 2.338 ms antes, 971 ms na volta.
+- Meta batida: sinal na barra e no selo, sem tingir o cartão.
+- Gráfico de área com eixo no zero, topo justo e unidade (R$, %); série longa sem as 61 bolinhas.
+- Funil: etapa abaixo de 5% da primeira em escala logarítmica, com nota; valor real sempre visível; taxa entre etapas numa linha própria.
+- Celular: primeiro número a 238 px (era 642 px) no 390; filtros atrás do botão "Filtros"; as 5 abas cabem sem rolar.
+- Sem o bloco preto do título; linhas do fundo a 30%; calculadora de meta abre vazia com a sugestão no placeholder; tabela semanal só pinta diferença acima de 5% e de um mínimo; tabela larga do Meta continua tabela a 1440.
+
+Testes
+
+- `npm test`: 1324 na 3.8.0, 1404 depois da junção. `rodar-testes.mjs`: 27 (novo `test-python-38.py`).
+- Ficou de fora: vão de cerca de 45 px nos cartões da 2ª linha quando o texto da meta é longo; moeda da conta Meta (`account_currency`, os valores saem em R$); D1 provado no SQLite, não no runtime do Cloudflare; minigráfico de 61 pontos e o ROAS com uma casa.
+
 ## 3.8.0
 
 Conector Meta Ads: puxa Resultados, Custo por resultado e Leads do jeito que o Gerenciador de Anúncios mostra, e lê todas as páginas da Graph API. Reclamação do dono: "ele não puxava do Meta Ads resultados, leads e custo por resultado".

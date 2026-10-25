@@ -9,6 +9,7 @@
 
 import { esc, fmtBy } from './_util.js';
 import { fmtPercent } from '../lib/format.js';
+import { SEM_DADOS_NO_PERIODO } from '../lib/estado-vazio.js';
 
 const LIMIAR_LINEAR = 0.05; // a menor etapa com valor tem pelo menos 5% da maior: linear
 const MINIMA_LOG = 8;       // barra mínima (% da largura) na escala logarítmica
@@ -46,7 +47,7 @@ export function render(props = {}, steps) {
   const list = Array.isArray(steps) ? steps : [];
 
   if (list.length === 0) {
-    return `<div class="funnel">${titleHtml}<div class="funnel__empty">Nenhum dado neste período.</div></div>`;
+    return `<div class="funnel">${titleHtml}<div class="funnel__empty">${SEM_DADOS_NO_PERIODO}</div></div>`;
   }
 
   const { larguras, log } = larguraDasEtapas(list.map((s) => s.value));

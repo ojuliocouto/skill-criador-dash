@@ -12,7 +12,7 @@ triggers:
   - dashboard cloudflare
   - publicar dashboard
   - roas cpl cpa ticket médio
-version: 3.8.0
+version: 3.9.0
 author: Julio Couto
 category: marketing-analytics
 tags: [dashboard, marketing, vendas, suporte, financeiro, estoque, cloudflare-pages, functions, kv, d1, cron, workers, google-sheets, csv, meta-ads, guiado, no-code, roas, cpl, cpa, ticket-medio, giro]
@@ -704,7 +704,7 @@ assistente reaberto num painel assim mostra "Como estava" e só muda quando a pe
 
 **Faixa de indicadores sem cartão meio vazio (3.7.1).** Com o número em destaque largo (tem série no tempo), os cartões vizinhos
 ganham um minigráfico de tendência do período (o mesmo traço fino do destaque, em cor de texto secundária, sem eixo) com a variação
-"vs. início" ao lado; o traço se desenha na abertura e se transforma junto na troca de período, e com movimento reduzido nada anima.
+"vs. N dias anteriores" ao lado (3.9.0: compara com o mesmo número de dias logo antes; em "Tudo" a seta some); o traço se desenha na abertura e se transforma junto na troca de período, e com movimento reduzido nada anima.
 Indicador sem série no tempo (taxa sem dado diário) fica sem minigráfico, com a altura do conteúdo. No celular a faixa tem 2 colunas;
 se o minigráfico não couber (cartão com menos de 120 px), só ele some. A barra do topo fica opaca assim que a página sai do topo.
 

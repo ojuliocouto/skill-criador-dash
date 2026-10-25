@@ -178,6 +178,34 @@ node <skill-dir>/scripts/rodar-testes.mjs --lista         # list what would run
 
 No shell globs (Windows does not expand them): the runner reads the folder itself, runs `.py` files through `py.mjs`, and reports any test that skipped itself with `PULADO: <reason>`. GitHub Actions (`.github/workflows/portabilidade.yml`) runs it on Windows, macOS and Linux, plus the browser-free subset from a folder with an accent and a space on Windows; in CI a skip for lack of Playwright counts as a failure.
 
+## What changed in 3.9.0
+
+An adversarial review of 3.7.4 (mean score 5.8, number reliability 4) led to three fixes: right numbers, security plus Meta revenue, and visual polish.
+
+Behavior changes to know about:
+- Meta Ads dashboards: "Cliques" is now link clicks (`inline_link_clicks`), the base of CTR and CPC, as in Ads Manager. All clicks move to a new "Cliques (todos)" column, so CTR and CPC of existing Meta dashboards change.
+- Listing dashboards (`GET /api/dashboards` without `id`) now requires the admin key. Opening one dashboard without the key returns only the dashboard view: the CSV trimmed to the mapped columns, no spreadsheet link.
+- "Hoje", "7 dias" and "30 dias" count from the calendar day, not from the last day with data. Stale data shows "Último dado: <date>" and an empty state with the reason.
+
+Numbers:
+- The trend arrow compares with the N previous days (it compared the two halves of the period and could flip the sign). It is hidden on "Tudo".
+- A rate with a zero denominator (CPA, CPL, CPC, CTR, ROAS, cost per result) shows "sem dado" with the reason, never R$ 0,00. The proof script fails on R$ 0,00 for a cost.
+- An empty period explains itself and offers "Ver todo o período". The Data tab opens on the most recent rows, with "Mostrar mais 50", and sorting covers the whole set.
+- A goal passed more than twice reads as a multiple ("5x a meta").
+
+Security, revenue and history:
+- Meta Ads asks for `action_values` and `inline_link_clicks`; Revenue follows the Conversions rule (`omni_purchase` alone when present) and appears only when the account has purchases. Older Meta dashboards get Revenue and ROAS on their own.
+- History mode keeps one row per dashboard per day (`snapshot_dias`), with retention (`HISTORICO_DIAS`, 400 by default) and period reads. Re-apply `db/schema.sql`.
+- Guided-flow scripts run on Python 3.8 (CI job added). Step 6.1 only warns about the optional `high-end-visual-design` and `animate` skills.
+
+Visual:
+- Short welcome only on a device's first visit, in the page theme; numbers count up only on the first load. "Goal reached" marks the bar and badge without tinting the card.
+- Area chart starts at zero, with units on the axis. Funnel stays readable when one step is tiny (log scale with a note, real value always shown, step rate on its own line).
+- Phone: first number at 238 px instead of 642 px, filters behind a "Filtros" button, all five tabs fit.
+- No black title block; quieter background lines; the goal calculator opens empty with a suggestion; the weekly table colors only differences above 5%.
+
+Not covered: a gap of about 45 px in second-row cards when the goal text is long; Meta account currency (values are shown in R$); D1 history proved on SQLite, not on the Cloudflare runtime.
+
 ## What changed in 3.8.0
 
 The Meta Ads connector now pulls what Ads Manager shows. Before, it asked only for `campaign_name,spend,impressions,clicks,actions,date_start`, counted Leads only from the `lead` action type and read only the first page of the Graph API response, so long periods or accounts with many campaigns were cut short.

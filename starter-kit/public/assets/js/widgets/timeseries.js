@@ -3,6 +3,7 @@
 
 import { esc } from './_util.js';
 import { fmtNumber } from '../lib/format.js';
+import { SEM_DADOS_NO_PERIODO } from '../lib/estado-vazio.js';
 
 /**
  * Rótulo de uma marca do eixo de valor, com a unidade da série (3.9: o eixo saía sem R$ nem %).
@@ -74,7 +75,7 @@ export function render(props = {}, points) {
     return (
       `<div class="chart chart--timeseries">` +
         titleHtml +
-        `<div class="chart__empty">Nenhum dado neste período.</div>` +
+        `<div class="chart__empty">${SEM_DADOS_NO_PERIODO}</div>` +
       `</div>`
     );
   }
