@@ -1,53 +1,62 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { splitByPeriod, buildTrends, buildGoal } from '../public/assets/js/dashboard.js';
+import { tendenciasDoPeriodo, buildTrends, buildGoal } from '../public/assets/js/dashboard.js';
 
 const colMap = { data: 'Data', invest: 'Invest' };
 
-test('splitByPeriod divide as datas distintas em duas metades', () => {
-  const rows = [
-    { Data: '01/07/2026', Invest: '10' },
-    { Data: '02/07/2026', Invest: '20' },
-    { Data: '03/07/2026', Invest: '30' },
-    { Data: '04/07/2026', Invest: '40' },
-  ];
-  const { current, previous } = splitByPeriod(rows, colMap, 'data');
-  assert.equal(previous.length, 2); // 01 e 02
-  assert.equal(current.length, 2);  // 03 e 04
-  assert.equal(previous[0].Invest, '10');
-  assert.equal(current[current.length - 1].Invest, '40');
+// 3.9 (achado 3 da auditoria de 25/10/2026): a seta compara com o período ANTERIOR do mesmo tamanho.
+// O "vs. início" (2a metade contra a 1a metade do próprio período) invertia o sinal: em 7 dias, Leads
+// ▼30,12% numa semana em que subiram 2,32%. Estes testes travam a regra nova.
+const T = {
+  dateSlot: 'data',
+  metrics: [
+    { key: 'leads', agg: 'sum', column: 'leads', betterWhen: 'higher' },
+    { key: 'investimento', agg: 'sum', column: 'investimento' },
+    { key: 'conversoes', agg: 'sum', column: 'conversoes', betterWhen: 'higher' },
+    { key: 'CPA', agg: 'ratio', ratioOf: ['investimento', 'conversoes'], betterWhen: 'lower' },
+  ],
+};
+const CM = { data: 'Data', leads: 'Leads', investimento: 'Inv', conversoes: 'Conv' };
+const dia = (d) => `${String(d).padStart(2, '0')}/10/2026`;
+// Semana anterior (12 a 18/10): 100 leads por dia. Semana atual (19 a 25/10): começa forte (200) e termina
+// fraca (60): a 2a metade é pior que a 1a, mas a semana inteira (900) é melhor que a anterior (700).
+const LINHAS = [];
+for (let d = 12; d <= 18; d++) LINHAS.push({ Data: dia(d), Leads: '100', Inv: '100', Conv: '2' });
+for (const [d, l] of [[19, 200], [20, 200], [21, 200], [22, 60], [23, 60], [24, 60], [25, 120]]) LINHAS.push({ Data: dia(d), Leads: String(l), Inv: '100', Conv: '2' });
+const SETE_DIAS = { from: '2026-10-19', to: '2026-10-25', dims: {} };
+
+test('tendenciasDoPeriodo: 7 dias contra os 7 anteriores (não contra a metade do próprio período)', () => {
+  const t = tendenciasDoPeriodo(T, LINHAS, CM, SETE_DIAS);
+  assert.ok(t.leads, 'Leads tem seta');
+  // 900 contra 700 = +28,57%. As metades dariam 180 (22 a 24) contra 600 (19 a 21): ▼70%.
+  assert.match(t.leads.text, /▲/);
+  assert.match(t.leads.text, /28,57%/);
+  assert.equal(t.leads.good, true);
+  assert.equal(t.leads.rotulo, 'vs. 7 dias anteriores');
+  assert.equal(t.leads.titulo, 'Comparado com 12/10/2026 a 18/10/2026');
 });
 
-test('splitByPeriod com datas impares: metades iguais, dia do meio descartado', () => {
-  const rows = [
-    { Data: '01/07/2026', Invest: '10' },
-    { Data: '02/07/2026', Invest: '20' },
-    { Data: '03/07/2026', Invest: '30' }, // meio: descartado
-    { Data: '04/07/2026', Invest: '40' },
-    { Data: '05/07/2026', Invest: '50' },
-  ];
-  const { current, previous } = splitByPeriod(rows, colMap, 'data');
-  assert.equal(previous.length, 2); // 01, 02
-  assert.equal(current.length, 2);  // 04, 05
-  assert.ok(!previous.concat(current).some((r) => r.Invest === '30')); // 03 fora
+test('tendenciasDoPeriodo: "Tudo" não tem período anterior, então não tem seta', () => {
+  assert.deepEqual(tendenciasDoPeriodo(T, LINHAS, CM, { from: null, to: null, dims: {} }), {});
 });
 
-test('splitByPeriod sem comparacao possivel (1 data) devolve previous null', () => {
-  const rows = [{ Data: '01/07/2026', Invest: '10' }, { Data: '01/07/2026', Invest: '20' }];
-  const { current, previous } = splitByPeriod(rows, colMap, 'data');
-  assert.equal(previous, null);
-  assert.equal(current.length, 2);
+test('tendenciasDoPeriodo: período anterior fora dos dados não mostra seta', () => {
+  assert.deepEqual(tendenciasDoPeriodo(T, LINHAS, CM, { from: '2026-10-12', to: '2026-10-18', dims: {} }), {});
 });
 
-test('splitByPeriod ignora linhas com data invalida', () => {
-  const rows = [
-    { Data: 'xx', Invest: '10' },
-    { Data: '01/07/2026', Invest: '20' },
-    { Data: '02/07/2026', Invest: '30' },
-  ];
-  const { current, previous } = splitByPeriod(rows, colMap, 'data');
-  assert.equal(previous.length, 1);
-  assert.equal(current.length, 1);
+test('tendenciasDoPeriodo: o filtro de canal vale nos dois períodos', () => {
+  const linhas = LINHAS.map((r) => ({ ...r, Canal: 'Meta' })).concat(
+    LINHAS.map((r) => ({ ...r, Canal: 'Google', Leads: r.Data >= '19' ? '1' : '1000' })));
+  const t = tendenciasDoPeriodo(T, linhas, { ...CM, canal: 'Canal' }, { ...SETE_DIAS, dims: { canal: 'Meta' } });
+  assert.match(t.leads.text, /▲ 28,57%/);
+});
+
+test('buildTrends: taxa sem denominador em um dos períodos não ganha seta (CPA sem venda não é ▼100%)', () => {
+  const cur = [{ Data: dia(19), Inv: '100', Conv: '0', Leads: '5' }];
+  const prev = [{ Data: dia(18), Inv: '100', Conv: '2', Leads: '5' }];
+  assert.equal(buildTrends(T.metrics, cur, prev, CM).CPA, undefined);
+  assert.equal(buildTrends(T.metrics, prev, cur, CM).CPA, undefined);
+  assert.ok(buildTrends(T.metrics, prev, [{ ...prev[0], Inv: '50' }], CM).CPA, 'com venda nos dois, a seta aparece');
 });
 
 test('buildTrends: metrica higher subindo = bom (verde)', () => {
@@ -117,4 +126,10 @@ test('buildGoal: sem meta, meta <= 0 ou metrica ausente devolve null', () => {
   assert.equal(buildGoal({ goal: { metricKey: 'leads', value: 0 } }, { leads: 10 }), null);
   assert.equal(buildGoal({ goal: { metricKey: 'leads', value: -5 } }, { leads: 10 }), null);
   assert.equal(buildGoal({ goal: { metricKey: 'x', value: 100 } }, {}), null);
+});
+
+test('buildGoal: taxa sem denominador não monta barra de meta (ROAS sem investimento não é "0% da meta")', () => {
+  const tpl = { metrics: [{ key: 'ROAS', agg: 'derived', denominator: 'investimento', betterWhen: 'higher' }] };
+  assert.equal(buildGoal({ goal: { metricKey: 'ROAS', value: 2 } }, { ROAS: 0, investimento: 0 }, {}, tpl), null);
+  assert.ok(buildGoal({ goal: { metricKey: 'ROAS', value: 2 } }, { ROAS: 1, investimento: 10 }, {}, tpl));
 });
