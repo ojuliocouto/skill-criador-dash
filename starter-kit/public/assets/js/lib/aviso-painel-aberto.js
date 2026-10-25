@@ -29,6 +29,7 @@ export function avisoDePainelAberto({ template, colMap, protegido = false, senha
     .filter((k) => typeof mapa[k] === 'string' && mapa[k].trim())
     .map((k) => (slots.find((s) => s.key === k) || { label: k }).label);
   if (!nomes.length) return '';
-  return `Este painel vai ficar aberto: quem tiver o link vê ${juntar(nomes)} e todos os números dele. `
+  const quais = nomes.length > 1 ? `os números de ${juntar(nomes)}` : `o número de ${nomes[0]}`;
+  return `Este painel vai ficar aberto: quem tiver o link vê ${quais} e todos os outros dele. `
     + 'Se esse número é só seu, defina uma senha em Mais opções.';
 }
