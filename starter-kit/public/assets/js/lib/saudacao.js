@@ -18,9 +18,11 @@ const CONTROLE = /[\u0000-\u001f\u007f]/;
 //   pular        no clique ou na tecla, a saída é esta (curta)
 //   entradaBase  atraso da primeira peça do painel depois de a cortina começar a descer
 //   entrada      da primeira à última peça do painel parada (faixa, abas, números, gráficos)
+// 3.9: a saudação só aparece na primeira visita do aparelho e é curta (auditoria de 25/10/2026:
+// 2,3 s até o primeiro número em toda sessão nova). A cortina desce em 0,64 s.
 export const TEMPOS = Object.freeze({
-  texto: 440, linhaInicio: 300, linha: 900, revelar: 1300, cortina: 560, folhaAtraso: 90, pular: 220,
-  entradaBase: 120, entrada: 1100,
+  texto: 300, linhaInicio: 120, linha: 420, revelar: 640, cortina: 380, folhaAtraso: 60, pular: 200,
+  entradaBase: 80, entrada: 900,
 });
 
 /** Do primeiro quadro da saudação até a última peça do painel parada. */
@@ -76,9 +78,22 @@ export function chaveDaSaudacao(id) {
   return `cd-saudou:${id}`;
 }
 
+/** Marca (localStorage) de que este aparelho já viu a contagem dos números deste painel. */
+export function chaveDaContagem(id) {
+  return `cd-contou:${id}`;
+}
+
 /**
- * Mostra a saudação? Nasce ligada (painel antigo, sem o campo, saúda), uma vez por sessão do
- * navegador por painel, e nunca pra quem pediu menos movimento.
+ * Os números contam do zero? Só na primeira carga do painel neste aparelho, e nunca pra quem
+ * pediu menos movimento. Nas outras, o número final aparece na hora (3.9).
+ */
+export function deveContar({ jaContou, menosMovimento } = {}) {
+  return !jaContou && !menosMovimento;
+}
+
+/**
+ * Mostra a saudação? Nasce ligada (painel antigo, sem o campo, saúda), uma vez por aparelho
+ * por painel (3.9: localStorage; antes era a cada sessão), e nunca pra quem pediu menos movimento.
  * @param {{config:object|null, id:string, jaSaudou:boolean, menosMovimento:boolean}} p
  */
 export function deveSaudar({ config, id, jaSaudou, menosMovimento } = {}) {

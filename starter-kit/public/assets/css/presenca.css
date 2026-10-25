@@ -17,13 +17,13 @@
 
 /* Tempos da saudação (espelhados em lib/saudacao.js, com teste de paridade). */
 :root {
-  --saud-texto: 440ms;          /* cada peça (logotipo, "Olá,", nome) sobe e aparece */
-  --saud-linha-inicio: 300ms;   /* a linha da marca começa a se desenhar */
-  --saud-linha: 900ms;          /* e leva isto pra se completar: é o tempo de ler o nome */
-  --saud-revelar: 1300ms;       /* a cortina começa a descer */
-  --saud-cortina: 560ms;        /* e leva isto pra sair da tela */
-  --saud-folha-atraso: 90ms;    /* a folha na cor da marca desce logo atrás */
-  --saud-pular: 220ms;          /* saída curta no clique ou na tecla */
+  --saud-texto: 300ms;          /* cada peça (logotipo, "Olá,", nome) sobe e aparece */
+  --saud-linha-inicio: 120ms;   /* a linha da marca começa a se desenhar */
+  --saud-linha: 420ms;          /* e leva isto pra se completar: é o tempo de ler o nome */
+  --saud-revelar: 640ms;        /* a cortina começa a descer (3.9: só na 1ª visita, e curta) */
+  --saud-cortina: 380ms;        /* e leva isto pra sair da tela */
+  --saud-folha-atraso: 60ms;    /* a folha na cor da marca desce logo atrás */
+  --saud-pular: 200ms;          /* saída curta no clique ou na tecla */
   /* Blocos do esqueleto: um tom do próprio texto, bem apagado. */
   --esq-cor: color-mix(in srgb, var(--text) 10%, transparent);
   --esq-brilho: color-mix(in srgb, var(--text) 9%, transparent);
@@ -98,8 +98,9 @@
 .fundo--local .fundo__brilho { width: 84cqmax; height: 84cqmax; }
 
 /* ---------- Saudação de abertura ----------
-   Tela cheia com o logotipo e "Olá, <nome>". São duas folhas: a da frente, escura nos dois
-   modos (como a faixa do painel), e a de trás, na cor da marca. Quando a linha embaixo do nome
+   Tela cheia com o logotipo e "Olá, <nome>". São duas folhas: a da frente, na cor do fundo do
+   tema (clara no claro, escura no escuro: 3.9, antes era preta nos dois), e a de trás, na cor da
+   marca. Aparece só na primeira visita do aparelho (cobertura-boot.js desliga nas outras). Quando a linha embaixo do nome
    se completa, a da frente desce, a da marca desce logo atrás e o painel aparece de cima pra
    baixo, com as peças dele entrando em sequência (o dashboard.js desenha o painel no instante em
    que a cortina começa a descer).
@@ -120,7 +121,7 @@ html[data-saudar] .saudacao { display: block; }
 }
 .saudacao__folha {
   pointer-events: auto; cursor: pointer;
-  display: grid; place-items: center; background: #0a0c10; color: #f1f3f6;
+  display: grid; place-items: center; background: var(--bg); color: var(--text);
   animation: saud-desce var(--saud-cortina) var(--ease-vai-volta) var(--saud-revelar) both;
 }
 @keyframes saud-desce { from { transform: translateY(0); } to { transform: translateY(100%); visibility: hidden; } }
@@ -161,8 +162,12 @@ html[data-saudar] .saudacao { display: block; }
 .saudacao--longa .saudacao__frase { font-size: clamp(28px, 4.8vw, 62px); font-size: clamp(28px, 4.8cqw, 62px); }
 .saudacao__mascara { display: inline-block; overflow: hidden; vertical-align: bottom; padding: 0.06em 0.05em 0.14em; margin: 0 -0.05em; max-width: 100%; }
 .saudacao__ola, .saudacao__nome { display: inline-block; animation: saud-sobe var(--saud-texto) var(--ease-saida) both; }
-/* "Olá," na cor da marca, clareada pro fundo escuro (o JS grava a cor calibrada em --saud-ola). */
+/* "Olá," na cor da marca, clareada pro fundo escuro (o JS grava a cor calibrada em --saud-ola).
+   No tema claro a folha é clara: vale o texto de marca do tema, que passa no fundo claro. */
 .saudacao__ola { color: var(--saud-ola, color-mix(in srgb, var(--accent) 60%, white)); animation-delay: 70ms; }
+[data-theme="light"] .saudacao__ola { color: var(--accent-text); }
+[data-theme="light"] .saudacao__linha { background: var(--accent-text); }
+[data-theme="light"] .saudacao__brilho { opacity: 0.45; }
 .saudacao__nome { animation-delay: 160ms; }
 @keyframes saud-sobe { from { transform: translateY(112%); } to { transform: translateY(0); } }
 /* A linha da marca: se desenha da esquerda pra direita enquanto a pessoa lê o nome. */
@@ -176,6 +181,13 @@ html[data-saudar] .saudacao { display: block; }
 /* Dentro da prévia do assistente o texto fica no alto (a moldura pode ser bem mais alta que a tela). */
 .saudacao--local .saudacao__folha { place-items: start center; }
 .saudacao--local .saudacao__centro { margin-top: clamp(40px, 16cqh, 150px); }
+
+/* ---------- Contagem só na primeira carga (3.9) ----------
+   O visor da contagem (dashboard.js, .kpi__conta) conta do zero até o número. Ele só vale na
+   primeira carga do painel neste aparelho: nas outras, cobertura-boot.js marca data-sem-contagem
+   no primeiro quadro e o número final (que já está no DOM) aparece na hora. */
+html[data-sem-contagem] .kpi__conta { display: none; }
+html[data-sem-contagem] .kpi__value.is-contando { color: var(--text); }
 
 /* ---------- Carregamento ----------
    Barra fina no topo, na cor da marca, e o esqueleto no formato do painel. */
