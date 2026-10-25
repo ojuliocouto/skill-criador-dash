@@ -6,15 +6,25 @@
 // IMPORTANTE: o mapeamento não usa Date. O campo meta.fetchedAt sai como null; o handler
 // (functions/api/connectors/meta-ads.js) e o Worker (workers/snapshot) carimbam a data depois.
 //
-// Documentação oficial lida em 25/10/2026 (versão 3.8.0):
+// Documentação oficial lida em 25/10/2026 (versões 3.8.0 e 3.9.0):
 //   Insights da conta: https://developers.facebook.com/documentation/ads-commerce/marketing-api/reference/ad-account/insights
+//                      (mesma página em https://developers.facebook.com/docs/marketing-api/reference/ad-account/insights/)
+//     action_values       list<AdsActionStats>  "The total value of all conversions attributed to your ads."
+//     inline_link_clicks  numeric string        "The number of clicks on links to select destinations or experiences,
+//                                                on or off Facebook-owned properties."
+//     clicks              numeric string        "The number of clicks on your ads." (todos os cliques)
 //   Ações:             https://developers.facebook.com/docs/marketing-api/reference/ads-action-stats/
 //   Paginação:         https://developers.facebook.com/docs/graph-api/results
 // Permissão necessária no token: ads_read.
 
 // Colunas do DataSet do conector Meta, na ordem do Contrato 1. As 7 primeiras existem desde a
-// 1.x e ficam na mesma ordem (dash já criado continua lendo as mesmas colunas); as 4 últimas
-// entraram na 3.8.0.
+// 1.x e ficam na mesma ordem (dash já criado continua lendo as mesmas colunas); as 4 seguintes
+// entraram na 3.8.0 e "Cliques (todos)" na 3.9.0.
+//
+// 3.9.0: "Cliques" passa a ser o clique no LINK (inline_link_clicks), o número que o Gerenciador usa para
+// CTR e CPC de link. Todos os cliques (clicks: curtida, foto, perfil, link) vão para "Cliques (todos)".
+// A coluna "Receita" (action_values) só entra quando alguma linha tem valor de compra: conta de captação
+// sem compra não ganha uma Receita de R$ 0,00 nem um ROAS 0 falsos, e o painel não liga o que não existe.
 const COLUMNS = [
   'Data',
   'Campanha',
@@ -27,7 +37,9 @@ const COLUMNS = [
   'Tipo de resultado',
   'Custo por resultado',
   'CPL',
+  'Cliques (todos)',
 ];
+const COLUNA_RECEITA = 'Receita';
 
 // Paginação: quantas linhas a Graph manda por página e quantas páginas no máximo o painel lê.
 // 500 x 40 = 20.000 linhas (campanha x dia). Passou disso, o painel avisa em vez de mostrar
@@ -37,7 +49,9 @@ export const TETO_DE_PAGINAS = 40;
 
 // Campos pedidos à Graph API. `results` e `cost_per_result` são a coluna "Resultados" e
 // "Custo por resultado" do Gerenciador de Anúncios (dependem do objetivo da campanha).
-const FIELDS = 'campaign_name,spend,impressions,clicks,actions,results,cost_per_result,date_start';
+// 3.9.0: `action_values` (valor das conversões, de onde sai a Receita) e `inline_link_clicks`
+// (clique no link, base do CTR e do CPC que o gestor vê no Gerenciador).
+const FIELDS = 'campaign_name,spend,impressions,clicks,inline_link_clicks,actions,action_values,results,cost_per_result,date_start';
 
 // Tipos de ação da Graph API que contam como conversão de compra.
 //
@@ -264,14 +278,33 @@ export function contarLeads(actions) {
   return noFacebook + noSite;
 }
 
-function contarConversoes(actions) {
-  // Escolhe UMA fonte, nunca soma agregado + componentes (ver nota em OMNI_ACTION_TYPE).
-  const omni = actions.filter((a) => a && a.action_type === OMNI_ACTION_TYPE);
-  const fonte = omni.length > 0
+// Itens de compra de uma lista AdsActionStats, escolhendo UMA fonte: nunca soma agregado + componentes
+// (ver nota em OMNI_ACTION_TYPE). Vale para `actions` (quantas compras) e para `action_values` (quanto
+// elas valem): as duas listas usam os mesmos action_type, então a mesma regra impede a dobra nas duas.
+function itensDeCompra(lista) {
+  const omni = lista.filter((a) => a && a.action_type === OMNI_ACTION_TYPE);
+  return omni.length > 0
     ? omni
-    : actions.filter((a) => a && SPECIFIC_PURCHASE_ACTION_TYPES.includes(a.action_type));
+    : lista.filter((a) => a && SPECIFIC_PURCHASE_ACTION_TYPES.includes(a.action_type));
+}
+
+function contarConversoes(actions) {
   let total = 0;
-  for (const a of fonte) total += num(a.value) || 0;
+  for (const a of itensDeCompra(actions)) total += num(a.value) || 0;
+  return total;
+}
+
+/**
+ * Receita de uma linha: valor das compras em `action_values`, com a mesma regra das Conversões
+ * (com omni_purchase vale só ele; sem ele, purchase + offsite_conversion.fb_pixel_purchase).
+ * @param {Object[]} actionValues  lista AdsActionStats ({ action_type, value })
+ * @returns {number|null}  null quando a linha não tem nenhum valor de compra
+ */
+export function somarReceita(actionValues) {
+  const itens = itensDeCompra(Array.isArray(actionValues) ? actionValues : []);
+  if (itens.length === 0) return null;
+  let total = 0;
+  for (const a of itens) total += num(a.value) || 0;
   return total;
 }
 
@@ -356,30 +389,41 @@ export function mapInsightsToDataSet(apiJson) {
 
   const data = Array.isArray(json.data) ? json.data : [];
 
+  const receitas = [];
   const rows = data.map((item) => {
     const actions = Array.isArray(item.actions) ? item.actions : [];
     const investimento = num(item.spend);
     const leads = contarLeads(actions);
     const conversoes = contarConversoes(actions);
     const res = resultadosDaLinha(item, investimento, leads, conversoes);
+    receitas.push(somarReceita(item.action_values));
 
     return {
       Data: item.date_start != null ? String(item.date_start) : '',
       Campanha: item.campaign_name != null ? String(item.campaign_name) : '',
       Investimento: item.spend != null ? String(item.spend) : '',
       'Impressões': item.impressions != null ? String(item.impressions) : '',
-      Cliques: item.clicks != null ? String(item.clicks) : '',
+      // Clique no link. O campo foi pedido: se a Graph não mandou, a linha não teve clique no link
+      // (nunca cair para `clicks`, que é outro número e inflaria o CTR).
+      Cliques: item.inline_link_clicks != null ? String(item.inline_link_clicks) : '0',
       Leads: String(leads),
       'Conversões': String(conversoes),
       Resultados: String(res.total),
       'Tipo de resultado': res.tipo,
       'Custo por resultado': res.custo != null ? dinheiro(res.custo) : '',
       CPL: leads > 0 && investimento != null ? dinheiro(investimento / leads) : '',
+      'Cliques (todos)': item.clicks != null ? String(item.clicks) : '',
     };
   });
 
+  // Receita só existe se alguma linha trouxe valor de compra (ver nota em COLUMNS).
+  const temReceita = receitas.some((v) => v != null);
+  if (temReceita) {
+    rows.forEach((r, i) => { r[COLUNA_RECEITA] = receitas[i] != null ? dinheiro(receitas[i]) : ''; });
+  }
+
   return {
-    columns: [...COLUMNS],
+    columns: temReceita ? [...COLUMNS, COLUNA_RECEITA] : [...COLUMNS],
     rows,
     // fetchedAt fica null: o handler carimba a data após o fetch.
     meta: { source: 'meta', fetchedAt: null, rowCount: rows.length },

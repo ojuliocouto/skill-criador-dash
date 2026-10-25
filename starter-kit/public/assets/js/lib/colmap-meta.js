@@ -1,9 +1,14 @@
-// Dash do Meta Ads criado antes da 3.8.0: o colMap foi salvo quando o conector ainda não trazia a
-// coluna Resultados. Aqui ela é ligada na hora de desenhar, sem regravar a config e sem mexer no
+// Dash do Meta Ads criado antes da 3.8.0 (ou da 3.9.0): o colMap foi salvo quando o conector ainda não
+// trazia a coluna Resultados (ou a Receita). Aqui ela é ligada na hora de desenhar, sem regravar a config e sem mexer no
 // que a pessoa escolheu. ESM, puro (roda no navegador e no node:test).
 
-// Slot do template de Marketing -> coluna que o conector Meta entrega desde a 3.8.0.
-export const COLUNAS_NOVAS_DA_META = Object.freeze({ resultados: 'Resultados' });
+// Slot do template de Marketing -> coluna que o conector Meta entrega desde a 3.8.0 (Resultados) e a
+// 3.9.0 (Receita, de action_values).
+export const COLUNAS_NOVAS_DA_META = Object.freeze({ resultados: 'Resultados', receita: 'Receita' });
+
+// Colunas que o conector só manda quando existe o dado (a Receita só vem quando a conta tem compra). Sem o
+// DataSet em mãos (esqueleto) elas não são ligadas: ligar seria prometer um número que talvez não exista.
+const SO_COM_O_DADO = new Set(['receita']);
 
 /**
  * Devolve um colMap novo com as colunas da 3.8.0 ligadas, só para fonte Meta Ads.
@@ -24,6 +29,7 @@ export function completarColMapDaMeta(colMap, { source, dataset } = {}) {
   for (const [slot, coluna] of Object.entries(COLUNAS_NOVAS_DA_META)) {
     if (base[slot]) continue;
     if (colunas && !colunas.includes(coluna)) continue;
+    if (!colunas && SO_COM_O_DADO.has(slot)) continue;
     if (out === base) out = { ...base };
     out[slot] = coluna;
   }

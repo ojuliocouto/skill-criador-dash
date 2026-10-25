@@ -91,7 +91,11 @@ Conectores implementados:
   página 1 continua genérico); Leads sem dobra (`lead` é o agregado; sem ele, `lead_grouped` ou
   `leadgen_grouped` mais `fb_pixel_lead`). Colunas: `Data, Campanha, Investimento, Impressões,
   Cliques, Leads, Conversões` (as de sempre) e `Resultados, Tipo de resultado, Custo por resultado, CPL`.
-  O Worker de snapshot usa a mesma paginação.
+  Desde a 3.9.0: pede `action_values` e `inline_link_clicks`. `Cliques` passa a ser o clique no link
+  (base do CTR e do CPC, como no Gerenciador) e `Cliques (todos)` guarda o `clicks`. A coluna `Receita`
+  soma o valor das compras com a mesma regra das Conversões (`omni_purchase`; sem ele, `purchase` mais
+  `fb_pixel_purchase`) e só entra no DataSet quando alguma linha tem valor de compra.
+  O Worker de snapshot usa a mesma paginação e o mesmo mapeamento.
 - `d1.js`: conector do MODO HISTORICO. Nao bate na fonte viva: le o snapshot mais recente
   gravado pelo cron no D1 (via `functions/lib/snapshots.mjs`). So faz sentido com `storage:'d1'`.
 
